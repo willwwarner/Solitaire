@@ -80,7 +80,7 @@ impl SolitaireApplication {
         glib::Object::builder()
             .property("application-id", application_id)
             .property("flags", flags)
-            .property("resource-base-path", "/org/gnome/Solitaire")
+            .property("resource-base-path", "/io/github/shbozz/Solitaire")
             .build()
     }
 
@@ -98,7 +98,7 @@ impl SolitaireApplication {
         let window = self.active_window().unwrap();
         let about = adw::AboutDialog::builder()
             .application_name("Solitaire")
-            .application_icon("org.gnome.Solitaire")
+            .application_icon("io.github.shbozz.Solitaire")
             .developer_name("Shbozz")
             .version(VERSION)
             .developers(vec!["Shbozz"])

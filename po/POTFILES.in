@@ -1,6 +1,6 @@
 # List of source files containing translatable strings.
 # Please keep this file sorted alphabetically.
-data/org.gnome.Solitaire.desktop.in
-data/org.gnome.Solitaire.metainfo.xml.in
-data/org.gnome.Solitaire.gschema.xml
-src/window.blp
+data/io.github.shbozz.Solitaire.desktop.in
+data/io.github.shbozz.Solitaire.metainfo.xml.in
+data/io.github.shbozz.Solitaire.gschema.xml
+src/window.ui
