@@ -1,0 +1,159 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $SolitaireWindow: Adw.ApplicationWindow {
+  title: _("Solitaire");
+  default-width: 800;
+  default-height: 600;
+
+  content: Adw.NavigationView nav_view {
+    Adw.NavigationPage {
+      title: _("Solitaire");
+      tag: "chooser";
+
+      child: Adw.ToolbarView {
+        [top]
+        Adw.HeaderBar {
+          [end]
+          MenuButton {
+            primary: true;
+            icon-name: "open-menu-symbolic";
+            tooltip-text: _("Main Menu");
+            menu-model: primary_menu;
+          }
+        }
+
+        content: Adw.StatusPage {
+          title: _("Choose Solitaire Type");
+          description: _("Choose which type of Solitaire you want to play:");
+
+          Box {
+            orientation: vertical;
+            vexpand: true;
+
+            Adw.Clamp {
+              maximum-size: 500;
+
+              ListBox list {
+                //lists all of our games, and each can be selected!
+                selection-mode: none;
+
+                styles [
+                  "boxed-list",
+                ]
+
+                Adw.ActionRow recent_row {
+                  title: _("Continue Last Game");
+                  subtitle: _("You played for 5 minutes");
+                  activatable: true;
+                  activated => $recent_clicked() swapped;
+
+                  [suffix]
+                  Image {
+                    icon-name: "go-next-symbolic";
+                    valign: center;
+                  }
+                }
+
+                Adw.ActionRow klondike_row {
+                  title: _("Klondike");
+                  subtitle: _("You played for 15 minutes");
+                  activatable: true;
+                  action-name: "navigation.push";
+                  action-target: "'game'";
+
+                  [suffix]
+                  Image {
+                    icon-name: "go-next-symbolic";
+                    valign: center;
+                  }
+                }
+
+                Adw.ActionRow spider_row {
+                  title: _("Spider");
+                  subtitle: _("You haven't played this yet.");
+                  activatable: true;
+                  action-name: "navigation.push";
+                  action-target: "'game'";
+
+                  [suffix]
+                  Image {
+                    icon-name: "go-next-symbolic";
+                    valign: center;
+                  }
+                }
+
+                Adw.ActionRow freecell_row {
+                  title: _("Freecell");
+                  subtitle: _("You haven't played this yet.");
+                  activatable: true;
+                  action-name: "navigation.push";
+                  action-target: "'game'";
+
+                  [suffix]
+                  Image {
+                    icon-name: "go-next-symbolic";
+                    valign: center;
+                  }
+                }
+              }
+            }
+          }
+        };
+      };
+    }
+
+    Adw.NavigationPage nav_page {
+      title: _("Solitaire");
+      tag: "game";
+
+      child: Adw.ToolbarView {
+        [top]
+        Adw.HeaderBar {
+          [end]
+          MenuButton {
+            primary: true;
+            icon-name: "open-menu-symbolic";
+            tooltip-text: _("Main Menu");
+            menu-model: primary_menu;
+          }
+        }
+
+        content: Box {
+          orientation: vertical;
+          Box {
+            Text {
+              hexpand: true;
+              text: _("This box is for our game's controls");
+            }
+          }
+
+          Box card_box {
+            vexpand: true;
+            hexpand: true;
+            realize => $draw_init() swapped;
+          }
+        };
+      };
+    }
+  };
+}
+
+menu primary_menu {
+  section {
+    item {
+      label: _("_Preferences");
+      action: "app.preferences";
+    }
+
+    item {
+      label: _("_Keyboard Shortcuts");
+      action: "win.show-help-overlay";
+    }
+
+    item {
+      label: _("_About Solitaire");
+      action: "app.about";
+    }
+  }
+}
