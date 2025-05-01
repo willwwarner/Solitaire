@@ -21,7 +21,7 @@
 use gtk::prelude::*;
 use cairo::Context;
 use gtk::gdk::*;
-use rsvg::{Loader, CairoRenderer};
+use rsvg::CairoRenderer;
 use crate::games;
 
 pub fn draw_image(image: &gtk::Image, name: &str, renderer: &CairoRenderer) {
@@ -50,14 +50,10 @@ pub fn draw_image(image: &gtk::Image, name: &str, renderer: &CairoRenderer) {
 
     // Set the image using the new method
     image.set_paintable(Some(texture.upcast_ref::<Paintable>()));
-
-
 }
 
 pub fn resize() {
     println!("resizing...");
-    unsafe {
-        //DRAW_CARDS = "all";
-    }
+    
 }
 

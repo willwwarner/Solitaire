@@ -102,9 +102,11 @@ impl SolitaireApplication {
             .developer_name("Shbozz")
             .version(VERSION)
             .developers(vec!["Shbozz"])
+            .artists(vec!["Vincent Bermel"])
             // Translators: Replace "translator-credits" with your name/username, and optionally an email or URL.
             .translator_credits(&gettext("translator-credits"))
-            .copyright("© 2025 Shbozz")
+            .copyright("© 2025 Shbozz \
+                        \n© 2024 Vincent Bermel")
             .license_type(gtk::License::Gpl30)
             .build();
 
