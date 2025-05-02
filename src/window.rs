@@ -95,7 +95,9 @@ impl SolitaireWindow {
     #[template_callback]
     fn draw_init(&self, card_box: &gtk::Box) {
         println!("Drawing cards!");
-        let handle = Loader::new().read_path("./assets/minimum_dark.svg").expect("Failed to load SVG"); 
+        let resource = gio::resources_lookup_data("/io/github/shbozz/Solitaire/assets/minimum_dark.svg", gio::ResourceLookupFlags::NONE)
+            .expect("Failed to load resource data");
+        let handle = Loader::new().read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>).expect("Failed to load SVG"); 
         let renderer = rsvg::CairoRenderer::new(&handle); // We need to hand this out to the rendering functions
         let mut cards_to_add:u8 = 52; // This is the amount of gtk::images (cards) to add to the box, of course a standard deck has 52 cards
 
