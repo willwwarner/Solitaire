@@ -93,11 +93,35 @@ impl SolitaireWindow {
         self.imp().nav_view.get().push_by_tag("game");
     }
     #[template_callback]
-    fn draw_init(&self, card_box: &gtk::Box) {
+    fn draw_init_internal(&self, card_box: &gtk::Box) {
         println!("Drawing cards!");
         let resource = gio::resources_lookup_data("/io/github/shbozz/Solitaire/assets/minimum_dark.svg", gio::ResourceLookupFlags::NONE)
             .expect("Failed to load resource data");
         let handle = Loader::new().read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>).expect("Failed to load SVG"); 
+        let renderer = rsvg::CairoRenderer::new(&handle); // We need to hand this out to the rendering functions
+        let mut cards_to_add:u8 = 52; // This is the amount of gtk::images (cards) to add to the box, of course a standard deck has 52 cards
+
+        while cards_to_add > 0 {
+            let image = gtk::Image::new();
+
+            let suite_index = ((cards_to_add - 1) / 13) as usize;
+            let rank_index = ((cards_to_add - 1) % 13) as usize;
+            let card_name = format!("{}_{}", games::SUITES[suite_index], games::RANKS[rank_index]);
+
+            println!("Adding {}", &card_name);
+            image.set_widget_name(card_name.as_str());
+            card_box.append(&image);
+            renderer::draw_image(&image, &card_name, &renderer);
+
+            cards_to_add -= 1;
+        }
+    }
+    pub fn draw_init(&self) {
+        let card_box = self.imp().card_box.get();
+        println!("Drawing cards!");
+        let resource = gio::resources_lookup_data("/io/github/shbozz/Solitaire/assets/minimum_dark.svg", gio::ResourceLookupFlags::NONE)
+            .expect("Failed to load resource data");
+        let handle = Loader::new().read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>).expect("Failed to load SVG");
         let renderer = rsvg::CairoRenderer::new(&handle); // We need to hand this out to the rendering functions
         let mut cards_to_add:u8 = 52; // This is the amount of gtk::images (cards) to add to the box, of course a standard deck has 52 cards
 

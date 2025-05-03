@@ -25,7 +25,6 @@ use rsvg::CairoRenderer;
 use crate::games;
 
 pub fn draw_image(image: &gtk::Image, name: &str, renderer: &CairoRenderer) {
-    let aspect = 1.4;
     let surface = cairo::ImageSurface::
         create(cairo::Format::ARgb32, 25, 35)
         .expect("Couldn't create surface");
