@@ -37,6 +37,7 @@ template $SolitaireWindow: Adw.ApplicationWindow {
               ListBox list {
                 //lists all of our games, and each can be selected!
                 selection-mode: none;
+                realize => $populate_game_list() swapped;
 
                 styles [
                   "boxed-list",
@@ -47,48 +48,6 @@ template $SolitaireWindow: Adw.ApplicationWindow {
                   subtitle: _("You played for 5 minutes");
                   activatable: true;
                   activated => $recent_clicked() swapped;
-
-                  [suffix]
-                  Image {
-                    icon-name: "go-next-symbolic";
-                    valign: center;
-                  }
-                }
-
-                Adw.ActionRow klondike_row {
-                  title: _("Klondike");
-                  subtitle: _("You played for 15 minutes");
-                  activatable: true;
-                  action-name: "navigation.push";
-                  action-target: "'game'";
-
-                  [suffix]
-                  Image {
-                    icon-name: "go-next-symbolic";
-                    valign: center;
-                  }
-                }
-
-                Adw.ActionRow spider_row {
-                  title: _("Spider");
-                  subtitle: _("You haven't played this yet.");
-                  activatable: true;
-                  action-name: "navigation.push";
-                  action-target: "'game'";
-
-                  [suffix]
-                  Image {
-                    icon-name: "go-next-symbolic";
-                    valign: center;
-                  }
-                }
-
-                Adw.ActionRow freecell_row {
-                  title: _("Freecell");
-                  subtitle: _("You haven't played this yet.");
-                  activatable: true;
-                  action-name: "navigation.push";
-                  action-target: "'game'";
 
                   [suffix]
                   Image {
@@ -139,6 +98,16 @@ template $SolitaireWindow: Adw.ApplicationWindow {
 }
 
 menu primary_menu {
+  section {
+    item {
+      label: _("_Scores");
+      action: "win.show-score-dialog";
+    }
+    item {
+      label: _("_Apperance");
+      action: "win.show-apperance-dialog";
+    }
+  }
   section {
     item {
       label: _("_Preferences");

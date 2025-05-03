@@ -17,7 +17,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-
+use adw::prelude::ActionRowExt;
 use gtk::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gio, glib};
@@ -39,12 +39,6 @@ mod imp {
         #[template_child]
         pub recent_row: TemplateChild<adw::ActionRow>,
         #[template_child]
-        pub klondike_row: TemplateChild<adw::ActionRow>,
-        #[template_child]
-        pub spider_row: TemplateChild<adw::ActionRow>,
-        #[template_child]
-        pub freecell_row: TemplateChild<adw::ActionRow>,
-        #[template_child]
         pub nav_page: TemplateChild<adw::NavigationPage>,
         #[template_child]
         pub card_box: TemplateChild<gtk::Box>,
@@ -58,7 +52,7 @@ mod imp {
 
         fn class_init(klass: &mut Self::Class) {
             klass.bind_template();
-            <crate::SolitaireWindow as gtk::subclass::widget::CompositeTemplateCallbacks>::bind_template_callbacks(klass);
+            <crate::SolitaireWindow as CompositeTemplateCallbacks>::bind_template_callbacks(klass);
         }
 
         fn instance_init(obj: &glib::subclass::InitializingObject<Self>) {
@@ -93,27 +87,26 @@ impl SolitaireWindow {
         self.imp().nav_view.get().push_by_tag("game");
     }
     #[template_callback]
-    fn draw_init_internal(&self, card_box: &gtk::Box) {
-        println!("Drawing cards!");
-        let resource = gio::resources_lookup_data("/io/github/shbozz/Solitaire/assets/minimum_dark.svg", gio::ResourceLookupFlags::NONE)
-            .expect("Failed to load resource data");
-        let handle = Loader::new().read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>).expect("Failed to load SVG"); 
-        let renderer = rsvg::CairoRenderer::new(&handle); // We need to hand this out to the rendering functions
-        let mut cards_to_add:u8 = 52; // This is the amount of gtk::images (cards) to add to the box, of course a standard deck has 52 cards
-
-        while cards_to_add > 0 {
-            let image = gtk::Image::new();
-
-            let suite_index = ((cards_to_add - 1) / 13) as usize;
-            let rank_index = ((cards_to_add - 1) % 13) as usize;
-            let card_name = format!("{}_{}", games::SUITES[suite_index], games::RANKS[rank_index]);
-
-            println!("Adding {}", &card_name);
-            image.set_widget_name(card_name.as_str());
-            card_box.append(&image);
-            renderer::draw_image(&image, &card_name, &renderer);
-
-            cards_to_add -= 1;
+    fn populate_game_list(&self, list: &gtk::ListBox) {
+        println!("Populating game list!");
+        let nav_view = self.imp().nav_view.get();
+        for game in games::GAMES {
+            let action_row = adw::ActionRow::new();
+            let icon = gtk::Image::new();
+            icon.set_icon_name(Some("go-next-symbolic"));
+            icon.set_valign(gtk::Align::Center);
+            action_row.set_activatable(true);
+            action_row.set_property("title", game);
+            action_row.set_property("subtitle", "You haven't played this yet");
+            action_row.add_suffix(&icon);
+            let nav_view = nav_view.clone();
+            action_row.connect_activated(move |_| {
+                eprintln!("Starting {}!", game);
+                let game_id = game.to_lowercase(); 
+                games::load_game(game_id.as_str());
+                nav_view.push_by_tag("game");
+            });
+            list.append(&action_row);
         }
     }
     pub fn draw_init(&self) {
