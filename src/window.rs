@@ -17,8 +17,11 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-use adw::prelude::ActionRowExt;
+
+use adw::prelude::AlertDialogExt;
+use adw::prelude::{ActionRowExt, AlertDialogExtManual};
 use gtk::prelude::*;
+use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gio, glib};
 use rsvg::Loader;
@@ -135,5 +138,29 @@ impl SolitaireWindow {
             });
             list.append(&action_row);
         }
+    }
+
+    #[template_callback]
+    fn new_game_clicked(&self, _button: &gtk::Button) {
+        let dialog = adw::AlertDialog::builder()
+            .heading("Do you want to start a new game?")
+            .body("If you start a new game, your current progress will be lost.")
+            .default_response("delete_event")
+            .build();
+        dialog.add_responses(&[
+            ("accept",   "Start New Game"),
+            ("delete_event", "Keep Current Game")
+        ]);
+        let nav_view = self.imp().nav_view.get();
+        dialog.connect_response(Some("accept"), move |_dialog, _response| {
+            println!("Starting new game!");
+            nav_view.pop_to_tag("chooser");
+            //todo! trash current game
+        });
+        dialog.connect_response(Some("delete_event"), |_dialog, _response| {
+            println!("Keeping current game!");
+        });
+        dialog.set_response_appearance("accept", adw::ResponseAppearance::Destructive);
+        dialog.present(Some(self));
     }
 }

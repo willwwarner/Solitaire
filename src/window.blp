@@ -73,6 +73,7 @@ template $SolitaireWindow: Adw.ApplicationWindow {
           Button new_game {
             icon-name: "go-previous-symbolic";
             tooltip-text: _("New Game");
+            clicked => $new_game_clicked() swapped;
           }
           Button undo {
             icon-name: "edit-undo-symbolic";

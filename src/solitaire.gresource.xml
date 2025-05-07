@@ -4,7 +4,6 @@
     <file preprocess="xml-stripblanks">window.ui</file>
     <file preprocess="xml-stripblanks">gtk/help-overlay.ui</file>
     <file preprocess="xml-stripblanks">assets/minimum_dark.svg</file>
-    <file>games/klondike.scm</file>
   </gresource>
   <gresource prefix="/io/github/shbozz/Solitaire/icons/scalable/actions/">
     <file preprocess="xml-stripblanks">lightbulb-symbolic.svg</file>
