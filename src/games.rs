@@ -18,14 +18,16 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-pub static ASPECT:f32 = 1.4;
-pub static JOKERS: [&str; 2] = ["joker_red", "joker_black"];
-pub static SUITES: [&str; 4] = ["club", "diamond", "heart", "spade"];
-pub static RANKS: [&str; 13] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king"]; // We use 1 instead of ace for AisleRiot compat
-pub static GAMES: [&str; 3] = ["Klondike", "Spider", "Freecell"];
+pub const JOKERS: [&str; 2] = ["joker_red", "joker_black"];
+pub const SUITES: [&str; 4] = ["club", "diamond", "heart", "spade"];
+pub const RANKS: [&str; 13] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king"]; // We use 1 instead of ace for AisleRiot compat
+pub const GAMES: [&str; 3] = ["Klondike", "Spider", "Freecell"];
 
 // Links to all the included games
 pub fn load_game(game: &str) {
 
 }
 
+pub fn load_recent() {
+
+}

@@ -65,10 +65,23 @@ template $SolitaireWindow: Adw.ApplicationWindow {
     Adw.NavigationPage nav_page {
       title: _("Solitaire");
       tag: "game";
+      can-pop: false;
 
       child: Adw.ToolbarView {
         [top]
         Adw.HeaderBar {
+          Button new_game {
+            icon-name: "go-previous-symbolic";
+            tooltip-text: _("New Game");
+          }
+          Button undo {
+            icon-name: "edit-undo-symbolic";
+            tooltip-text: _("Undo");
+          }
+          Button redo {
+            icon-name: "edit-redo-symbolic";
+            tooltip-text: _("Redo");
+          }
           [end]
           MenuButton {
             primary: true;
@@ -76,17 +89,15 @@ template $SolitaireWindow: Adw.ApplicationWindow {
             tooltip-text: _("Main Menu");
             menu-model: primary_menu;
           }
+          [end]
+          Button hint {
+            icon-name: "lightbulb-symbolic";
+            tooltip-text: _("Hint");
+          }
         }
 
         content: Box {
-          orientation: vertical;
-          Box {
-            Text {
-              hexpand: true;
-              text: _("This box is for our game's controls");
-            }
-          }
-
+        orientation: vertical;
           Box card_box {
             vexpand: true;
             hexpand: true;

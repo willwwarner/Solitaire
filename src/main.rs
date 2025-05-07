@@ -23,6 +23,7 @@ mod config;
 mod window;
 mod renderer;
 mod games;
+mod card_stack;
 
 use self::application::SolitaireApplication;
 use self::window::SolitaireWindow;

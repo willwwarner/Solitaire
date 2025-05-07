@@ -23,7 +23,7 @@ use cairo::Context;
 use gtk::gdk::*;
 use rsvg::CairoRenderer;
 use crate::games;
-
+pub const ASPECT:f32 = 1.4;
 pub fn draw_image(image: &gtk::Image, name: &str, renderer: &CairoRenderer) {
     let surface = cairo::ImageSurface::
         create(cairo::Format::ARgb32, 25, 35)

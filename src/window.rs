@@ -21,7 +21,7 @@ use adw::prelude::ActionRowExt;
 use gtk::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gio, glib};
-use rsvg::{Loader, SvgHandle};
+use rsvg::Loader;
 use crate::renderer;
 use crate::games;
 
@@ -80,35 +80,6 @@ impl SolitaireWindow {
             .build()
     }
 
-    #[template_callback]
-    fn recent_clicked(&self, _row: &adw::ActionRow) {
-        println!("Starting Klondike!");
-        games::load_game("klondike");
-        self.imp().nav_view.get().push_by_tag("game");
-    }
-    #[template_callback]
-    fn populate_game_list(&self, list: &gtk::ListBox) {
-        println!("Populating game list!");
-        let nav_view = self.imp().nav_view.get();
-        for game in games::GAMES {
-            let action_row = adw::ActionRow::new();
-            let icon = gtk::Image::new();
-            icon.set_icon_name(Some("go-next-symbolic"));
-            icon.set_valign(gtk::Align::Center);
-            action_row.set_activatable(true);
-            action_row.set_property("title", game);
-            action_row.set_property("subtitle", "You haven't played this yet");
-            action_row.add_suffix(&icon);
-            let nav_view = nav_view.clone();
-            action_row.connect_activated(move |_| {
-                eprintln!("Starting {}!", game);
-                let game_id = game.to_lowercase(); 
-                games::load_game(game_id.as_str());
-                nav_view.push_by_tag("game");
-            });
-            list.append(&action_row);
-        }
-    }
     pub fn draw_init(&self) {
         let card_box = self.imp().card_box.get();
         println!("Drawing cards!");
@@ -127,10 +98,42 @@ impl SolitaireWindow {
 
             println!("Adding {}", &card_name);
             image.set_widget_name(card_name.as_str());
+            image.set_property("sensitive", true);
+            //card_grid.attach(&image, rank_index as i32, suite_index as i32, 1, 1);
             card_box.append(&image);
             renderer::draw_image(&image, &card_name, &renderer);
 
             cards_to_add -= 1;
+        }
+    }
+    
+    #[template_callback]
+    fn recent_clicked(&self, _row: &adw::ActionRow) {
+        println!("Starting Recent!");
+        games::load_recent();
+        self.imp().nav_view.get().push_by_tag("game");
+    }
+    
+    #[template_callback]
+    fn populate_game_list(&self, list: &gtk::ListBox) {
+        println!("Populating game list!");
+        for game in games::GAMES {
+            let action_row = adw::ActionRow::new();
+            let icon = gtk::Image::new();
+            icon.set_icon_name(Some("go-next-symbolic"));
+            icon.set_valign(gtk::Align::Center);
+            action_row.set_activatable(true);
+            action_row.set_property("title", game);
+            action_row.set_property("subtitle", "You haven't played this yet");
+            action_row.add_suffix(&icon);
+            let nav_view = self.imp().nav_view.get();
+            action_row.connect_activated(move |_| {
+                eprintln!("Starting {}!", game);
+                let game_id = game.to_lowercase(); 
+                games::load_game(game_id.as_str());
+                nav_view.push_by_tag("game");
+            });
+            list.append(&action_row);
         }
     }
 }
