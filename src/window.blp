@@ -48,6 +48,7 @@ template $SolitaireWindow: Adw.ApplicationWindow {
                   subtitle: _("You played for 5 minutes");
                   activatable: true;
                   activated => $recent_clicked() swapped;
+                  visible: false;
 
                   [suffix]
                   Image {
@@ -99,9 +100,13 @@ template $SolitaireWindow: Adw.ApplicationWindow {
 
         content: Box {
         orientation: vertical;
-          Box card_box {
+          Grid card_stack_grid {
             vexpand: true;
             hexpand: true;
+            valign: center;
+            halign: center;
+            column-homogeneous: true;
+            row-homogeneous: false;
           }
         };
       };

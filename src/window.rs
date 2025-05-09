@@ -44,7 +44,7 @@ mod imp {
         #[template_child]
         pub nav_page: TemplateChild<adw::NavigationPage>,
         #[template_child]
-        pub card_box: TemplateChild<gtk::Box>,
+        pub card_stack_grid: TemplateChild<gtk::Grid>,
     }
 
     #[glib::object_subclass]
@@ -84,7 +84,7 @@ impl SolitaireWindow {
     }
 
     pub fn draw_init(&self) {
-        let card_box = self.imp().card_box.get();
+        let card_grid = self.imp().card_stack_grid.get();
         println!("Drawing cards!");
         let resource = gio::resources_lookup_data("/io/github/shbozz/Solitaire/assets/minimum_dark.svg", gio::ResourceLookupFlags::NONE)
             .expect("Failed to load resource data");
@@ -102,8 +102,7 @@ impl SolitaireWindow {
             println!("Adding {}", &card_name);
             image.set_widget_name(card_name.as_str());
             image.set_property("sensitive", true);
-            //card_grid.attach(&image, rank_index as i32, suite_index as i32, 1, 1);
-            card_box.append(&image);
+            card_grid.attach(&image, rank_index as i32, suite_index as i32, 1, 1);
             renderer::draw_image(&image, &card_name, &renderer);
 
             cards_to_add -= 1;
@@ -130,10 +129,11 @@ impl SolitaireWindow {
             action_row.set_property("subtitle", "You haven't played this yet");
             action_row.add_suffix(&icon);
             let nav_view = self.imp().nav_view.get();
+            let card_grid = self.imp().card_stack_grid.get();
             action_row.connect_activated(move |_| {
                 eprintln!("Starting {}!", game);
                 let game_id = game.to_lowercase(); 
-                games::load_game(game_id.as_str());
+                games::load_game(game_id.as_str(), &card_grid);
                 nav_view.push_by_tag("game");
             });
             list.append(&action_row);

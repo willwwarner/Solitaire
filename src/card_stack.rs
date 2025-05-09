@@ -27,6 +27,19 @@ glib::wrapper! {
         @extends gtk::Fixed, gtk::Widget;
 }
 
+fn calculate_offset(stack_height: i32, num_cards: u32, card_height: i32) -> u32 {
+    if num_cards == 0 {
+        return 0;
+    }
+
+    // Calculate the overlap percentage (e.g., 50% of card height visible)
+    let max_spacing = (card_height / 2) as u32;
+
+    // Calculate the offset without exceeding the stack height
+    std::cmp::min((stack_height / num_cards as i32) as u32, max_spacing)
+
+}
+
 mod imp {
     use super::*;
 
@@ -47,12 +60,15 @@ mod imp {
 
             // Custom resizing logic
             println!("Resizing CardStack: width = {}, height = {}", width, height);
-
             // Iterate over the children of the CardStack
             let widget = self.obj();
             let children = widget.observe_children();
             let child_count = children.n_items();
-
+            for i in 0..child_count {
+                let child = children.item(i).expect("Failed to get child from CardStack");
+                let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (size_allocate)");
+                widget.move_(&image, 0.0, (i * calculate_offset(height, i, image.height())) as f64);   
+            }
         }
     }
     impl FixedImpl for CardStack {}
@@ -67,13 +83,13 @@ impl CardStack {
         let drop_target = gtk::DropTarget::new(glib::Type::OBJECT, gdk::DragAction::MOVE);
         let stack_clone = self.clone();
         drop_target.connect_drop(move |_, val, _, _| {
-            let stack = val.get::<CardStack>().unwrap();
+            let stack = val.get::<CardStack>().expect("Failed to get CardStack from DropTarget");
             let children = stack.observe_children();
             let child_count = children.n_items();
 
             for i in child_count..0 {
                 let child = children.item(i).expect("Failed to get child from CardStack");
-                let image = child.downcast::<gtk::Image>().unwrap();
+                let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (drop)");
                 stack.remove(&image);
                 stack_clone.add_card(&image);
             }
@@ -90,12 +106,12 @@ impl CardStack {
         // Loop through all the children widgets to find the matching card
         for i in 0..total_children {
             let mut child = children.item(i).expect("Failed to get child from CardStack");
-            let image = child.downcast::<gtk::Image>().unwrap();
+            let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (split:1)");
             if image.widget_name() == card_name {
                 let new_stack = CardStack::new();
                 for j in i..total_children {
                     child = children.item(j).expect("Failed to get child from CardStack");
-                    let image = child.downcast::<gtk::Image>().unwrap();
+                    let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (split:2)");
                     self.remove(&image);
                     new_stack.add_card(&image);
                 }
