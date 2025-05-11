@@ -24,6 +24,7 @@ use adw::subclass::prelude::*;
 use gtk::{gio, glib};
 use glib::subclass::InitializingObject;
 use rsvg::Loader;
+use crate::card_stack::CardStack;
 use crate::renderer;
 use crate::games;
 
@@ -180,10 +181,16 @@ impl SolitaireWindow {
             ("delete_event", "Keep Current Game")
         ]);
         let nav_view = self.imp().nav_view.get();
+        let grid = self.imp().card_grid.get();
         dialog.connect_response(Some("accept"), move |_dialog, _response| {
-            println!("Starting new game!");
+            println!("Going to game chooser!");
             nav_view.pop_to_tag("chooser");
-            //todo! trash current game
+            let grid_children = grid.observe_children();
+            for child in &grid_children {
+                if let Ok(stack) = child.expect("Couldn't get child").downcast::<CardStack>() {
+                    stack.dissolve_self(&grid);
+                }
+            }
         });
         dialog.connect_response(Some("delete_event"), |_dialog, _response| {
             println!("Keeping current game!");

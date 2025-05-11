@@ -57,29 +57,59 @@ pub fn draw_image(image: &gtk::Image, name: &str, renderer: &CairoRenderer) {
 
 fn update_geometry(grid: &gtk::Grid, height: i32, width: i32) {
     eprintln!("Total height: {}, total width: {}", height, width);
-    let height_units = 6 + 1;
-    let card_height = height / height_units;
-    //let is_width_restricted = find_size_restrictions(total_height, total_width);
-    let stack_height = card_height * 3; // This seems to be the standard
     let num_cols = 7;
     let num_rows = 2;
+    // Calculate the optimal card dimensions based on available space
+    // Accounting for some padding between stacks (10% of space)
+    let available_width = (width * 90) / 100;
+    let available_height = (height * 90) / 100;
+
+    // Calculate maximum card width based on columns
+    let max_card_width = available_width / num_cols;
+
+    // For a tableau stack, we need to show multiple cards with overlap
+    // Reserve more vertical space for tableau rows (usually row 1)
+    let tableau_height_ratio = 0.7;  // 70% of height for tableau
+    let tableau_row_height = (available_height as f64 * tableau_height_ratio) as i32;
+    let foundation_row_height = available_height - tableau_row_height;
+
+    // Log sizing information for debugging
+    println!("Window dimensions: {}x{}", width, height);
+    println!("Game type: {}, Layout: {}x{}", "Klondike", num_rows, num_cols);
+    println!("Card size (max width): {}", max_card_width);
+
+    // Process each child widget in the grid
     let stacks = grid.observe_children();
     for object in &stacks {
         let object = object.expect("Couldn't get object");
         if object.type_() == CardStack::static_type() {
             let stack = object.downcast::<CardStack>().expect("Couldn't downcast to stack");
-            stack.imp().size_allocate((stack_height as f64 * 0.6) as i32, stack_height, 0);
-        } else {
-            continue;
+
+            // Calculate dimensions based on row (foundation vs tableau)
+            let stack_width = max_card_width;
+            let stack_height = if stack.row() == 0 {
+                // Foundation row (top)
+                foundation_row_height
+            } else {
+                // Tableau row (bottom)
+                tableau_row_height
+            };
+
+            // Apply the calculated dimensions
+            stack.imp().size_allocate(stack_width, stack_height, 0);
+
+            println!("Stack at ({},{}) sized: {}x{}", stack.row(), stack.col(), stack_width, stack_height);
         }
     }
+
 }
 
 pub fn setup_resize(card_grid: &gtk::Grid) {
-    card_grid.add_tick_callback(|grid, _frame| {
+    let window = card_grid.root().expect("Couldn't get window");
+    card_grid.add_tick_callback(move |grid, _frame| {
         let mut do_update = false;
         let height = grid.height();
-        let width = grid.width();
+        let width = window.width();
         let previous_height = GAME_HEIGHT.load(std::sync::atomic::Ordering::Acquire);
         let previous_width = GAME_WIDTH.load(std::sync::atomic::Ordering::Acquire);
         if height != previous_height {

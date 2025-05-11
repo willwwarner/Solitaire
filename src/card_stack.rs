@@ -46,7 +46,8 @@ mod imp {
 
     #[derive(Default)]
     pub struct CardStack {
-        has_offset: bool
+        pub col: u8,
+        pub row: u8,
     }
 
     #[glib::object_subclass]
@@ -200,13 +201,13 @@ impl CardStack {
         }
     }
     
-    pub fn dissolve_self(self, grid: gtk::Grid) {
+    pub fn dissolve_self(self, grid: &gtk::Grid) {
         let children= self.observe_children();
-        let mut children_removed = 0;
-        for child in &children {
-            let image = child.expect("Couldn't get child").downcast::<gtk::Image>().expect("Child is not a gtk::Image (dissolve)");
-            grid.attach(&image, children_removed, 0, 1, 1);
-            children_removed += 1;
+        for i in 0..children.n_items() {
+            let child = children.item(0).expect("Failed to get child from CardStack");
+            let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (dissolve)");
+            self.remove(&image);
+            grid.attach_next_to(&image, Some(&self), gtk::PositionType::Bottom, 1, 1);
         }
         
         drop(self)
@@ -214,5 +215,13 @@ impl CardStack {
     
     pub fn focus_card(&self, card_name: &str) {
         self.get_card(card_name).expect("Couldn't get card").grab_focus();
+    }
+    
+    pub fn col(&self) -> u8{
+        self.imp().col
+    }
+    
+    pub fn row(&self) -> u8 {
+        self.imp().row
     }
 }
