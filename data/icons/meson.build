@@ -1,4 +1,4 @@
-application_id = 'io.github.shbozz.Solitaire'
+application_id = 'org.gnome.Solitaire'
 
 scalable_dir = 'hicolor' / 'scalable' / 'apps'
 install_data(

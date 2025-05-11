@@ -203,8 +203,8 @@ impl CardStack {
     
     pub fn dissolve_self(self, grid: &gtk::Grid) {
         let children= self.observe_children();
-        for i in 0..children.n_items() {
-            let child = children.item(0).expect("Failed to get child from CardStack");
+        for _i in 0..children.n_items() {
+            let child = children.item(children.n_items() - 1).expect("Failed to get child from CardStack");
             let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (dissolve)");
             self.remove(&image);
             grid.attach_next_to(&image, Some(&self), gtk::PositionType::Bottom, 1, 1);

@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=Solitaire
 Exec=solitaire
-Icon=io.github.shbozz.Solitaire
+Icon=org.gnome.Solitaire
 Terminal=false
 Type=Application
 Categories=Utility;

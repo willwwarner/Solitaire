@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist gettext-domain="solitaire">
-	<schema id="io.github.shbozz.Solitaire" path="/io/github/shbozz/Solitaire/">
+	<schema id="org.gnome.Solitaire" path="/org/gnome/Solitaire/">
 	</schema>
 </schemalist>

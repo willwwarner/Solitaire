@@ -17,7 +17,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-use std::sync::atomic::AtomicI32;
+
 use adw::subclass::prelude::*;
 use gtk::prelude::*;
 use cairo::Context;
@@ -25,8 +25,10 @@ use gtk::gdk::*;
 use rsvg::CairoRenderer;
 use crate::card_stack::*;
 
-static GAME_HEIGHT: AtomicI32 = AtomicI32::new(0);
-static GAME_WIDTH: AtomicI32 = AtomicI32::new(0);
+// We can't afford to use safe variables here, because we are reading (& writing)
+// multiple times a second
+static mut GAME_HEIGHT: i32 = 0;
+static mut GAME_WIDTH: i32 = 0;
 
 pub const ASPECT:f32 = 1.4;
 pub fn draw_image(image: &gtk::Image, name: &str, renderer: &CairoRenderer) {
@@ -106,25 +108,25 @@ fn update_geometry(grid: &gtk::Grid, height: i32, width: i32) {
 
 pub fn setup_resize(card_grid: &gtk::Grid) {
     let window = card_grid.root().expect("Couldn't get window");
-    card_grid.add_tick_callback(move |grid, _frame| {
-        let mut do_update = false;
-        let height = grid.height();
-        let width = window.width();
-        let previous_height = GAME_HEIGHT.load(std::sync::atomic::Ordering::Acquire);
-        let previous_width = GAME_WIDTH.load(std::sync::atomic::Ordering::Acquire);
-        if height != previous_height {
-            println!("Height: {}, Width: {}", height, width);
-            GAME_HEIGHT.store(height, std::sync::atomic::Ordering::Release);
-            do_update = true;
-        }
-        if width != previous_width {
-            println!("Height: {}, Width: {}", height, width);
-            GAME_WIDTH.store(width, std::sync::atomic::Ordering::Release);
-            do_update = true;
-        }
-        if do_update {
-            update_geometry(&grid, height, width);
-        }
-        glib::ControlFlow::Continue
-    });
+    unsafe {
+        card_grid.add_tick_callback(move |grid, _frame| {
+            let mut do_update = false;
+            let height = grid.height();
+            let width = window.width();
+            if height != GAME_HEIGHT {
+                println!("Height: {}, Width: {}", height, width);
+                GAME_HEIGHT = height;
+                do_update = true;
+            }
+            if width != GAME_WIDTH {
+                println!("Height: {}, Width: {}", height, width);
+                GAME_WIDTH = width;
+                do_update = true;
+            }
+            if do_update {
+                update_geometry(&grid, height, width);
+            }
+            glib::ControlFlow::Continue
+        });
+    }
 }

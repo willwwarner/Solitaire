@@ -32,7 +32,7 @@ mod imp {
     use super::*;
 
     #[derive(Debug, Default, gtk::CompositeTemplate)]
-    #[template(resource = "/io/github/shbozz/Solitaire/window.ui")]
+    #[template(resource = "/org/gnome/Solitaire/window.ui")]
     pub struct SolitaireWindow {
         // Template widgets
         #[template_child]
@@ -92,7 +92,7 @@ impl SolitaireWindow {
     pub fn draw_init(&self) {
         let game_board = &self.imp().card_grid.get();
         println!("Drawing cards!");
-        let resource = gio::resources_lookup_data("/io/github/shbozz/Solitaire/assets/minimum_dark.svg", gio::ResourceLookupFlags::NONE)
+        let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/minimum_dark.svg", gio::ResourceLookupFlags::NONE)
             .expect("Failed to load resource data");
         let handle = Loader::new().read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>).expect("Failed to load SVG");
         let renderer = rsvg::CairoRenderer::new(&handle); // We need to hand this out to the rendering functions

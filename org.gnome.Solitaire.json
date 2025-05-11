@@ -1,5 +1,5 @@
 {
-    "id" : "io.github.shbozz.Solitaire",
+    "id" : "org.gnome.Solitaire",
     "runtime" : "org.gnome.Platform",
     "runtime-version" : "48",
     "sdk" : "org.gnome.Sdk",
