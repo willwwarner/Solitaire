@@ -17,11 +17,17 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-
+use std::sync::atomic::AtomicI32;
+use adw::subclass::prelude::*;
 use gtk::prelude::*;
 use cairo::Context;
 use gtk::gdk::*;
 use rsvg::CairoRenderer;
+use crate::card_stack::*;
+
+static GAME_HEIGHT: AtomicI32 = AtomicI32::new(0);
+static GAME_WIDTH: AtomicI32 = AtomicI32::new(0);
+
 pub const ASPECT:f32 = 1.4;
 pub fn draw_image(image: &gtk::Image, name: &str, renderer: &CairoRenderer) {
     let surface = cairo::ImageSurface::
@@ -45,15 +51,50 @@ pub fn draw_image(image: &gtk::Image, name: &str, renderer: &CairoRenderer) {
         &bytes,
         stride,
     );
-    // Set the images size
-    image.set_size_request(250, 350);
     // Set the image using the new method
     image.set_paintable(Some(texture.upcast_ref::<Paintable>()));
 }
 
-fn update_geometry () {
-    
+fn update_geometry(grid: &gtk::Grid, height: i32, width: i32) {
+    eprintln!("Total height: {}, total width: {}", height, width);
+    let height_units = 6 + 1;
+    let card_height = height / height_units;
+    //let is_width_restricted = find_size_restrictions(total_height, total_width);
+    let stack_height = card_height * 3; // This seems to be the standard
+    let num_cols = 7;
+    let num_rows = 2;
+    let stacks = grid.observe_children();
+    for object in &stacks {
+        let object = object.expect("Couldn't get object");
+        if object.type_() == CardStack::static_type() {
+            let stack = object.downcast::<CardStack>().expect("Couldn't downcast to stack");
+            stack.imp().size_allocate((stack_height as f64 * 0.6) as i32, stack_height, 0);
+        } else {
+            continue;
+        }
+    }
 }
-pub fn resize () {
-    update_geometry();
+
+pub fn setup_resize(card_grid: &gtk::Grid) {
+    card_grid.add_tick_callback(|grid, _frame| {
+        let mut do_update = false;
+        let height = grid.height();
+        let width = grid.width();
+        let previous_height = GAME_HEIGHT.load(std::sync::atomic::Ordering::Acquire);
+        let previous_width = GAME_WIDTH.load(std::sync::atomic::Ordering::Acquire);
+        if height != previous_height {
+            println!("Height: {}, Width: {}", height, width);
+            GAME_HEIGHT.store(height, std::sync::atomic::Ordering::Release);
+            do_update = true;
+        }
+        if width != previous_width {
+            println!("Height: {}, Width: {}", height, width);
+            GAME_WIDTH.store(width, std::sync::atomic::Ordering::Release);
+            do_update = true;
+        }
+        if do_update {
+            update_geometry(&grid, height, width);
+        }
+        glib::ControlFlow::Continue
+    });
 }

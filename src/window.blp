@@ -25,7 +25,7 @@ template $SolitaireWindow: Adw.ApplicationWindow {
 
         content: Adw.StatusPage {
           title: _("Choose Solitaire Type");
-          description: _("Choose which type of Solitaire you want to play:");
+          description: _("Pick the type of Solitaire you want to play:");
 
           Box {
             orientation: vertical;
@@ -71,6 +71,7 @@ template $SolitaireWindow: Adw.ApplicationWindow {
       child: Adw.ToolbarView {
         [top]
         Adw.HeaderBar {
+
           Button new_game {
             icon-name: "go-previous-symbolic";
             tooltip-text: _("New Game");
@@ -79,10 +80,12 @@ template $SolitaireWindow: Adw.ApplicationWindow {
           Button undo {
             icon-name: "edit-undo-symbolic";
             tooltip-text: _("Undo");
+            action-name: "win.undo";
           }
           Button redo {
             icon-name: "edit-redo-symbolic";
             tooltip-text: _("Redo");
+            action-name: "win.redo";
           }
           [end]
           MenuButton {
@@ -95,19 +98,13 @@ template $SolitaireWindow: Adw.ApplicationWindow {
           Button hint {
             icon-name: "lightbulb-symbolic";
             tooltip-text: _("Hint");
+            action-name: "win.hint";
           }
         }
 
-        content: Box {
-        orientation: vertical;
-          Grid card_stack_grid {
-            vexpand: true;
+        content: Grid card_grid {
             hexpand: true;
-            valign: center;
-            halign: center;
-            column-homogeneous: true;
-            row-homogeneous: false;
-          }
+            vexpand: true;
         };
       };
     }
@@ -115,21 +112,21 @@ template $SolitaireWindow: Adw.ApplicationWindow {
 }
 
 menu primary_menu {
+  // section {
+  //   item {
+  //     label: _("_Scores");
+  //     action: "win.show-score-dialog";
+  //   }
+  //   item {
+  //     label: _("_Apperance");
+  //     action: "win.show-apperance-dialog";
+  //   }
+  // }
   section {
-    item {
-      label: _("_Scores");
-      action: "win.show-score-dialog";
-    }
-    item {
-      label: _("_Apperance");
-      action: "win.show-apperance-dialog";
-    }
-  }
-  section {
-    item {
-      label: _("_Preferences");
-      action: "app.preferences";
-    }
+    // item {
+    //   label: _("_Preferences");
+    //   action: "app.preferences";
+    // }
 
     item {
       label: _("_Keyboard Shortcuts");

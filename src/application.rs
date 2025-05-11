@@ -44,6 +44,9 @@ mod imp {
             let obj = self.obj();
             obj.setup_gactions();
             obj.set_accels_for_action("app.quit", &["<primary>q"]);
+            obj.set_accels_for_action("win.hint", &["<primary>h"]);
+            obj.set_accels_for_action("win.redo", &["<primary><shift>z"]);
+            obj.set_accels_for_action("win.undo", &["<primary>z"]);
         }
     }
 
@@ -103,12 +106,15 @@ impl SolitaireApplication {
             .developer_name("Shbozz")
             .version(VERSION)
             .developers(vec!["Shbozz"])
-            .artists(vec!["Vincent Bermel"])
+            .artists(vec!["Vincent Bermel", "Shbozz"])
             // Translators: Replace "translator-credits" with your name/username, and optionally an email or URL.
             .translator_credits(&gettext("translator-credits"))
             .copyright("© 2025 Shbozz \
                         \n© 2024 Vincent Bermel")
             .license_type(gtk::License::Gpl30)
+            .issue_url("https://gitlab.gnome.org/shbozz/solitaire/-/issues")
+            .website("https://shbozz.github.io/Solitaire")
+            .comments("Solitaire is a simple collection of card games.")
             .build();
 
         about.present(Some(&window));

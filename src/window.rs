@@ -18,12 +18,11 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use adw::prelude::AlertDialogExt;
-use adw::prelude::{ActionRowExt, AlertDialogExtManual};
 use gtk::prelude::*;
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gio, glib};
+use glib::subclass::InitializingObject;
 use rsvg::Loader;
 use crate::renderer;
 use crate::games;
@@ -44,7 +43,7 @@ mod imp {
         #[template_child]
         pub nav_page: TemplateChild<adw::NavigationPage>,
         #[template_child]
-        pub card_stack_grid: TemplateChild<gtk::Grid>,
+        pub card_grid: TemplateChild<gtk::Grid>,
     }
 
     #[glib::object_subclass]
@@ -58,12 +57,18 @@ mod imp {
             <crate::SolitaireWindow as CompositeTemplateCallbacks>::bind_template_callbacks(klass);
         }
 
-        fn instance_init(obj: &glib::subclass::InitializingObject<Self>) {
+        fn instance_init(obj: &InitializingObject<Self>) {
             obj.init_template();
         }
     }
 
-    impl ObjectImpl for SolitaireWindow {}
+    impl ObjectImpl for SolitaireWindow {
+        fn constructed(&self) {
+            self.parent_constructed();
+            let obj = self.obj();
+            obj.setup_gactions();
+        }
+    }
     impl WidgetImpl for SolitaireWindow {}
     impl WindowImpl for SolitaireWindow {}
     impl ApplicationWindowImpl for SolitaireWindow {}
@@ -84,7 +89,7 @@ impl SolitaireWindow {
     }
 
     pub fn draw_init(&self) {
-        let card_grid = self.imp().card_stack_grid.get();
+        let game_board = &self.imp().card_grid.get();
         println!("Drawing cards!");
         let resource = gio::resources_lookup_data("/io/github/shbozz/Solitaire/assets/minimum_dark.svg", gio::ResourceLookupFlags::NONE)
             .expect("Failed to load resource data");
@@ -102,11 +107,34 @@ impl SolitaireWindow {
             println!("Adding {}", &card_name);
             image.set_widget_name(card_name.as_str());
             image.set_property("sensitive", true);
-            card_grid.attach(&image, rank_index as i32, suite_index as i32, 1, 1);
+            game_board.attach(&image, rank_index as i32, suite_index as i32, 1, 1);
             renderer::draw_image(&image, &card_name, &renderer);
 
             cards_to_add -= 1;
         }
+    }
+    
+    fn hint(&self) {
+        println!("Hint!");
+    }
+    fn undo(&self) {
+        println!("Undo!");
+    }
+    fn redo(&self) {
+        println!("Redo!");
+    }
+
+    fn setup_gactions(&self) {
+        let hint_action = gio::ActionEntry::builder("hint")
+            .activate(move |win: &Self, _, _| win.hint())
+            .build();
+        let undo_action = gio::ActionEntry::builder("undo")
+            .activate(move |win: &Self, _, _| win.undo())
+            .build();
+        let redo_action = gio::ActionEntry::builder("redo")
+            .activate(move |win: &Self, _, _| win.redo())
+            .build();
+        self.add_action_entries([hint_action, undo_action, redo_action]);
     }
     
     #[template_callback]
@@ -129,7 +157,7 @@ impl SolitaireWindow {
             action_row.set_property("subtitle", "You haven't played this yet");
             action_row.add_suffix(&icon);
             let nav_view = self.imp().nav_view.get();
-            let card_grid = self.imp().card_stack_grid.get();
+            let card_grid = self.imp().card_grid.get();
             action_row.connect_activated(move |_| {
                 eprintln!("Starting {}!", game);
                 let game_id = game.to_lowercase(); 

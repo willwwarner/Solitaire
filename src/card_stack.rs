@@ -21,6 +21,7 @@
 use gtk::{glib, gdk};
 use adw::prelude::*;
 use adw::subclass::prelude::*;
+use crate::renderer;
 
 glib::wrapper! {
     pub struct CardStack(ObjectSubclass<imp::CardStack>)
@@ -44,7 +45,9 @@ mod imp {
     use super::*;
 
     #[derive(Default)]
-    pub struct CardStack {}
+    pub struct CardStack {
+        has_offset: bool
+    }
 
     #[glib::object_subclass]
     impl ObjectSubclass for CardStack {
@@ -58,16 +61,41 @@ mod imp {
             // Call the parent implementation to ensure default behavior
             self.parent_size_allocate(width, height, baseline);
 
-            // Custom resizing logic
-            println!("Resizing CardStack: width = {}, height = {}", width, height);
-            // Iterate over the children of the CardStack
             let widget = self.obj();
             let children = widget.observe_children();
             let child_count = children.n_items();
+            
+            // Don't bother with empty stacks
+            if child_count == 0 {
+                return;
+            }
+            
+            // Calculate a size that maintains aspect ratio for cards
+            let card_width = width;
+            let card_height = (card_width as f32 * renderer::ASPECT) as i32;
+            
+            // Calculate vertical spacing between cards
+            let total_cards = child_count;
+            let vertical_offset = calculate_offset(height, total_cards, card_height);
+            
+            // Position each card with proper spacing
             for i in 0..child_count {
-                let child = children.item(i).expect("Failed to get child from CardStack");
-                let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (size_allocate)");
-                widget.move_(&image, 0.0, (i * calculate_offset(height, i, image.height())) as f64);   
+                if let Some(child) = children.item(i) {
+                    if let Ok(image) = child.downcast::<gtk::Image>() {
+                        // Set explicit size request for the image
+                        image.set_size_request(card_width, card_height);
+                        
+                        // Position the card vertically with proper offset
+                        // The formula ensures cards are properly staggered with the calculated offset
+                        let y_pos = (i * vertical_offset) as f64;
+                        widget.move_(&image, 0.0, y_pos);
+                    }
+                }
+            }
+            
+            if child_count > 0 {
+                println!("CardStack resized: {}x{} with {} cards, offset: {}", 
+                         width, height, child_count, vertical_offset);
             }
         }
     }
@@ -79,10 +107,43 @@ impl CardStack {
         glib::Object::new()
     }
     
+    pub fn get_card(&self, card_name: &str) -> Result<gtk::Image, glib::Error> {
+        // Attempt to locate the child with the given card name
+        let children = self.observe_children();
+        let total_children = children.n_items();
+
+        // Loop through all the children widgets to find the matching card
+        for i in 0..total_children {
+            let child = children.item(i).expect("Failed to get child from CardStack");
+            let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (find)");
+            if image.widget_name() == card_name {
+                return Ok(image);
+            }
+        }
+
+        Err(glib::Error::new(glib::FileError::Exist, format!("Card named '{}' was not found in the stack.", card_name).as_str()))
+    }
+    
+    pub fn get_card_and_children(&self, card_name: &str) -> Result<(gtk::Image, crate::gio::ListModel, u32), glib::Error> {
+        // Attempt to locate the child with the given card name
+        let children = self.observe_children();
+        let total_children = children.n_items();
+    
+        // Loop through all the children widgets to find the matching card
+        for i in 0..total_children {
+            let child = children.item(i).expect("Failed to get child from CardStack");
+            let image = child.downcast::<gtk::Image> ().expect("Child is not a gtk::Image (find)");
+            if image.widget_name() == card_name {
+                return Ok((image, children, total_children));
+            }
+        }
+
+        Err(glib::Error::new(glib::FileError::Exist, format!("Card named '{}' was not found in the stack.", card_name).as_str()))
+    }
     pub fn enable_drop(&self) {
         let drop_target = gtk::DropTarget::new(glib::Type::OBJECT, gdk::DragAction::MOVE);
         let stack_clone = self.clone();
-        drop_target.connect_drop(move |_, val, _, _| {
+        drop_target.connect_drop(move |_, val, height, _| {
             let stack = val.get::<CardStack>().expect("Failed to get CardStack from DropTarget");
             let children = stack.observe_children();
             let child_count = children.n_items();
@@ -91,7 +152,7 @@ impl CardStack {
                 let child = children.item(i).expect("Failed to get child from CardStack");
                 let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (drop)");
                 stack.remove(&image);
-                stack_clone.add_card(&image);
+                stack_clone.add_card(&image, height as i32);
             }
             true
         });
@@ -113,7 +174,7 @@ impl CardStack {
                     child = children.item(j).expect("Failed to get child from CardStack");
                     let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (split:2)");
                     self.remove(&image);
-                    new_stack.add_card(&image);
+                    new_stack.add_card(&image, image.height());
                 }
                 return Ok(new_stack);
             }
@@ -124,12 +185,34 @@ impl CardStack {
     }
 
 
-    pub fn add_card(&self, card_image: &gtk::Image) {
-        // Calculate vertical offset based on the current number of children
-        let child_count = self.observe_children().n_items();
-        let offset = child_count * 16;
-
-        // Add the card to the stack
-        self.put(card_image, 0.0, offset as f64)
+    pub fn add_card(&self, card_image: &gtk::Image, height: i32) {
+        // Only add the image if it doesn't already have a parent
+        if card_image.parent().is_none() {
+            // Calculate vertical offset based on the current number of children
+            let child_count = self.observe_children().n_items();
+            let offset = (child_count as i32 * height) as f64 * 0.5;
+            println!("Adding card at offset: {}", offset);
+            // Add the card to the stack
+            self.put(card_image, 0.0, offset);
+        } else {
+            // If the image already has a parent, log a warning
+            eprintln!("Warning: Attempted to add a widget that already has a parent");
+        }
+    }
+    
+    pub fn dissolve_self(self, grid: gtk::Grid) {
+        let children= self.observe_children();
+        let mut children_removed = 0;
+        for child in &children {
+            let image = child.expect("Couldn't get child").downcast::<gtk::Image>().expect("Child is not a gtk::Image (dissolve)");
+            grid.attach(&image, children_removed, 0, 1, 1);
+            children_removed += 1;
+        }
+        
+        drop(self)
+    }
+    
+    pub fn focus_card(&self, card_name: &str) {
+        self.get_card(card_name).expect("Couldn't get card").grab_focus();
     }
 }

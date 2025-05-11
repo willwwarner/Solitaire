@@ -17,53 +17,89 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-
+use std::sync::Mutex;
 use gtk::prelude::*;
 use crate::card_stack::CardStack;
+use crate::renderer;
+
 pub const JOKERS: [&str; 2] = ["joker_red", "joker_black"];
 pub const SUITES: [&str; 4] = ["club", "diamond", "heart", "spade"];
 pub const RANKS: [&str; 13] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king"]; // We use 1 instead of ace for AisleRiot compat
 pub const GAMES: [&str; 3] = ["Klondike", "Spider", "Freecell"];
+static CURRENT_GAME: Mutex<String> = Mutex::new(String::new());
 
 // Links to all the included games
 pub fn load_game(game: &str, grid: &gtk::Grid) {
     // Get children from the grid
-    let children = grid.observe_children(); // Observes all children currently present in the grid
-    
-    for i in 0..13 {
-        // Create a new card stack for this iteration
+    let children = grid.observe_children();
+
+    // Game-specific configuration
+    let (rows, columns) = match game {
+        "klondike" => (2, 7),   // Standard Klondike layout
+        "spider" => (2, 10),    // Spider layout with 10 columns
+        "freecell" => (2, 8),   // FreeCell layout
+        _ => {
+            eprintln!("Unknown game type: {}, defaulting to Klondike", game);
+            (2, 7)              // Default to Klondike layout
+        }
+    };
+
+    // Create card stacks based on game type
+    let total_stacks = rows * columns;
+    for i in 0..total_stacks {
+        // Create a new card stack for this position
         let card_stack = CardStack::new();
-        let row = i / 7; // Calculate which row this stack belongs to
-        let col = i % 7; // Calculate which column this stack belongs to
-        
-        for j in 0..4 {
-            // Safely fetch and validate individual child widgets
-            if let Some(child) = children.item(j) {
-                // Attempt the downcast and handle types that are not `gtk::Image`
-                let child_type = child.type_();
-                if let Ok(image) = child.downcast::<gtk::Image>() {
-                    // Successfully downcasted child to gtk::Image
-                    grid.remove(&image); // Remove from grid
-                    card_stack.add_card(&image); // Add to card stack
-                } else {
-                    // Log an error if the child isn't of type gtk::Image
-                    eprintln!(
-                        "Warning: Child at index {} is not a gtk::Image; skipping. Found type: {:?}",
-                        j,
-                        child_type
-                    );
+
+        // Calculate layout position
+        let row = i / columns;
+        let col = i % columns;
+
+        // Initial number of cards for this stack depends on game type and position
+        let card_count = match game {
+            "klondike" => {
+                if col < 7 && row == 1 { col + 1 } else { 0 }
+            },
+            "spider" => {
+                if col < 10 && row == 1 {
+                    if col < 4 { 6 } else { 5 }
+                } else { 0 }
+            },
+            "freecell" => 0,    // FreeCell starts with no cards in play stacks
+            _ => 0
+        };
+
+        // Add cards to the stack, reusing available images
+        for j in 0..card_count.min(children.n_items() as i32) {
+            if let Some(obj) = children.item(j as u32) {
+                if let Ok(image) = obj.downcast::<gtk::Image>() {
+                    grid.remove(&image);
+                    card_stack.add_card(&image, 50);
                 }
-            } else {
-                // Log an error if no child was found at the given index
-                eprintln!("Warning: No child found at index {} in the grid; skipping.", j);
             }
         }
+
+        // Enable drag and drop for gameplay
+        card_stack.enable_drop();
 
         // Attach the card stack to the grid at the calculated position
         grid.attach(&card_stack, col, row, 1, 1);
     }
+
+    // Store the current game type
+    CURRENT_GAME.lock().unwrap().push_str(game);
+
+    // Setup resize handler for responsive layout
+    renderer::setup_resize(grid);
+
+    // Log game loading
+    println!("Loaded game: {}", game);
 }
+
 
 pub fn load_recent() {
 
+}
+
+pub fn get_current_game() -> String {
+    CURRENT_GAME.lock().unwrap().clone()
 }

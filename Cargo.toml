@@ -6,8 +6,8 @@ edition = "2021"
 [dependencies]
 gettext-rs = { version = "0.7", features = ["gettext-system"] }
 gtk = { version = "0.9", package = "gtk4", features = ["gnome_47"] }
-librsvg = "2.60.0"
-cairo = { version = "0.20.7", package = "cairo-rs" }
+librsvg = "2.60"
+cairo = { version = "0.20", package = "cairo-rs" }
 
 [dependencies.adw]
 package = "libadwaita"
