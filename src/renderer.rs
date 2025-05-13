@@ -57,28 +57,30 @@ pub fn draw_image(image: &gtk::Image, name: &str, renderer: &CairoRenderer) {
     image.set_paintable(Some(texture.upcast_ref::<Paintable>()));
 }
 
-fn update_geometry(grid: &gtk::Grid, height: i32, width: i32) {
-    eprintln!("Total height: {}, total width: {}", height, width);
+fn calculate_card_size_from_grid_size(height: i32, width: i32) -> (i32, i32) {
     let num_cols = 7;
     let num_rows = 2;
-    // Calculate the optimal card dimensions based on available space
-    // Accounting for some padding between stacks (10% of space)
-    let available_width = (width * 90) / 100;
-    let available_height = (height * 90) / 100;
+    let card_heights_needed = 6; // 6 for tableau + 0 for foundation
 
-    // Calculate maximum card width based on columns
-    let max_card_width = available_width / num_cols;
+    // Calculate maximum card width based on columns and rows
+    let max_card_height_by_width = (((width * 90) / 100) / num_cols) as f32 * ASPECT;
 
-    // For a tableau stack, we need to show multiple cards with overlap
-    // Reserve more vertical space for tableau rows (usually row 1)
-    let tableau_height_ratio = 0.7;  // 70% of height for tableau
-    let tableau_row_height = (available_height as f64 * tableau_height_ratio) as i32;
-    let foundation_row_height = available_height - tableau_row_height;
+    // Determine max card width based on height constraint and aspect ratio
+    let max_card_height_by_height = ((height * 90) / 100) / card_heights_needed;
+
+    // Use the more constraining dimension (smaller width)
+    let card_height = std::cmp::min(max_card_height_by_width as i32, max_card_height_by_height);
+    
+    (card_height, (card_height as f32 / ASPECT) as i32)
+}
+fn update_geometry(grid: &gtk::Grid, height: i32, width: i32) {
+    println!("Total height: {}, total width: {}", height, width);
+    let (card_height, card_width) = calculate_card_size_from_grid_size(height, width);
+    let tableau_row_height = card_height * 3; // Allocate 3 card heights for tableau
 
     // Log sizing information for debugging
     println!("Window dimensions: {}x{}", width, height);
-    println!("Game type: {}, Layout: {}x{}", "Klondike", num_rows, num_cols);
-    println!("Card size (max width): {}", max_card_width);
+    println!("Stack height: {}", tableau_row_height);
 
     // Process each child widget in the grid
     let stacks = grid.observe_children();
@@ -87,26 +89,13 @@ fn update_geometry(grid: &gtk::Grid, height: i32, width: i32) {
         if object.type_() == CardStack::static_type() {
             let stack = object.downcast::<CardStack>().expect("Couldn't downcast to stack");
 
-            // Calculate dimensions based on row (foundation vs tableau)
-            let stack_width = max_card_width;
-            let stack_height = if stack.row() == 0 {
-                // Foundation row (top)
-                foundation_row_height
-            } else {
-                // Tableau row (bottom)
-                tableau_row_height
-            };
-
             // Apply the calculated dimensions
-            stack.imp().size_allocate(stack_width, stack_height, 0);
-
-            println!("Stack at ({},{}) sized: {}x{}", stack.row(), stack.col(), stack_width, stack_height);
+            stack.imp().size_allocate(card_width, tableau_row_height, 0);
         }
     }
-
 }
 
-pub fn setup_resize(card_grid: &gtk::Grid) {
+pub fn register_resize(card_grid: &gtk::Grid) {
     let window = card_grid.root().expect("Couldn't get window");
     unsafe {
         card_grid.add_tick_callback(move |grid, _frame| {

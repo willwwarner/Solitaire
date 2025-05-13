@@ -38,7 +38,6 @@ fn calculate_offset(stack_height: i32, num_cards: u32, card_height: i32) -> u32 
 
     // Calculate the offset without exceeding the stack height
     std::cmp::min((stack_height / num_cards as i32) as u32, max_spacing)
-
 }
 
 mod imp {
@@ -46,8 +45,10 @@ mod imp {
 
     #[derive(Default)]
     pub struct CardStack {
-        pub col: u8,
+        pub is_stackable: bool,
+        // Store row for layout calculations
         pub row: u8,
+        pub col: u8,
     }
 
     #[glib::object_subclass]
@@ -141,6 +142,7 @@ impl CardStack {
 
         Err(glib::Error::new(glib::FileError::Exist, format!("Card named '{}' was not found in the stack.", card_name).as_str()))
     }
+    
     pub fn enable_drop(&self) {
         let drop_target = gtk::DropTarget::new(glib::Type::OBJECT, gdk::DragAction::MOVE);
         let stack_clone = self.clone();
@@ -185,7 +187,6 @@ impl CardStack {
         Err(glib::Error::new(glib::FileError::Exist, format!("Card named '{}' was not found in the stack.", card_name).as_str()))
     }
 
-
     pub fn add_card(&self, card_image: &gtk::Image, height: i32) {
         // Only add the image if it doesn't already have a parent
         if card_image.parent().is_none() {
@@ -195,6 +196,8 @@ impl CardStack {
             println!("Adding card at offset: {}", offset);
             // Add the card to the stack
             self.put(card_image, 0.0, offset);
+            self.queue_allocate();
+            
         } else {
             // If the image already has a parent, log a warning
             eprintln!("Warning: Attempted to add a widget that already has a parent");
@@ -217,7 +220,7 @@ impl CardStack {
         self.get_card(card_name).expect("Couldn't get card").grab_focus();
     }
     
-    pub fn col(&self) -> u8{
+    pub fn col(&self) -> u8 {
         self.imp().col
     }
     

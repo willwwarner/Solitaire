@@ -39,6 +39,7 @@ pub fn load_game(game: &str, grid: &gtk::Grid) {
     for i in 0..14 {
         // Create a new card stack for this position
         let card_stack = CardStack::new();
+        card_stack.set_vexpand(true);
 
         // Calculate layout position
         let row = i / 7;
@@ -65,7 +66,7 @@ pub fn load_game(game: &str, grid: &gtk::Grid) {
     CURRENT_GAME.lock().unwrap().push_str(game);
 
     // Setup resize handler for responsive layout
-    renderer::setup_resize(grid);
+    renderer::register_resize(grid);
 
     // Log game loading
     println!("Loaded game: {}", game);
