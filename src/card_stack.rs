@@ -66,38 +66,33 @@ mod imp {
             let widget = self.obj();
             let children = widget.observe_children();
             let child_count = children.n_items();
-            
+
             // Don't bother with empty stacks
             if child_count == 0 {
                 return;
             }
-            
+
             // Calculate a size that maintains aspect ratio for cards
             let card_width = width;
             let card_height = (card_width as f32 * renderer::ASPECT) as i32;
-            
+
             // Calculate vertical spacing between cards
             let total_cards = child_count;
             let vertical_offset = calculate_offset(height, total_cards, card_height);
-            
+
             // Position each card with proper spacing
             for i in 0..child_count {
                 if let Some(child) = children.item(i) {
                     if let Ok(image) = child.downcast::<gtk::Image>() {
                         // Set explicit size request for the image
                         image.set_size_request(card_width, card_height);
-                        
+
                         // Position the card vertically with proper offset
                         // The formula ensures cards are properly staggered with the calculated offset
                         let y_pos = (i * vertical_offset) as f64;
                         widget.move_(&image, 0.0, y_pos);
                     }
                 }
-            }
-            
-            if child_count > 0 {
-                println!("CardStack resized: {}x{} with {} cards, offset: {}", 
-                         width, height, child_count, vertical_offset);
             }
         }
     }
@@ -197,23 +192,24 @@ impl CardStack {
             // Add the card to the stack
             self.put(card_image, 0.0, offset);
             self.queue_allocate();
-            
+
         } else {
             // If the image already has a parent, log a warning
             eprintln!("Warning: Attempted to add a widget that already has a parent");
         }
     }
     
-    pub fn dissolve_self(self, grid: &gtk::Grid) {
-        let children= self.observe_children();
-        for _i in 0..children.n_items() {
-            let child = children.item(children.n_items() - 1).expect("Failed to get child from CardStack");
+    pub fn dissolve_to_row(self, grid: &gtk::Grid, row: i32) {
+        let items = self.observe_children().n_items();
+        for i in 0..items {
+            let child = self.first_child().expect("Failed to get first child from CardStack");
             let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (dissolve)");
             self.remove(&image);
-            grid.attach_next_to(&image, Some(&self), gtk::PositionType::Bottom, 1, 1);
+            grid.attach(&image, i as i32, row, 1, 1);
+            image.set_height_request(1);
         }
-        
-        drop(self)
+        grid.remove(&self);
+        self.unrealize();
     }
     
     pub fn focus_card(&self, card_name: &str) {

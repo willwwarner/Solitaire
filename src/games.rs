@@ -35,7 +35,6 @@ pub fn load_game(game: &str, grid: &gtk::Grid) {
     // Get children from the grid
     let children = grid.observe_children();
 
-    
     for i in 0..14 {
         // Create a new card stack for this position
         let card_stack = CardStack::new();
@@ -46,12 +45,16 @@ pub fn load_game(game: &str, grid: &gtk::Grid) {
         let col = i % 7;
 
         // Add cards to the stack, reusing available images
-        for j in 0..4 {
-            if let Some(obj) = children.item(j as u32) {
+        for _j in 0..4 {
+            // Always get the first item from the collection (index 0)
+            // as the collection shifts when items are removed
+            if let Some(obj) = children.item(0) {
                 if let Ok(image) = obj.downcast::<gtk::Image>() {
                     grid.remove(&image);
                     card_stack.add_card(&image, 50);
                 }
+            } else {
+                gtk::glib::g_error!("Failed to get child from grid", "Solitaire");
             }
         }
 
@@ -66,12 +69,16 @@ pub fn load_game(game: &str, grid: &gtk::Grid) {
     CURRENT_GAME.lock().unwrap().push_str(game);
 
     // Setup resize handler for responsive layout
-    renderer::register_resize(grid);
+    renderer::setup_resize(grid);
 
     // Log game loading
     println!("Loaded game: {}", game);
 }
 
+pub fn unload(grid: &gtk::Grid) {
+    CURRENT_GAME.lock().unwrap().clear();
+    renderer::unregister_resize(grid);
+}
 
 pub fn load_recent() {
 

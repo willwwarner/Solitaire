@@ -160,7 +160,7 @@ impl SolitaireWindow {
             let nav_view = self.imp().nav_view.get();
             let card_grid = self.imp().card_grid.get();
             action_row.connect_activated(move |_| {
-                eprintln!("Starting {}!", game);
+                println!("Starting {}!", game);
                 let game_id = game.to_lowercase(); 
                 games::load_game(game_id.as_str(), &card_grid);
                 nav_view.push_by_tag("game");
@@ -184,13 +184,14 @@ impl SolitaireWindow {
         let grid = self.imp().card_grid.get();
         dialog.connect_response(Some("accept"), move |_dialog, _response| {
             println!("Going to game chooser!");
-            nav_view.pop_to_tag("chooser");
-            let grid_children = grid.observe_children();
-            for child in &grid_children {
-                if let Ok(stack) = child.expect("Couldn't get child").downcast::<CardStack>() {
-                    stack.dissolve_self(&grid);
-                }
+            games::unload(&grid);
+            let items = grid.observe_children().n_items();
+            for i in 0..items {
+                let child = grid.first_child().expect("Couldn't get child");
+                let stack = child.downcast::<CardStack>().expect("Couldn't downcast child");
+                stack.dissolve_to_row(&grid, i as i32);
             }
+            nav_view.pop_to_tag("chooser");
         });
         dialog.connect_response(Some("delete_event"), |_dialog, _response| {
             println!("Keeping current game!");

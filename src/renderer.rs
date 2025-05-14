@@ -19,16 +19,17 @@
  */
 
 use adw::subclass::prelude::*;
-use gtk::prelude::*;
+use adw::prelude::*;
 use cairo::Context;
 use gtk::gdk::*;
 use rsvg::CairoRenderer;
 use crate::card_stack::*;
 
-// We can't afford to use safe variables here, because we are reading (& writing)
-// multiple times a second
+// We can't afford to use safe variables here,
+// we are reading (& writing) multiple times a second
 static mut GAME_HEIGHT: i32 = 0;
 static mut GAME_WIDTH: i32 = 0;
+static mut TICK_CALLBACK_ID: Option<gtk::TickCallbackId> = None;
 
 pub const ASPECT:f32 = 1.4;
 pub fn draw_image(image: &gtk::Image, name: &str, renderer: &CairoRenderer) {
@@ -57,58 +58,50 @@ pub fn draw_image(image: &gtk::Image, name: &str, renderer: &CairoRenderer) {
     image.set_paintable(Some(texture.upcast_ref::<Paintable>()));
 }
 
-fn calculate_card_size_from_grid_size(height: i32, width: i32) -> (i32, i32) {
-    let num_cols = 7;
-    let num_rows = 2;
-    let card_heights_needed = 6; // 6 for tableau + 0 for foundation
-
-    // Calculate maximum card width based on columns and rows
-    let max_card_height_by_width = (((width * 90) / 100) / num_cols) as f32 * ASPECT;
-
-    // Determine max card width based on height constraint and aspect ratio
-    let max_card_height_by_height = ((height * 90) / 100) / card_heights_needed;
-
-    // Use the more constraining dimension (smaller width)
-    let card_height = std::cmp::min(max_card_height_by_width as i32, max_card_height_by_height);
-    
-    (card_height, (card_height as f32 / ASPECT) as i32)
-}
 fn update_geometry(grid: &gtk::Grid, height: i32, width: i32) {
-    println!("Total height: {}, total width: {}", height, width);
-    let (card_height, card_width) = calculate_card_size_from_grid_size(height, width);
-    let tableau_row_height = card_height * 3; // Allocate 3 card heights for tableau
+    const NUM_COLS: i32 = 7;
+    const CARD_HEIGHTS_NEEDED: i32 = 6;
+    const SCREEN_USAGE_RATIO: i32 = 9;  // 90% usage becomes 9/10
 
-    // Log sizing information for debugging
-    println!("Window dimensions: {}x{}", width, height);
-    println!("Stack height: {}", tableau_row_height);
+    // Calculate dimensions in fewer operations
+    let available_width = width * SCREEN_USAGE_RATIO / 10;
+    let available_height = height * SCREEN_USAGE_RATIO / 10;
 
-    // Process each child widget in the grid
+    // Calculate maximum height based on constraints
+    let max_height_by_width = (available_width / NUM_COLS) as f32 * ASPECT;
+    let max_height_by_height = available_height / CARD_HEIGHTS_NEEDED;
+
+    // Use the more constraining dimension
+    let card_height = std::cmp::min(max_height_by_width as i32, max_height_by_height);
+    let card_width = (card_height as f32 / ASPECT) as i32;
+    let tableau_row_height = card_height * 3;
+    
+    // Process each stack widget in the grid
     let stacks = grid.observe_children();
-    for object in &stacks {
-        let object = object.expect("Couldn't get object");
-        if object.type_() == CardStack::static_type() {
-            let stack = object.downcast::<CardStack>().expect("Couldn't downcast to stack");
-
-            // Apply the calculated dimensions
-            stack.imp().size_allocate(card_width, tableau_row_height, 0);
+    for i in 0..stacks.n_items() {
+        if let Some(object) = stacks.item(i) {
+            if object.type_() == CardStack::static_type() {
+                if let Ok(stack) = object.downcast::<CardStack>() {
+                    // Apply calculated dimensions
+                    stack.imp().size_allocate(card_width, tableau_row_height, 0);
+                }
+            }
         }
     }
 }
 
-pub fn register_resize(card_grid: &gtk::Grid) {
+pub fn setup_resize(card_grid: &gtk::Grid) {
     let window = card_grid.root().expect("Couldn't get window");
     unsafe {
-        card_grid.add_tick_callback(move |grid, _frame| {
+        let tick_callback = card_grid.add_tick_callback(move |grid, _frame| {
             let mut do_update = false;
             let height = grid.height();
             let width = window.width();
             if height != GAME_HEIGHT {
-                println!("Height: {}, Width: {}", height, width);
                 GAME_HEIGHT = height;
                 do_update = true;
             }
             if width != GAME_WIDTH {
-                println!("Height: {}, Width: {}", height, width);
                 GAME_WIDTH = width;
                 do_update = true;
             }
@@ -117,5 +110,16 @@ pub fn register_resize(card_grid: &gtk::Grid) {
             }
             glib::ControlFlow::Continue
         });
+        TICK_CALLBACK_ID = Some(tick_callback);
+    }
+}
+
+pub fn unregister_resize(card_grid: &gtk::Grid) {
+    unsafe {
+        if let Some(id) = TICK_CALLBACK_ID.take() { // Maybe a raw pointer would work here
+            id.remove();
+        }
+        GAME_HEIGHT = 0;
+        GAME_WIDTH = 0;
     }
 }
