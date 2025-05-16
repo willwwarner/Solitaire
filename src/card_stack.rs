@@ -41,6 +41,7 @@ fn calculate_offset(stack_height: i32, num_cards: u32, card_height: i32) -> u32 
 }
 
 mod imp {
+    use gtk::Snapshot;
     use super::*;
 
     #[derive(Default)]
@@ -103,7 +104,7 @@ impl CardStack {
     pub fn new() -> Self {
         glib::Object::new()
     }
-    
+    // Most stack methods could use these
     pub fn get_card(&self, card_name: &str) -> Result<gtk::Image, glib::Error> {
         // Attempt to locate the child with the given card name
         let children = self.observe_children();
@@ -120,16 +121,16 @@ impl CardStack {
 
         Err(glib::Error::new(glib::FileError::Exist, format!("Card named '{}' was not found in the stack.", card_name).as_str()))
     }
-    
+
     pub fn get_card_and_children(&self, card_name: &str) -> Result<(gtk::Image, crate::gio::ListModel, u32), glib::Error> {
         // Attempt to locate the child with the given card name
         let children = self.observe_children();
         let total_children = children.n_items();
-    
+
         // Loop through all the children widgets to find the matching card
         for i in 0..total_children {
             let child = children.item(i).expect("Failed to get child from CardStack");
-            let image = child.downcast::<gtk::Image> ().expect("Child is not a gtk::Image (find)");
+            let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (find)");
             if image.widget_name() == card_name {
                 return Ok((image, children, total_children));
             }
@@ -137,16 +138,17 @@ impl CardStack {
 
         Err(glib::Error::new(glib::FileError::Exist, format!("Card named '{}' was not found in the stack.", card_name).as_str()))
     }
-    
+
     pub fn enable_drop(&self) {
         let drop_target = gtk::DropTarget::new(glib::Type::OBJECT, gdk::DragAction::MOVE);
+        //drop_target.set_highlight(false); or something, the highlighting isn't ideal 
         let stack_clone = self.clone();
         drop_target.connect_drop(move |_, val, height, _| {
             let stack = val.get::<CardStack>().expect("Failed to get CardStack from DropTarget");
             let children = stack.observe_children();
             let child_count = children.n_items();
 
-            for i in child_count..0 {
+            for i in (child_count..0).rev() {
                 let child = children.item(i).expect("Failed to get child from CardStack");
                 let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (drop)");
                 stack.remove(&image);
@@ -156,30 +158,59 @@ impl CardStack {
         });
         self.add_controller(drop_target);
     }
-    
+
     pub fn split_to_new_on(&self, card_name: &str) -> Result<CardStack, glib::Error> {
         // Attempt to locate the child with the given card name
         let children = self.observe_children();
         let total_children = children.n_items();
+        let mut cards_to_move = Vec::new();
 
-        // Loop through all the children widgets to find the matching card
+        // First find the starting index
+        let mut start_index = None;
         for i in 0..total_children {
-            let mut child = children.item(i).expect("Failed to get child from CardStack");
+            let child = children.item(i).expect("Failed to get child from CardStack");
             let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (split:1)");
             if image.widget_name() == card_name {
-                let new_stack = CardStack::new();
-                for j in i..total_children {
-                    child = children.item(j).expect("Failed to get child from CardStack");
-                    let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (split:2)");
-                    self.remove(&image);
-                    new_stack.add_card(&image, image.height());
-                }
-                return Ok(new_stack);
+                start_index = Some(i);
+                break;
             }
         }
 
+        // If we found the card, collect all cards from that index onwards
+        if let Some(start_idx) = start_index {
+            let new_stack = CardStack::new();
+        
+            // First collect all the cards we want to move
+            for j in start_idx..total_children {
+                let child = children.item(j).expect("Failed to get child from CardStack");
+                let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (split:2)");
+                cards_to_move.push(image);
+            }
+
+            // Then remove and add them to the new stack
+            for image in cards_to_move {
+                self.remove(&image);
+                new_stack.add_card(&image, image.height());
+            }
+
+            return Ok(new_stack);
+        }
+
         // If the card is not found, return an error
-        Err(glib::Error::new(glib::FileError::Exist, format!("Card named '{}' was not found in the stack.", card_name).as_str()))
+        Err(glib::Error::new(
+            glib::FileError::Exist,
+            format!("Card named '{}' was not found in the stack.", card_name).as_str()
+        ))
+    }
+
+    pub fn merge_stack(&self, stack: &CardStack) {
+        let items = stack.observe_children().n_items();
+        for i in 0..items {
+            let child = stack.first_child().expect("Failed to get first child from CardStack");
+            let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (dissolve)");
+            stack.remove(&image);
+            self.add_card(&image, image.height());
+        }
     }
 
     pub fn add_card(&self, card_image: &gtk::Image, height: i32) {
@@ -191,7 +222,6 @@ impl CardStack {
             println!("Adding card at offset: {}", offset);
             // Add the card to the stack
             self.put(card_image, 0.0, offset);
-            self.queue_allocate();
 
         } else {
             // If the image already has a parent, log a warning

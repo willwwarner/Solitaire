@@ -19,6 +19,7 @@
  */
 use std::sync::Mutex;
 use gtk::prelude::*;
+use gtk::{DragSource, gdk::DragAction, gdk, glib};
 use crate::card_stack::CardStack;
 use crate::renderer;
 use crate::window::*;
@@ -51,6 +52,7 @@ pub fn load_game(game: &str, grid: &gtk::Grid) {
             if let Some(obj) = children.item(0) {
                 if let Ok(image) = obj.downcast::<gtk::Image>() {
                     grid.remove(&image);
+                    add_drag_to_card(&image);
                     card_stack.add_card(&image, 50);
                 }
             } else {
@@ -86,4 +88,26 @@ pub fn load_recent() {
 
 pub fn get_current_game() -> String {
     CURRENT_GAME.lock().unwrap().clone()
+}
+
+pub fn add_drag_to_card(card: &gtk::Image) {
+    let card_clone = card.clone();
+    let drag_source = DragSource::builder()
+        .actions(DragAction::MOVE)  // allow moving the stack
+        .build();
+
+    // When a drag is about to start, supply the CardStack as the drag data:
+    drag_source.connect_prepare(move |src, _x, _y| {
+        // Convert the CardStack (a GObject) into a GValue, then a ContentProvider.
+        let stack = card_clone.parent().unwrap().downcast::<CardStack>().unwrap();
+        let move_stack = stack.split_to_new_on(&*card_clone.widget_name()).unwrap();
+        let paintable = gtk::WidgetPaintable::new(Some(&move_stack));
+        src.set_icon(Some(&paintable), 0, 0);
+        let value = move_stack.upcast::<glib::Object>().to_value();
+        let provider = gdk::ContentProvider::for_value(&value);
+        src.set_content(Some(&provider));  // attach the data provider
+        Some(provider)  // must return Some(provider) from prepare
+    });
+    
+    card.add_controller(drag_source);
 }
