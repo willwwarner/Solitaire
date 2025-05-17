@@ -18,6 +18,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+use adw::gdk::Paintable;
 use gtk::prelude::*;
 use adw::prelude::*;
 use adw::subclass::prelude::*;
@@ -109,7 +110,8 @@ impl SolitaireWindow {
             image.set_widget_name(card_name.as_str());
             image.set_property("sensitive", true);
             game_board.attach(&image, rank_index as i32, suite_index as i32, 1, 1);
-            renderer::draw_image(&image, &card_name, &renderer);
+            let texture = renderer::draw_card(&card_name, &renderer);
+            image.set_paintable(Some(texture.upcast_ref::<Paintable>()));
 
             cards_to_add -= 1;
         }
@@ -118,9 +120,11 @@ impl SolitaireWindow {
     fn hint(&self) {
         println!("Hint!");
     }
+    
     fn undo(&self) {
         println!("Undo!");
     }
+
     fn redo(&self) {
         println!("Redo!");
     }
@@ -137,14 +141,14 @@ impl SolitaireWindow {
             .build();
         self.add_action_entries([hint_action, undo_action, redo_action]);
     }
-    
+
     #[template_callback]
     fn recent_clicked(&self, _row: &adw::ActionRow) {
         println!("Starting Recent!");
         games::load_recent();
         self.imp().nav_view.get().push_by_tag("game");
     }
-    
+
     #[template_callback]
     fn populate_game_list(&self, list: &gtk::ListBox) {
         println!("Populating game list!");
@@ -168,7 +172,7 @@ impl SolitaireWindow {
             list.append(&action_row);
         }
     }
-
+    
     #[template_callback]
     fn new_game_clicked(&self, _button: &gtk::Button) {
         let dialog = adw::AlertDialog::builder()

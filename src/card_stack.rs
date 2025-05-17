@@ -28,7 +28,7 @@ glib::wrapper! {
         @extends gtk::Fixed, gtk::Widget;
 }
 
-fn calculate_offset(stack_height: i32, num_cards: u32, card_height: i32) -> u32 {
+pub fn calculate_offset(stack_height: i32, num_cards: u32, card_height: i32) -> u32 {
     if num_cards == 0 {
         return 0;
     }

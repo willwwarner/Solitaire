@@ -17,10 +17,12 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
+
+use adw::subclass::prelude::*;
 use std::sync::Mutex;
 use gtk::prelude::*;
 use gtk::{DragSource, gdk::DragAction, gdk, glib};
-use crate::card_stack::CardStack;
+use crate::card_stack::*;
 use crate::renderer;
 use crate::window::*;
 
@@ -52,11 +54,11 @@ pub fn load_game(game: &str, grid: &gtk::Grid) {
             if let Some(obj) = children.item(0) {
                 if let Ok(image) = obj.downcast::<gtk::Image>() {
                     grid.remove(&image);
-                    add_drag_to_card(&image);
                     card_stack.add_card(&image, 50);
+                    add_drag_to_card(&image);
                 }
             } else {
-                gtk::glib::g_error!("Failed to get child from grid", "Solitaire");
+                glib::g_error!("Failed to get child from grid", "Solitaire");
             }
         }
 
@@ -91,22 +93,32 @@ pub fn get_current_game() -> String {
 }
 
 pub fn add_drag_to_card(card: &gtk::Image) {
-    let card_clone = card.clone();
     let drag_source = DragSource::builder()
         .actions(DragAction::MOVE)  // allow moving the stack
         .build();
 
-    // When a drag is about to start, supply the CardStack as the drag data:
-    drag_source.connect_prepare(move |src, _x, _y| {
-        // Convert the CardStack (a GObject) into a GValue, then a ContentProvider.
-        let stack = card_clone.parent().unwrap().downcast::<CardStack>().unwrap();
+    let card_clone = card.clone();
+    let stack = card.parent().unwrap().downcast::<CardStack>().unwrap();
+    drag_source.connect_prepare(move |src, _, _| {
         let move_stack = stack.split_to_new_on(&*card_clone.widget_name()).unwrap();
-        let paintable = gtk::WidgetPaintable::new(Some(&move_stack));
-        src.set_icon(Some(&paintable), 0, 0);
+        // Convert the CardStack (a GObject) into a GValue, then a ContentProvider.
         let value = move_stack.upcast::<glib::Object>().to_value();
         let provider = gdk::ContentProvider::for_value(&value);
         src.set_content(Some(&provider));  // attach the data provider
         Some(provider)  // must return Some(provider) from prepare
+    });
+
+    drag_source.connect_drag_begin(|src, drag| {
+        let icon = gtk::DragIcon::for_drag(drag);
+        let provider = src.content().unwrap();
+        let value = provider.value(glib::Type::OBJECT).unwrap();
+        if let Ok(obj) = value.get::<glib::Object>() {
+            if let Ok(original_stack) = obj.downcast::<CardStack>() {
+                let stack_clone = original_stack.clone();
+                icon.set_child(Some(&stack_clone));
+                stack_clone.imp().size_allocate(50, 180, 0);
+            }
+        }
     });
     
     card.add_controller(drag_source);

@@ -32,7 +32,7 @@ static mut GAME_WIDTH: i32 = 0;
 static mut TICK_CALLBACK_ID: Option<gtk::TickCallbackId> = None;
 
 pub const ASPECT:f32 = 1.4;
-pub fn draw_image(image: &gtk::Image, name: &str, renderer: &CairoRenderer) {
+pub fn draw_card(name: &str, renderer: &CairoRenderer) -> MemoryTexture {
     let surface = cairo::ImageSurface::
         create(cairo::Format::ARgb32, 250, 350)
         .expect("Couldn't create surface");
@@ -47,15 +47,13 @@ pub fn draw_image(image: &gtk::Image, name: &str, renderer: &CairoRenderer) {
     let data = surface.take_data().expect("Failed to get data from surface");
     // Create a texture from the surface
     let bytes = glib::Bytes::from(&data[..]);
-    let texture = MemoryTexture::new(
+    MemoryTexture::new(
         250,
         350,
         MemoryFormat::B8g8r8a8Premultiplied, // Match ARGB32 surface
         &bytes,
         stride,
-    );
-    // Set the image using the new method
-    image.set_paintable(Some(texture.upcast_ref::<Paintable>()));
+    )
 }
 
 fn update_geometry(grid: &gtk::Grid, height: i32, width: i32) {
