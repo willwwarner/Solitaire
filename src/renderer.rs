@@ -58,6 +58,7 @@ pub fn draw_card(name: &str, renderer: &CairoRenderer) -> MemoryTexture {
 
 fn update_geometry(grid: &gtk::Grid, height: i32, width: i32) {
     const NUM_COLS: i32 = 7;
+    const NUM_ROWS: i32 = 2;
     const CARD_HEIGHTS_NEEDED: i32 = 6;
     const SCREEN_USAGE_RATIO: i32 = 9;  // 90% usage becomes 9/10
 
@@ -73,15 +74,19 @@ fn update_geometry(grid: &gtk::Grid, height: i32, width: i32) {
     let card_height = std::cmp::min(max_height_by_width as i32, max_height_by_height);
     let card_width = (card_height as f32 / ASPECT) as i32;
     let tableau_row_height = card_height * 3;
-    
+
     // Process each stack widget in the grid
     let stacks = grid.observe_children();
-    for i in 0..stacks.n_items() {
-        if let Some(object) = stacks.item(i) {
-            if object.type_() == CardStack::static_type() {
-                if let Ok(stack) = object.downcast::<CardStack>() {
-                    // Apply calculated dimensions
-                    stack.imp().size_allocate(card_width, tableau_row_height, 0);
+    let mut stack_index = 0;
+    for _i in 0..NUM_ROWS {
+        for _j in 0..NUM_COLS {
+            if let Some(object) = stacks.item(stack_index as u32) {
+                if object.type_() == CardStack::static_type() {
+                    if let Ok(stack) = object.downcast::<CardStack>() {
+                        // Apply calculated dimensions
+                        stack.imp().size_allocate(card_width, tableau_row_height, 0);
+                        stack_index += 1;
+                    }
                 }
             }
         }
@@ -112,7 +117,7 @@ pub fn setup_resize(card_grid: &gtk::Grid) {
     }
 }
 
-pub fn unregister_resize(card_grid: &gtk::Grid) {
+pub fn unregister_resize() {
     unsafe {
         if let Some(id) = TICK_CALLBACK_ID.take() { // Maybe a raw pointer would work here
             id.remove();

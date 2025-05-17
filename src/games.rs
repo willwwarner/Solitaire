@@ -41,7 +41,7 @@ pub fn load_game(game: &str, grid: &gtk::Grid) {
     for i in 0..14 {
         // Create a new card stack for this position
         let card_stack = CardStack::new();
-        card_stack.set_vexpand(true);
+        card_stack.set_overflow(gtk::Overflow::Hidden);
 
         // Calculate layout position
         let row = i / 7;
@@ -54,7 +54,7 @@ pub fn load_game(game: &str, grid: &gtk::Grid) {
             if let Some(obj) = children.item(0) {
                 if let Ok(image) = obj.downcast::<gtk::Image>() {
                     grid.remove(&image);
-                    card_stack.add_card(&image, 50);
+                    card_stack.add_card(&image);
                     add_drag_to_card(&image);
                 }
             } else {
@@ -72,16 +72,16 @@ pub fn load_game(game: &str, grid: &gtk::Grid) {
     // Store the current game type
     CURRENT_GAME.lock().unwrap().push_str(game);
 
-    // Setup resize handler for responsive layout
+    // setup the resize handler for responsive layout
     renderer::setup_resize(grid);
 
     // Log game loading
     println!("Loaded game: {}", game);
 }
 
-pub fn unload(grid: &gtk::Grid) {
+pub fn unload(_grid: &gtk::Grid) {
     CURRENT_GAME.lock().unwrap().clear();
-    renderer::unregister_resize(grid);
+    renderer::unregister_resize();
 }
 
 pub fn load_recent() {
@@ -98,9 +98,9 @@ pub fn add_drag_to_card(card: &gtk::Image) {
         .build();
 
     let card_clone = card.clone();
-    let stack = card.parent().unwrap().downcast::<CardStack>().unwrap();
     drag_source.connect_prepare(move |src, _, _| {
-        let move_stack = stack.split_to_new_on(&*card_clone.widget_name()).unwrap();
+        let stack = card_clone.parent().unwrap().downcast::<CardStack>().unwrap();
+        let move_stack = stack.split_to_new_on(&*card_clone.widget_name());
         // Convert the CardStack (a GObject) into a GValue, then a ContentProvider.
         let value = move_stack.upcast::<glib::Object>().to_value();
         let provider = gdk::ContentProvider::for_value(&value);
