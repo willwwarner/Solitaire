@@ -24,6 +24,7 @@ mod window;
 mod renderer;
 mod games;
 mod card_stack;
+mod runtime;
 
 use self::application::SolitaireApplication;
 use self::window::SolitaireWindow;

@@ -19,6 +19,8 @@ gnome.compile_resources('solitaire',
   dependencies: blueprints,
 )
 
+subdir('games')
+
 conf = configuration_data()
 conf.set_quoted('VERSION', meson.project_version())
 conf.set_quoted('GETTEXT_PACKAGE', 'solitaire')
@@ -38,6 +40,19 @@ run_command(
   meson.project_source_root() / 'src' / 'config.rs',
   check: true
 )
+
+c_sources = files(
+  'game-rewrite.h',
+  'game-rewrite.c'
+)
+
+c_dependencies = [
+  dependency('guile-3.0', required: true),
+  dependency('glib-2.0', required: true),
+  dependency('gtk4', required: true)
+]
+
+c_lib = static_library('c_lib', c_sources, dependencies: c_dependencies)
 
 cargo_bin  = find_program('cargo')
 cargo_opt  = [ '--manifest-path', meson.project_source_root() / 'Cargo.toml' ]
@@ -63,5 +78,6 @@ cargo_build = custom_target(
     'env', cargo_env,
     cargo_bin, 'build',
     cargo_opt, '&&', 'cp', 'src' / rust_target / meson.project_name(), '@OUTPUT@',
-  ]
+  ],
+  depends: c_lib
 )

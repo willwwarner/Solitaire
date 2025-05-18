@@ -36,6 +36,47 @@
         "*.a"
     ],
     "modules" : [
+    	{
+            "name": "guile",
+            "cleanup": [
+                "/bin",
+                "/lib/libguile-3.0.so.1.2.0-gdb.scm"
+            ],
+            "sources": [
+                {
+                    "type": "archive",
+                    "url": "https://ftp.gnu.org/gnu/guile/guile-3.0.10.tar.xz",
+                    "sha256": "bd7168517fd526333446d4f7ab816527925634094fbd37322e17e2b8d8e76388"
+                }
+            ],
+            "modules":[
+                {
+                    "name": "gc",
+                    "cleanup": [
+                        "/share"
+                    ],
+                    "sources": [
+                        {
+                            "type": "archive",
+                            "url": "https://www.hboehm.info/gc/gc_source/gc-8.2.8.tar.gz",
+                            "sha256": "7649020621cb26325e1fb5c8742590d92fb48ce5c259b502faf7d9fb5dabb160"
+                        }
+                    ],
+                    "modules": [
+                        {
+                            "name": "libadtomic_ops",
+                            "sources": [
+                                {
+                                    "type": "archive",
+                                    "url": "https://github.com/bdwgc/libatomic_ops/releases/download/v7.6.16/libatomic_ops-7.6.16.tar.gz",
+                                    "md5": "27a2aef8ee847703219192554e205fbe"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
         {
             "name" : "solitaire",
             "builddir" : true,

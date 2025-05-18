@@ -117,6 +117,7 @@ pub fn add_drag_to_card(card: &gtk::Image) {
                 let stack_clone = original_stack.clone();
                 icon.set_child(Some(&stack_clone));
                 stack_clone.imp().size_allocate(50, 180, 0);
+                // Hard-coded sizing, IDK how it should be done adaptively
             }
         }
     });
