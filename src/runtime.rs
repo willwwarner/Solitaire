@@ -19,5 +19,5 @@
  */
 
 extern "C" {
-    
+    fn scm_start_game();
 }

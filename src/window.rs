@@ -56,7 +56,7 @@ mod imp {
 
         fn class_init(klass: &mut Self::Class) {
             klass.bind_template();
-            <crate::SolitaireWindow as CompositeTemplateCallbacks>::bind_template_callbacks(klass);
+            klass.bind_template_instance_callbacks();
         }
 
         fn instance_init(obj: &InitializingObject<Self>) {
