@@ -138,12 +138,6 @@ G_DEFINE_TYPE (AisleriotGame, aisleriot_game, G_TYPE_OBJECT);
 /* helper functions */
 
 static void
-cscmi_init_guile ()
-{
-  scm_boot_guile(NULL, NULL, NULL, NULL);
-}
-
-static void
 clear_delayed_call (AisleriotGame *game)
 {
   if (game->delayed_call_timeout_id != 0) {

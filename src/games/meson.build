@@ -111,6 +111,9 @@ module_sources = [
   'api.scm',
 ]
 
+guile = dependency('guile-3.0', required: true)
+guile_version = '3.0'
+
 guile_warnings = [
   '-Warity-mismatch',
   '-Wbad-case-datum',
@@ -123,13 +126,15 @@ guile_warnings = [
   '-W1',
 ]
 
-guile_flags = []
+guile_flags = [
+  '-Ono-letrectify',
+]
 
-if guile_version.version_compare('>= 3.0')
-  guile_flags += [
-    '-Ono-letrectify',
-  ]
-endif
+ar_name = 'aisleriot'
+ar_prefix        = get_option('prefix')
+ar_libdir        = get_option('libdir')
+ar_pkglibdir     = ar_libdir     / ar_name
+ar_pkgguiledir = ar_pkglibdir / 'guile' / guile_version
 
 # FIXME: this should use files('...') (allowed as per docs),
 # but that crashes meson, see https://gitlab.gnome.org/chpe/meson/issues/2
@@ -139,7 +144,7 @@ guile_compile = [
   guile_compile_prog,
   meson.current_source_dir(),
   meson.current_build_dir(),
-  guile,
+#  guile,
   'compile',
   guile_flags,
   guile_warnings,

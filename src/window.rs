@@ -92,7 +92,6 @@ impl SolitaireWindow {
 
     pub fn draw_init(&self) {
         let game_board = &self.imp().card_grid.get();
-        println!("Drawing cards!");
         let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/minimum_dark.svg", gio::ResourceLookupFlags::NONE)
             .expect("Failed to load resource data");
         let handle = Loader::new().read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>).expect("Failed to load SVG");
@@ -106,7 +105,6 @@ impl SolitaireWindow {
             let rank_index = ((cards_to_add - 1) % 13) as usize;
             let card_name = format!("{}_{}", games::SUITES[suite_index], games::RANKS[rank_index]);
 
-            println!("Adding {}", &card_name);
             image.set_widget_name(card_name.as_str());
             image.set_property("sensitive", true);
             game_board.attach(&image, rank_index as i32, suite_index as i32, 1, 1);

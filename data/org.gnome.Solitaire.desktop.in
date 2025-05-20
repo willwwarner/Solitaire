@@ -2,7 +2,7 @@
 Name=Solitaire
 Exec=solitaire
 Icon=org.gnome.Solitaire
-Terminal=false
+Terminal=true
 Type=Application
 Categories=Utility;
 Keywords=GTK;
