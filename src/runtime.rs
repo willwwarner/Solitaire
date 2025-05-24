@@ -18,6 +18,14 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-extern "C" {
-    fn scm_start_game();
+unsafe extern "C" {
+    fn scm_start_game (
+        main_func: Option<
+        unsafe extern "C" fn(
+            closure: *mut std::os::raw::c_void,
+            argc: std::os::raw::c_int,
+            argv: *mut *mut std::os::raw::c_char,
+        )>,
+        filename: *const std::os::raw::c_char,
+    );
 }

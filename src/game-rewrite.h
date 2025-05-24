@@ -20,5 +20,5 @@
 
 #ifndef GAME_REWRITE_H
 #define GAME_REWRITE_H
-
+void scm_start_game(void(* func));
 #endif //GAME_REWRITE_H

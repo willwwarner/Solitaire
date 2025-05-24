@@ -18,6 +18,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+use gettextrs::gettext;
 use adw::gdk::Paintable;
 use gtk::prelude::*;
 use adw::prelude::*;
@@ -150,14 +151,15 @@ impl SolitaireWindow {
     #[template_callback]
     fn populate_game_list(&self, list: &gtk::ListBox) {
         println!("Populating game list!");
+        let not_played_text = gettext("You haven't played this yet");
         for game in games::GAMES {
             let action_row = adw::ActionRow::new();
             let icon = gtk::Image::new();
             icon.set_icon_name(Some("go-next-symbolic"));
             icon.set_valign(gtk::Align::Center);
             action_row.set_activatable(true);
-            action_row.set_property("title", game);
-            action_row.set_property("subtitle", "You haven't played this yet");
+            action_row.set_property("title", gettext(game));
+            action_row.set_property("subtitle", &not_played_text);
             action_row.add_suffix(&icon);
             let nav_view = self.imp().nav_view.get();
             let card_grid = self.imp().card_grid.get();
@@ -174,13 +176,13 @@ impl SolitaireWindow {
     #[template_callback]
     fn new_game_clicked(&self, _button: &gtk::Button) {
         let dialog = adw::AlertDialog::builder()
-            .heading("Do you want to start a new game?")
-            .body("If you start a new game, your current progress will be lost.")
+            .heading(gettext("Do you want to start a new game?"))
+            .body(gettext("If you start a new game, your current progress will be lost."))
             .default_response("delete_event")
             .build();
         dialog.add_responses(&[
-            ("accept",   "Start New Game"),
-            ("delete_event", "Keep Current Game")
+            ("accept",          gettext("Start New Game").as_str()),
+            ("delete_event",    gettext("Keep Current Game").as_str())
         ]);
         let nav_view = self.imp().nav_view.get();
         let grid = self.imp().card_grid.get();
