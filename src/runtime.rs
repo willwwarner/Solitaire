@@ -18,6 +18,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+use std::sync::atomic;
+
+static MOVES: atomic::AtomicU16 = atomic::AtomicU16::new(0);
+
 unsafe extern "C" {
     fn scm_start_game (
         main_func: Option<
@@ -28,4 +32,9 @@ unsafe extern "C" {
         )>,
         filename: *const std::os::raw::c_char,
     );
+}
+
+#[no_mangle]
+pub extern "C" fn get_moves() -> u16 {
+    MOVES.load(atomic::Ordering::Acquire)
 }
