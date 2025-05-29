@@ -72,8 +72,7 @@ mod imp {
     impl ObjectImpl for CardStack {}
     impl WidgetImpl for CardStack {
         fn size_allocate(&self, width: i32, height: i32, baseline: i32) {
-            // Call the parent implementation to ensure default behavior
-            self.parent_size_allocate(width, height, baseline);
+            //self.parent_size_allocate(width, height, baseline);
             let widget = self.obj();
             let children = widget.observe_children();
             let child_count = children.n_items();
@@ -85,7 +84,7 @@ mod imp {
             let card_height = (width as f32 * renderer::ASPECT).floor() as i32;
             
             if child_count == 1 {
-                self.obj().first_child().unwrap().set_size_request(width, card_height);
+                widget.first_child().unwrap().set_size_request(width, card_height);
                 return;
             }
 
@@ -107,7 +106,7 @@ mod imp {
                     }
                 }
             }
-            self.obj().set_height_request(height);
+            widget.set_height_request(height);
         }
     }
     impl FixedImpl for CardStack {}

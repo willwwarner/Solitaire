@@ -120,6 +120,51 @@ typedef enum {
 /* The one and only game */
 struct AisleriotGame *app_game;
 
+typedef struct {
+  SCM lambda;
+  SCM *args;
+  gsize n_args;
+} CallData;
+
+static SCM
+game_scm_call_lambda (void *user_data)
+{
+  CallData *data = (CallData *) user_data;
+  return scm_call_n (data->lambda, data->args, data->n_args);
+}
+
+static gboolean
+game_scm_call (SCM lambda,
+               SCM *args,
+               gsize n_args,
+               SCM *retval)
+{
+  CallData data = { lambda, args, n_args };
+  GError *error = NULL;
+  SCM rv;
+
+  rv = scm_c_catch (SCM_BOOL_T,
+                    game_scm_call_lambda, &data,
+                    NULL, NULL,
+                    NULL, &error);
+  if (error) {
+    app_game->had_exception = TRUE;
+
+    g_print ("aisleriot: exception in game-scm-call: %s\n", error->message);
+    g_error_free (error);
+
+    /* This game is over, but don't count it in the statistics */
+    //set_game_state (app_game, GAME_LOADED);
+
+    return FALSE;
+  }
+
+  if (retval)
+    *retval = rv;
+
+  return TRUE;
+}
+
 static void
 cscmi_slot_set_cards (SCM cards)
 {
@@ -141,16 +186,17 @@ cscmi_slot_set_cards (SCM cards)
     }
   }
 
-  /* Don't set the new cards if the same cards are already there.
-   * This saves us lots of updates on undo/redo.
-   */
-  if (slot->cards->len == n_cards &&
-      memcmp (slot->cards->data, data, n_cards) == 0)
-    return;
-
-  g_byte_array_set_size (slot->cards, 0);
-
-  aisleriot_game_slot_add_cards (game, slot, data, n_cards);
+  // /* Don't set the new cards if the same cards are already there.
+  //  * This saves us lots of updates on undo/redo.
+  //  */
+  // if (slot->cards->len == n_cards &&
+  //     memcmp (slot->cards->data, data, n_cards) == 0)
+  //   return;
+  //
+  // g_byte_array_set_size (slot->cards, 0);
+  //
+  // aisleriot_game_slot_add_cards (game, slot, data, n_cards);
+  g_print ("aisleriot: IDK what to do here");
 }
 
 static SCM
@@ -205,27 +251,27 @@ cscmi_add_slot (SCM slot_data)
 #undef EQUALS_SYMBOL
 
   add_stack();
-
-  slot->id = scm_to_int (SCM_CAR (slot_data));
-  slot->type = type;
-
-  slot->cards = g_byte_array_sized_new (SLOT_CARDS_N_PREALLOC);
-  slot->exposed = 0;
-  slot->x = scm_to_double (SCM_CAR (SCM_CADR (SCM_CADDR (slot_data))));
-  slot->y = scm_to_double (SCM_CADR (SCM_CADR (SCM_CADDR (slot_data))));
-
-  slot->expansion_depth = expansion_depth;
-
-  slot->expansion.dx = 0.0;
-  slot->expanded_down = expanded_down != FALSE;
-  slot->expanded_right = expanded_right != FALSE;
-
-  slot->card_images = g_ptr_array_sized_new (SLOT_CARDS_N_PREALLOC);
-
-  slot->needs_update = TRUE;
-
-  /* this will update the slot length too */
-  cscmi_slot_set_cards (slot, SCM_CADR (slot_data));
+  //
+  // slot->id = scm_to_int (SCM_CAR (slot_data));
+  // slot->type = type;
+  //
+  // slot->cards = g_byte_array_sized_new (SLOT_CARDS_N_PREALLOC);
+  // slot->exposed = 0;
+  // slot->x = scm_to_double (SCM_CAR (SCM_CADR (SCM_CADDR (slot_data))));
+  // slot->y = scm_to_double (SCM_CADR (SCM_CADR (SCM_CADDR (slot_data))));
+  //
+  // slot->expansion_depth = expansion_depth;
+  //
+  // slot->expansion.dx = 0.0;
+  // slot->expanded_down = expanded_down != FALSE;
+  // slot->expanded_right = expanded_right != FALSE;
+  //
+  // slot->card_images = g_ptr_array_sized_new (SLOT_CARDS_N_PREALLOC);
+  //
+  // slot->needs_update = TRUE;
+  //
+  // /* this will update the slot length too */
+  // cscmi_slot_set_cards (slot, SCM_CADR (slot_data));
 
   return SCM_EOL;
 }
@@ -306,7 +352,7 @@ scm_set_statusbar_message (SCM message)
   if (!str)
     goto out;
 
-  g_signal_emit (game, signals[GAME_MESSAGE], 0, str);
+  //g_signal_emit (game, signals[GAME_MESSAGE], 0, str);
 
 out:
   scm_dynwind_end ();
@@ -317,28 +363,30 @@ out:
 static SCM
 scm_reset_surface (void)
 {
-  struct AisleriotGame *game = app_game;
-
-  clear_slots (game, TRUE);
-  return SCM_EOL;
+  // struct AisleriotGame *game = app_game;
+  //
+  // clear_slots (game, TRUE);
+  // return SCM_EOL;
+  g_print ("aisleriot: IDK what to do here");
 }
 
 static SCM
 scm_set_slot_x_expansion (SCM scm_slot_id,
                           SCM new_exp_val)
 {
-  struct AisleriotGame *game = app_game;
-  ArSlot *slot;
-
-  slot = get_slot (game, scm_to_int (scm_slot_id));
-
-  /* We should only set the x expansion for right-expanded slots! */
-  g_return_val_if_fail (slot->expanded_right, SCM_EOL);
-  /* Cannot set x and y expansion at the same time */
-  g_return_val_if_fail (!slot->dy_set, SCM_EOL);
-
-  slot->expansion.dx = scm_to_double (new_exp_val);
-  slot->dx_set = TRUE;
+  // struct AisleriotGame *game = app_game;
+  // ArSlot *slot;
+  //
+  // slot = get_slot (game, scm_to_int (scm_slot_id));
+  //
+  // /* We should only set the x expansion for right-expanded slots! */
+  // g_return_val_if_fail (slot->expanded_right, SCM_EOL);
+  // /* Cannot set x and y expansion at the same time */
+  // g_return_val_if_fail (!slot->dy_set, SCM_EOL);
+  //
+  // slot->expansion.dx = scm_to_double (new_exp_val);
+  // slot->dx_set = TRUE;
+  g_print ("aisleriot: IDK what to do here");
 
   /* We don't need to emit the slot-changed signal here,
    * since we should be here only during game initialisation,
@@ -351,18 +399,19 @@ static SCM
 scm_set_slot_y_expansion (SCM scm_slot_id,
                           SCM new_exp_val)
 {
-  struct AisleriotGame *game = app_game;
-  ArSlot *slot;
-
-  slot = get_slot (game, scm_to_int (scm_slot_id));
-
-  /* We should only set the y expansion for down-expanded slots! */
-  g_return_val_if_fail (slot->expanded_down, SCM_EOL);
-  /* Cannot set x and y expansion at the same time */
-  g_return_val_if_fail (!slot->dx_set, SCM_EOL);
-
-  slot->expansion.dy = scm_to_double (new_exp_val);
-  slot->dy_set = TRUE;
+  // struct AisleriotGame *game = app_game;
+  // ArSlot *slot;
+  //
+  // slot = get_slot (game, scm_to_int (scm_slot_id));
+  //
+  // /* We should only set the y expansion for down-expanded slots! */
+  // g_return_val_if_fail (slot->expanded_down, SCM_EOL);
+  // /* Cannot set x and y expansion at the same time */
+  // g_return_val_if_fail (!slot->dx_set, SCM_EOL);
+  //
+  // slot->expansion.dy = scm_to_double (new_exp_val);
+  // slot->dy_set = TRUE;
+  g_print ("aisleriot: IDK what to do here");
 
   /* We don't need to emit the slot-changed signal here,
    * since we should be here only during game initialisation,

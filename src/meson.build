@@ -19,7 +19,7 @@ gnome.compile_resources('solitaire',
   dependencies: blueprints,
 )
 
-subdir('games')
+subdir('scm_games')
 
 conf = configuration_data()
 conf.set_quoted('VERSION', meson.project_version())
@@ -79,5 +79,5 @@ cargo_build = custom_target(
     cargo_bin, 'build',
     cargo_opt, '&&', 'cp', 'src' / rust_target / meson.project_name(), '@OUTPUT@',
   ],
-  depends: c_lib
+  #depends: c_lib
 )
