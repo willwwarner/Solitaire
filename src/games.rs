@@ -27,7 +27,7 @@ use crate::renderer;
 
 pub const JOKERS: [&str; 2] = ["joker_red", "joker_black"];
 pub const SUITES: [&str; 4] = ["club", "diamond", "heart", "spade"];
-pub const RANKS: [&str; 13] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king"]; // We use 1 instead of ace for AisleRiot card compat
+pub const RANKS: [&str; 13] = ["ace", "2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king"];
 pub const GAMES: [&str; 6] = ["Klondike", "Spider", "FreeCell", "Tri-Peaks", "Pyramid", "Yukon"];
 static CURRENT_GAME: Mutex<String> = Mutex::new(String::new());
 
@@ -115,8 +115,8 @@ pub fn add_drag_to_card(card: &gtk::Image) {
             if let Ok(original_stack) = obj.downcast::<CardStack>() {
                 let stack_clone = original_stack.clone();
                 icon.set_child(Some(&stack_clone));
-                stack_clone.imp().size_allocate(50, 180, 0);
-                // TODO Hard-coded sizing, IDK how it should be done adaptively
+                stack_clone.set_width_request(original_stack.width());
+                stack_clone.queue_allocate();
             }
         }
     });

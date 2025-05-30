@@ -21,6 +21,7 @@ use adw::gio::ListModel;
 use gtk::{glib, gdk};
 use adw::prelude::*;
 use adw::subclass::prelude::*;
+use std::cell::Cell;
 use crate::renderer;
 
 glib::wrapper! {
@@ -57,10 +58,7 @@ mod imp {
 
     #[derive(Default)]
     pub struct CardStack {
-        pub is_stackable: bool,
-        // Store row for layout calculations
-        pub row: u8,
-        pub col: u8,
+        pub is_stackable: Cell<bool>,
     }
 
     #[glib::object_subclass]
@@ -149,6 +147,7 @@ impl CardStack {
         self.add_controller(drop_target);
     }
 
+    // FIXME this causes "Broken accounting of active state for widget" when the top card is moved
     pub fn split_to_new_on(&self, card_name: &str) -> CardStack {
         // Attempt to locate the child with the given card name
         let children = self.observe_children();
@@ -205,13 +204,5 @@ impl CardStack {
     
     pub fn focus_card(&self, card_name: &str) {
         self.get_card(card_name).expect("Couldn't get card").grab_focus();
-    }
-    
-    pub fn col(&self) -> u8 {
-        self.imp().col
-    }
-    
-    pub fn row(&self) -> u8 {
-        self.imp().row
     }
 }
