@@ -19,8 +19,6 @@ gnome.compile_resources('solitaire',
   dependencies: blueprints,
 )
 
-subdir('scm_games')
-
 conf = configuration_data()
 conf.set_quoted('VERSION', meson.project_version())
 conf.set_quoted('GETTEXT_PACKAGE', 'solitaire')

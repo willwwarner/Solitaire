@@ -27,39 +27,8 @@ use crate::renderer;
 
 pub const JOKERS: [&str; 2] = ["joker_red", "joker_black"];
 pub const SUITES: [&str; 4] = ["club", "diamond", "heart", "spade"];
-pub const RANKS: [&str; 13] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king"]; // We use 1 instead of ace for AisleRiot compat
-pub const GAMES: [&str; 91] = [
-"Accordion", "Agnes", "Athena",
-"Auld Lang Syne", "Aunt Mary", "Australian Patience",
-"Backbone", "Bakers Dozen", "Bakers Game",
-"Bear River", "Beleaguered Castle", "Block Ten",
-"Bristol", "Camelot", "Canfield",
-"Carpet", "Chessboard", "Clock",
-"Cover", "Cruel", "Diamond Mine",
-"Doublets", "Eagle Wing", "Easthaven",
-"Eight Off", "Elevator", "Eliminator",
-"Escalator", "First Law", "Fortress",
-"Fortunes", "Forty Thieves", "Fourteen",
-"Freecell", "Gaps", "Gay Gordons",
-"Giant", "Glenwood", "Gold Mine",
-"Golf", "Gypsy", "Hamilton",
-"Helsinki", "Hopscotch", "Isabel",
-"Jamestown", "Jumbo", "Kansas",
-"King Albert", "Kings Audience", "Klondike",
-"Labyrinth", "Lady Jane", "Maze",
-"Monte Carlo", "Napoleons Tomb", "Neighbor",
-"Odessa", "Osmosis", "Peek",
-"Pileon", "Plait", "Poker",
-"Quatorze", "Royal East", "Saratoga",
-"Scorpion", "Scuffle", "Seahaven",
-"Sir Tommy", "Spider Three Decks", "Spider",
-"Spiderette", "Straight Up", "Streets And Alleys",
-"Ten Across", "Terrace", "Thieves",
-"Thirteen", "Thumb And Pouch", "Treize",
-"Triple Peaks", "Union Square", "Valentine",
-"Wall", "Westhaven", "Whitehead",
-"Will O The Wisp", "Yield", "Yukon", 
-"Zebra"];
+pub const RANKS: [&str; 13] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king"]; // We use 1 instead of ace for AisleRiot card compat
+pub const GAMES: [&str; 6] = ["Klondike", "Spider", "FreeCell", "Tri-Peaks", "Pyramid", "Yukon"];
 static CURRENT_GAME: Mutex<String> = Mutex::new(String::new());
 
 // Links to all the included games
