@@ -69,7 +69,7 @@ mod imp {
     }
     impl ObjectImpl for CardStack {}
     impl WidgetImpl for CardStack {
-        fn size_allocate(&self, width: i32, height: i32, baseline: i32) {
+        fn size_allocate(&self, width: i32, height: i32, _baseline: i32) {
             //self.parent_size_allocate(width, height, baseline);
             let widget = self.obj();
             let children = widget.observe_children();
@@ -87,8 +87,7 @@ mod imp {
             }
 
             // Calculate vertical spacing between cards
-            let total_cards = child_count;
-            let vertical_offset = calculate_offset(height, total_cards, card_height);
+            let vertical_offset = calculate_offset(height, child_count, card_height);
 
             // Position each card with proper spacing
             for i in 0..child_count {
@@ -104,7 +103,7 @@ mod imp {
                     }
                 }
             }
-            widget.set_height_request(height);
+            widget.set_size_request(width, height);
         }
     }
     impl FixedImpl for CardStack {}

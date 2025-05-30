@@ -111,12 +111,15 @@ pub fn add_drag_to_card(card: &gtk::Image) {
         let icon = gtk::DragIcon::for_drag(drag);
         let provider = src.content().unwrap();
         let value = provider.value(glib::Type::OBJECT).unwrap();
+        // I'd rather have no DnD icon instead of a crash
         if let Ok(obj) = value.get::<glib::Object>() {
             if let Ok(original_stack) = obj.downcast::<CardStack>() {
                 let stack_clone = original_stack.clone();
                 icon.set_child(Some(&stack_clone));
-                stack_clone.set_width_request(original_stack.width());
-                stack_clone.queue_allocate();
+                let width = stack_clone.first_child().unwrap().width_request(); // HACK
+                println!("width: {} height: {}", width, width * 6);
+                stack_clone.imp().size_allocate(width, width * 6, 0);
+                // width * 6 is arbitrary, if you have anything better, tell me!
             }
         }
     });
