@@ -56,6 +56,10 @@ pub fn draw_card(name: &str, renderer: &CairoRenderer) -> MemoryTexture {
     )
 }
 
+fn flip_card(card: &gtk::Image) {
+
+}
+
 fn update_geometry(grid: &gtk::Grid, height: i32, width: i32) {
     const NUM_COLS: i32 = 7;
     const NUM_ROWS: i32 = 2;

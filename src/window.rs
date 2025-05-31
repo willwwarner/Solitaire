@@ -97,6 +97,7 @@ impl SolitaireWindow {
 
     pub fn window_init(&self) {
         self.draw_init();
+        self.populate_game_list(&self.imp().list.get());
         self.imp().search_bar.connect_entry(&self.imp().search_entry.get());
     }
     pub fn draw_init(&self) {
@@ -105,7 +106,7 @@ impl SolitaireWindow {
             .expect("Failed to load resource data");
         let handle = Loader::new().read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>).expect("Failed to load SVG");
         let renderer = rsvg::CairoRenderer::new(&handle); // We need to hand this out to the rendering functions
-        let mut cards_to_add:u8 = 52; // This is the amount of gtk::images (cards) to add to the box, of course a standard deck has 52 cards
+        let mut cards_to_add:u8 = 52; // This is the amount of gtk::Images (cards) to add to the box, of course a standard deck has 52 cards
 
         while cards_to_add > 0 {
             let image = gtk::Image::new();

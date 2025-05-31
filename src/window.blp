@@ -53,9 +53,7 @@ template $SolitaireWindow: Adw.ApplicationWindow {
               maximum-size: 500;
 
               ListBox list {
-                //lists all of our games, and each can be selected!
                 selection-mode: none;
-                realize => $populate_game_list() swapped;
 
                 styles [
                   "boxed-list",
