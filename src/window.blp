@@ -6,6 +6,10 @@ template $SolitaireWindow: Adw.ApplicationWindow {
   default-width: 800;
   default-height: 600;
 
+  styles [
+    "devel",
+  ]
+
   content: Adw.NavigationView nav_view {
     Adw.NavigationPage {
       title: _("Solitaire");
@@ -14,6 +18,11 @@ template $SolitaireWindow: Adw.ApplicationWindow {
       child: Adw.ToolbarView {
         [top]
         Adw.HeaderBar {
+          ToggleButton {
+            icon-name: "edit-find-symbolic";
+            tooltip-text: _("Search");
+            active: bind search_bar.search-mode-enabled bidirectional;
+          }
           [end]
           MenuButton {
             primary: true;
@@ -21,6 +30,15 @@ template $SolitaireWindow: Adw.ApplicationWindow {
             tooltip-text: _("Main Menu");
             menu-model: primary_menu;
           }
+        }
+        [top]
+        SearchBar search_bar {
+          key-capture-widget: template;
+          child: Adw.Clamp {
+            child: SearchEntry search_entry {
+              placeholder-text: _("Search games");
+            };
+          };
         }
 
         content: Adw.StatusPage {
@@ -64,14 +82,13 @@ template $SolitaireWindow: Adw.ApplicationWindow {
     }
 
     Adw.NavigationPage nav_page {
-      title: _("Solitaire");
+      title: _("Game not loaded...");
       tag: "game";
       can-pop: false;
 
       child: Adw.ToolbarView {
         [top]
         Adw.HeaderBar {
-
           Button new_game {
             icon-name: "go-previous-symbolic";
             tooltip-text: _("New Game");

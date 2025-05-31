@@ -47,6 +47,10 @@ mod imp {
         pub nav_page: TemplateChild<adw::NavigationPage>,
         #[template_child]
         pub card_grid: TemplateChild<gtk::Grid>,
+        #[template_child]
+        pub search_bar: TemplateChild<gtk::SearchBar>,
+        #[template_child]
+        pub search_entry: TemplateChild<gtk::SearchEntry>,
     }
 
     #[glib::object_subclass]
@@ -91,6 +95,10 @@ impl SolitaireWindow {
             .build()
     }
 
+    pub fn window_init(&self) {
+        self.draw_init();
+        self.imp().search_bar.connect_entry(&self.imp().search_entry.get());
+    }
     pub fn draw_init(&self) {
         let game_board = &self.imp().card_grid.get();
         let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/minimum_dark.svg", gio::ResourceLookupFlags::NONE)
@@ -202,5 +210,10 @@ impl SolitaireWindow {
         });
         dialog.set_response_appearance("accept", adw::ResponseAppearance::Destructive);
         dialog.present(Some(self));
+    }
+
+    #[template_callback]
+    fn toggle_search(&self, _button: &gtk::ToggleButton) {
+        todo!();
     }
 }
