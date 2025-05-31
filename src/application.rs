@@ -60,7 +60,7 @@ mod imp {
             // Get the current window or create one if necessary
             let window = application.active_window().unwrap_or_else(|| {
                 let window = SolitaireWindow::new(&*application);
-                SolitaireWindow::draw_init(&window);
+                SolitaireWindow::window_init(&window);
                 window.upcast()
             });
 
