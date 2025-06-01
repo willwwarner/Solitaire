@@ -19,12 +19,12 @@
  */
 
 use gettextrs::gettext;
-use adw::gdk::Paintable;
 use gtk::prelude::*;
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gio, glib};
 use glib::subclass::InitializingObject;
+use gtk::gdk::Paintable;
 use rsvg::Loader;
 use crate::card_stack::CardStack;
 use crate::renderer;
@@ -33,7 +33,7 @@ use crate::games;
 mod imp {
     use super::*;
 
-    #[derive(Debug, Default, gtk::CompositeTemplate)]
+    #[derive(Default, gtk::CompositeTemplate)]
     #[template(resource = "/org/gnome/Solitaire/window.ui")]
     pub struct SolitaireWindow {
         // Template widgets
@@ -96,17 +96,23 @@ impl SolitaireWindow {
     }
 
     pub fn window_init(&self) {
-        self.draw_init();
+        self.add_cards();
         self.populate_game_list(&self.imp().list.get());
         self.imp().search_bar.connect_entry(&self.imp().search_entry.get());
     }
-    pub fn draw_init(&self) {
+    pub fn add_cards(&self) {
         let game_board = &self.imp().card_grid.get();
+        glib::g_message!("solitaire", "Loading SVG");
         let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/minimum_dark.svg", gio::ResourceLookupFlags::NONE)
             .expect("Failed to load resource data");
-        let handle = Loader::new().read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>).expect("Failed to load SVG");
+        glib::g_message!("solitaire", "loaded resource data");
+        let handle = Loader::new()
+            .read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>)
+            .expect("Failed to load SVG");
         let renderer = rsvg::CairoRenderer::new(&handle); // We need to hand this out to the rendering functions
-        let mut cards_to_add:u8 = 52; // This is the amount of gtk::Images (cards) to add to the box, of course a standard deck has 52 cards
+        glib::g_message!("solitaire", "Done Loading SVG");
+        
+        let mut cards_to_add:u8 = 52; // The number of gtk Images (cards) to add to the grid, a standard deck has 52 cards
 
         while cards_to_add > 0 {
             let image = gtk::Image::new();
@@ -173,10 +179,11 @@ impl SolitaireWindow {
             let nav_view = self.imp().nav_view.get();
             let card_grid = self.imp().card_grid.get();
             action_row.connect_activated(move |_| {
-                println!("Starting {}!", game);
+                glib::g_message!("solitaire", "Starting {game}!");
                 let game_id = game.to_lowercase(); 
                 games::load_game(game_id.as_str(), &card_grid);
                 nav_view.push_by_tag("game");
+                glib::g_message!("solitaire", "pushed to game");
             });
             list.append(&action_row);
         }
@@ -211,10 +218,5 @@ impl SolitaireWindow {
         });
         dialog.set_response_appearance("accept", adw::ResponseAppearance::Destructive);
         dialog.present(Some(self));
-    }
-
-    #[template_callback]
-    fn toggle_search(&self, _button: &gtk::ToggleButton) {
-        todo!();
     }
 }

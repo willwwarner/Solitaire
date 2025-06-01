@@ -22,7 +22,7 @@ use adw::subclass::prelude::*;
 use adw::prelude::*;
 use cairo::Context;
 use gtk::gdk::*;
-use rsvg::CairoRenderer;
+use rsvg::{CairoRenderer, Loader};
 use crate::card_stack::*;
 
 // We can't afford to use safe variables here,
@@ -56,8 +56,30 @@ pub fn draw_card(name: &str, renderer: &CairoRenderer) -> MemoryTexture {
     )
 }
 
-fn flip_card(card: &gtk::Image) {
-
+pub fn flip_card(card: &gtk::Image) {
+    // There has to be a better way to do this
+    glib::g_message!("solitaire", "Loading SVG");
+    let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/minimum_dark.svg", gio::ResourceLookupFlags::NONE)
+        .expect("Failed to load resource data");
+    glib::g_message!("solitaire", "loaded resource data");
+    let handle = Loader::new()
+        .read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>)
+        .expect("Failed to load SVG");
+    let renderer = rsvg::CairoRenderer::new(&handle);
+    glib::g_message!("solitaire", "Done Loading SVG");
+    
+    // It's pretty simple, the state is stored in the widget name
+    let current_name = card.widget_name();
+    if current_name.contains("_b") {
+        card.set_widget_name(&current_name.replace("_b", ""));
+        let texture = draw_card(&card.widget_name(), &renderer);
+        card.set_paintable(Some(texture.upcast_ref::<Paintable>()));
+    }
+    else {
+        card.set_widget_name((current_name.to_string() + "_b").as_str());
+        let texture = draw_card("back", &renderer);
+        card.set_paintable(Some(texture.upcast_ref::<Paintable>()));
+    }
 }
 
 fn update_geometry(grid: &gtk::Grid, height: i32, width: i32) {
@@ -85,12 +107,10 @@ fn update_geometry(grid: &gtk::Grid, height: i32, width: i32) {
     for _i in 0..NUM_ROWS {
         for _j in 0..NUM_COLS {
             if let Some(object) = stacks.item(stack_index as u32) {
-                if object.type_() == CardStack::static_type() {
-                    if let Ok(stack) = object.downcast::<CardStack>() {
-                        // Apply calculated dimensions
-                        stack.imp().size_allocate(card_width, tableau_row_height, 0);
-                        stack_index += 1;
-                    }
+                if let Ok(stack) = object.downcast::<CardStack>() {
+                    // Apply calculated dimensions
+                    stack.imp().size_allocate(card_width, tableau_row_height, 0);
+                    stack_index += 1;
                 }
             }
         }

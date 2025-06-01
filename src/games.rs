@@ -21,7 +21,7 @@
 use adw::subclass::prelude::*;
 use std::sync::Mutex;
 use gtk::prelude::*;
-use gtk::{DragSource, gdk::DragAction, gdk, glib};
+use gtk::{DragSource, gdk::DragAction, gdk, glib, GestureClick};
 use crate::card_stack::*;
 use crate::renderer;
 
@@ -55,9 +55,10 @@ pub fn load_game(game: &str, grid: &gtk::Grid) {
                     grid.remove(&image);
                     card_stack.add_card(&image);
                     add_drag_to_card(&image);
+                    connect_click(&image);
                 }
             } else {
-                glib::g_error!("Failed to get child from grid", "Solitaire");
+                glib::g_error!("solitaire", "Failed to get child from grid");
             }
         }
 
@@ -69,7 +70,8 @@ pub fn load_game(game: &str, grid: &gtk::Grid) {
     }
 
     // Store the current game type
-    CURRENT_GAME.lock().unwrap().push_str(game);
+    let mut game_string = CURRENT_GAME.lock().unwrap();
+    *game_string = game.to_string();
 
     // setup the resize handler for responsive layout
     renderer::setup_resize(grid);
@@ -125,4 +127,19 @@ pub fn add_drag_to_card(card: &gtk::Image) {
     });
     
     card.add_controller(drag_source);
+}
+
+fn connect_click(card: &gtk::Image) {
+    let click = GestureClick::new();
+    let card_clone = card.clone();
+    click.connect_released(move |_click, n_press, _x, _y| {
+        if n_press == 1{
+            renderer::flip_card(&card_clone);    
+        } else if n_press == 2 {
+            glib::g_message!("solitaire", "double click")
+        } else { 
+            return;
+        }
+    });
+    card.add_controller(click);
 }

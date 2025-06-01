@@ -29,14 +29,6 @@ glib::wrapper! {
         @extends gtk::Fixed, gtk::Widget;
 }
 
-pub fn calculate_offset(stack_height: i32, num_cards: u32, card_height: i32) -> u32 {
-    // Calculate the overlap percentage (e.g., 50% of card height visible)
-    let max_spacing = (card_height / 2) as u32;
-
-    // Calculate the offset without exceeding the stack height
-    std::cmp::min(((stack_height - card_height) / (num_cards as i32 - 1)) as u32, max_spacing)
-}
-
 pub fn get_index(card_name: &str, children: &ListModel) -> Result<u32, glib::Error> {
     // Attempt to locate the child with the given card name
     let total_children = children.n_items();
@@ -78,16 +70,14 @@ mod imp {
             if child_count == 0 {
                 return;
             }
-            // Calculate a size that maintains the aspect ratio for the cards
-            let card_height = (width as f32 * renderer::ASPECT).floor() as i32;
             
             if child_count == 1 {
-                widget.first_child().unwrap().set_size_request(width, card_height);
+                widget.first_child().unwrap().set_width_request(width);
                 return;
             }
-
-            // Calculate vertical spacing between cards
-            let vertical_offset = calculate_offset(height, child_count, card_height);
+            
+            let card_height = (width as f32 * renderer::ASPECT).floor() as i32; // Use floor() because the lower height means spacing is not messed up
+            let vertical_offset = std::cmp::min((height - card_height) / (child_count as i32 - 1), card_height / 2) as u32;
 
             // Position each card with proper spacing
             for i in 0..child_count {
@@ -95,7 +85,7 @@ mod imp {
                     if let Ok(image) = child.downcast::<gtk::Image>() {
                         // Set the explicit size request for the image
                         image.set_size_request(width, card_height);
-
+                        
                         // Position the card vertically with the proper offset
                         // The formula ensures cards are properly staggered with the calculated offset
                         let y_pos = (i * vertical_offset) as f64;
