@@ -21,6 +21,7 @@ gnome.compile_resources('solitaire',
 
 conf = configuration_data()
 conf.set_quoted('VERSION', meson.project_version())
+conf.set_quoted('APP_ID', app_id)
 conf.set_quoted('GETTEXT_PACKAGE', 'solitaire')
 conf.set_quoted('LOCALEDIR', get_option('prefix') / get_option('localedir'))
 conf.set_quoted('PKGDATADIR', pkgdatadir)
@@ -40,16 +41,7 @@ run_command(
 )
 
 cargo_bin  = find_program('cargo')
-cargo_opt  = [ '--manifest-path', meson.project_source_root() / 'Cargo.toml' ]
-cargo_opt += [ '--target-dir', meson.project_build_root()  / 'src' ]
 cargo_env  = [ 'CARGO_HOME=' + meson.project_build_root()  / 'cargo-home' ]
-
-if get_option('buildtype') == 'release'
-  cargo_opt += [ '--release' ]
-  rust_target = 'release'
-else
-  rust_target = 'debug'
-endif
 
 cargo_build = custom_target(
   'cargo-build',

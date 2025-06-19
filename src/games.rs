@@ -1,6 +1,6 @@
 /* games.rs
  *
- * Copyright 2025 Shbozz
+ * Copyright 2025 Will Warner
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -46,16 +46,16 @@ pub fn load_game(game: &str, grid: &gtk::Grid) {
         let row = i / 7;
         let col = i % 7;
 
-        // Add cards to the stack, reusing available images
+        // Add cards to the stack, reusing available pictures
         for _j in 0..4 {
             // Always get the first item from the collection (index 0)
             // as the collection shifts when items are removed
             if let Some(obj) = children.item(0) {
-                if let Ok(image) = obj.downcast::<gtk::Image>() {
-                    grid.remove(&image);
-                    card_stack.add_card(&image);
-                    add_drag_to_card(&image);
-                    connect_click(&image);
+                if let Ok(picture) = obj.downcast::<gtk::Picture>() {
+                    grid.remove(&picture);
+                    card_stack.add_card(&picture);
+                    add_drag_to_card(&picture);
+                    connect_click(&picture);
                 }
             } else {
                 glib::g_error!("solitaire", "Failed to get child from grid");
@@ -93,7 +93,7 @@ pub fn load_recent() {
 //     CURRENT_GAME.lock().unwrap().clone()
 // }
 
-pub fn add_drag_to_card(card: &gtk::Image) {
+pub fn add_drag_to_card(card: &gtk::Picture) {
     let drag_source = DragSource::builder()
         .actions(DragAction::MOVE)  // allow moving the stack
         .build();
@@ -129,7 +129,7 @@ pub fn add_drag_to_card(card: &gtk::Image) {
     card.add_controller(drag_source);
 }
 
-fn connect_click(card: &gtk::Image) {
+fn connect_click(card: &gtk::Picture) {
     let click = GestureClick::new();
     let card_clone = card.clone();
     click.connect_released(move |_click, n_press, _x, _y| {

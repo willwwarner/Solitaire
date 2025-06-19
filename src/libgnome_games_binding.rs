@@ -1,4 +1,4 @@
-/* runtime.rs
+/* libgnome_games_binding.rs
  *
  * Copyright 2025 Will Warner
  *
@@ -18,4 +18,5 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-// I will craft a rust API for creating games soon
+// This game is going to use libgnome-games-support, 
+// but since that is made in Vala, some bindings need to be made.

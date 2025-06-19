@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=Solitaire
 Exec=solitaire
-Icon=org.gnome.Solitaire
+Icon=@app-id@
 Terminal=true
 Type=Application
 Categories=Utility;

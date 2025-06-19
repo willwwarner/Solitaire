@@ -1,6 +1,6 @@
 /* card_stack.rs
  *
- * Copyright 2025 Shbozz
+ * Copyright 2025 Will Warner
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -36,8 +36,8 @@ pub fn get_index(card_name: &str, children: &ListModel) -> Result<u32, glib::Err
     // Loop through all the children widgets to find the matching card
     for i in 0..total_children {
         let child = children.item(i).expect("Failed to get child from CardStack");
-        let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (find)");
-        if image.widget_name() == card_name {
+        let picture = child.downcast::<gtk::Picture>().expect("Child is not a gtk::Picture (find)");
+        if picture.widget_name() == card_name {
             return Ok(i);
         }
     }
@@ -82,14 +82,14 @@ mod imp {
             // Position each card with proper spacing
             for i in 0..child_count {
                 if let Some(child) = children.item(i) {
-                    if let Ok(image) = child.downcast::<gtk::Image>() {
-                        // Set the explicit size request for the image
-                        image.set_size_request(width, card_height);
+                    if let Ok(picture) = child.downcast::<gtk::Picture>() {
+                        // Set the explicit size request for the picture
+                        picture.set_size_request(width, card_height);
                         
                         // Position the card vertically with the proper offset
                         // The formula ensures cards are properly staggered with the calculated offset
                         let y_pos = (i * vertical_offset) as f64;
-                        widget.move_(&image, 0.0, y_pos);
+                        widget.move_(&picture, 0.0, y_pos);
                     }
                 }
             }
@@ -104,7 +104,7 @@ impl CardStack {
         glib::Object::new()
     }
     // Most stack methods could use these
-    pub fn get_card(&self, card_name: &str) -> Result<gtk::Image, glib::Error> {
+    pub fn get_card(&self, card_name: &str) -> Result<gtk::Picture, glib::Error> {
         // Attempt to locate the child with the given card name
         let children = self.observe_children();
         let total_children = children.n_items();
@@ -112,9 +112,9 @@ impl CardStack {
         // Loop through all the children widgets to find the matching card
         for i in 0..total_children {
             let child = children.item(i).expect("Failed to get child from CardStack");
-            let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (find)");
-            if image.widget_name() == card_name {
-                return Ok(image);
+            let picture = child.downcast::<gtk::Picture>().expect("Child is not a gtk::Picture (find)");
+            if picture.widget_name() == card_name {
+                return Ok(picture);
             }
         }
 
@@ -147,9 +147,9 @@ impl CardStack {
         let start_index = get_index(card_name, &children).expect("Couldn't get card");
         for _i in start_index..total_children {
             let child = children.item(start_index).expect("Failed to get child from CardStack");
-            let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (split:1)");
-            self.remove(&image);
-            new_stack.add_card(&image);
+            let picture = child.downcast::<gtk::Picture>().expect("Child is not a gtk::Picture (split:1)");
+            self.remove(&picture);
+            new_stack.add_card(&picture);
         }
         self.imp().size_allocate(self.width(), self.height(), self.baseline());
         
@@ -160,20 +160,20 @@ impl CardStack {
         let items = stack.observe_children().n_items();
         for _i in 0..items {
             let child = stack.first_child().expect("Failed to get first child from CardStack");
-            let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (merge)");
-            stack.remove(&image);
-            self.add_card(&image);
+            let picture = child.downcast::<gtk::Picture>().expect("Child is not a gtk::Picture (merge)");
+            stack.remove(&picture);
+            self.add_card(&picture);
         }
         self.imp().size_allocate(self.width(), self.height(), self.baseline());
         stack.unrealize();
     }
 
-    pub fn add_card(&self, card_image: &gtk::Image) {
-        // Only add the image if it doesn't already have a parent
-        if card_image.parent().is_none() {
-            self.put(card_image, 0.0, 0.0);
+    pub fn add_card(&self, card_picture: &gtk::Picture) {
+        // Only add the picture if it doesn't already have a parent
+        if card_picture.parent().is_none() {
+            self.put(card_picture, 0.0, 0.0);
         } else {
-            // If the image already has a parent, log a warning
+            // If the picture already has a parent, log a warning
             eprintln!("Warning: Attempted to add a widget that already has a parent");
         }
     }
@@ -182,10 +182,10 @@ impl CardStack {
         let items = self.observe_children().n_items();
         for i in 0..items {
             let child = self.first_child().expect("Failed to get first child from CardStack");
-            let image = child.downcast::<gtk::Image>().expect("Child is not a gtk::Image (dissolve)");
-            self.remove(&image);
-            grid.attach(&image, i as i32, row, 1, 1);
-            image.set_height_request(1);
+            let picture = child.downcast::<gtk::Picture>().expect("Child is not a gtk::Picture (dissolve)");
+            self.remove(&picture);
+            grid.attach(&picture, i as i32, row, 1, 1);
+            picture.set_height_request(1);
         }
         grid.remove(&self);
         self.unrealize();

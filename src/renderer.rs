@@ -1,6 +1,6 @@
 /* renderer.rs
  *
- * Copyright 2025 Shbozz
+ * Copyright 2025 Will Warner
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,6 +29,7 @@ use crate::card_stack::*;
 // we are reading (& writing) multiple times a second
 static mut GAME_HEIGHT: i32 = 0;
 static mut GAME_WIDTH: i32 = 0;
+static mut CARD_WIDTH: u32 = 0;
 static mut TICK_CALLBACK_ID: Option<gtk::TickCallbackId> = None;
 
 pub const ASPECT:f32 = 1.4;
@@ -56,7 +57,7 @@ pub fn draw_card(name: &str, renderer: &CairoRenderer) -> MemoryTexture {
     )
 }
 
-pub fn flip_card(card: &gtk::Image) {
+pub fn flip_card(card: &gtk::Picture) {
     // There has to be a better way to do this
     glib::g_message!("solitaire", "Loading SVG");
     let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/minimum_dark.svg", gio::ResourceLookupFlags::NONE)

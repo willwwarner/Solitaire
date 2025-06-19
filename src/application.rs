@@ -1,6 +1,6 @@
 /* application.rs
  *
- * Copyright 2025 Shbozz
+ * Copyright 2025 Will Warner
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@ use gettextrs::gettext;
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gio, glib};
-use crate::config::VERSION;
+use crate::config::{VERSION, APP_ID};
 use crate::SolitaireWindow;
 
 mod imp {
@@ -102,19 +102,19 @@ impl SolitaireApplication {
         let window = self.active_window().unwrap();
         let about = adw::AboutDialog::builder()
             .application_name("Solitaire")
-            .application_icon("org.gnome.Solitaire")
-            .developer_name("Shbozz")
+            .application_icon(APP_ID)
+            .developer_name("Will Warner")
             .version(VERSION)
-            .developers(vec!["Shbozz"])
-            .artists(vec!["Vincent Bermel", "Shbozz"])
+            .developers(vec!["Will Warner"])
+            .artists(vec!["Vincent Bermel", "Will Warner"])
             // Translators: Replace "translator-credits" with your name/username, and optionally an email or URL.
             .translator_credits(&gettext("translator-credits"))
-            .copyright("© 2025 Shbozz \
+            .copyright("© 2025 Will Warner \
                         \n© 2024 Vincent Bermel")
             .license_type(gtk::License::Gpl30)
             .issue_url("https://gitlab.gnome.org/shbozz/solitaire/-/issues")
             .website("https://shbozz.github.io/Solitaire")
-            .comments("Solitaire is a simple collection of card games.")
+            .comments("A simple collection of card games.")
             .build();
 
         about.present(Some(&window));

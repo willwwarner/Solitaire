@@ -1,6 +1,6 @@
 /* main.rs
  *
- * Copyright 2025 Shbozz
+ * Copyright 2025 Will Warner
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,11 +25,12 @@ mod renderer;
 mod games;
 mod card_stack;
 mod runtime;
+mod libgnome_games_binding;
 
 use self::application::SolitaireApplication;
 use self::window::SolitaireWindow;
 
-use config::{GETTEXT_PACKAGE, LOCALEDIR, PKGDATADIR};
+use config::{GETTEXT_PACKAGE, LOCALEDIR, PKGDATADIR, APP_ID};
 use gettextrs::{bind_textdomain_codeset, bindtextdomain, textdomain};
 use gtk::{gio, glib};
 use gtk::prelude::*;
@@ -49,7 +50,7 @@ fn main() -> glib::ExitCode {
     // Create a new GtkApplication. The application manages our main loop,
     // application windows, integration with the window manager/compositor, and
     // desktop features such as file opening and single-instance applications.
-    let app = SolitaireApplication::new("org.gnome.Solitaire", &gio::ApplicationFlags::empty());
+    let app = SolitaireApplication::new(APP_ID, &gio::ApplicationFlags::empty());
 
     // Run the application. This function will block until the application
     // exits. Upon return, we have our exit code to return to the shell. (This

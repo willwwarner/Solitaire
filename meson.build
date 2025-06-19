@@ -1,5 +1,5 @@
 project('solitaire', ['c', 'rust'],
-          version: '0.1.0',
+          version: 'DEV',
     meson_version: '>= 1.0.0',
   default_options: [ 'warning_level=2', 'werror=false', ],
 )
@@ -7,8 +7,17 @@ project('solitaire', ['c', 'rust'],
 i18n = import('i18n')
 gnome = import('gnome')
 
+cargo_opt  = [ '--manifest-path', meson.project_source_root() / 'Cargo.toml' ]
+cargo_opt += [ '--target-dir', meson.project_build_root()  / 'src' ]
 
-
+if get_option('buildtype') == 'release'
+  cargo_opt += [ '--release' ]
+  rust_target = 'release'
+  app_id = 'org.gnome.Solitaire'
+else
+  rust_target = 'debug'
+  app_id = 'org.gnome.Solitaire.Devel'
+endif
 
 subdir('data')
 subdir('src')

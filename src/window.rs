@@ -1,6 +1,6 @@
 /* window.rs
  *
- * Copyright 2025 Shbozz
+ * Copyright 2025 Will Warner
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -112,20 +112,20 @@ impl SolitaireWindow {
         let renderer = rsvg::CairoRenderer::new(&handle); // We need to hand this out to the rendering functions
         glib::g_message!("solitaire", "Done Loading SVG");
         
-        let mut cards_to_add:u8 = 52; // The number of gtk Images (cards) to add to the grid, a standard deck has 52 cards
+        let mut cards_to_add:u8 = 52; // The number of gtk Pictures (cards) to add to the grid, a standard deck has 52 cards
 
         while cards_to_add > 0 {
-            let image = gtk::Image::new();
+            let picture = gtk::Picture::new();
 
             let suite_index = ((cards_to_add - 1) / 13) as usize;
             let rank_index = ((cards_to_add - 1) % 13) as usize;
             let card_name = format!("{}_{}", games::SUITES[suite_index], games::RANKS[rank_index]);
 
-            image.set_widget_name(card_name.as_str());
-            image.set_property("sensitive", true);
-            game_board.attach(&image, rank_index as i32, suite_index as i32, 1, 1);
+            picture.set_widget_name(card_name.as_str());
+            picture.set_property("sensitive", true);
+            game_board.attach(&picture, rank_index as i32, suite_index as i32, 1, 1);
             let texture = renderer::draw_card(&card_name, &renderer);
-            image.set_paintable(Some(texture.upcast_ref::<Paintable>()));
+            picture.set_paintable(Some(texture.upcast_ref::<Paintable>()));
 
             cards_to_add -= 1;
         }
