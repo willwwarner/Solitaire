@@ -11,7 +11,7 @@ template $SolitaireWindow: Adw.ApplicationWindow {
   ]
 
   content: Adw.NavigationView nav_view {
-    Adw.NavigationPage {
+    Adw.NavigationPage nav_page {
       title: _("Solitaire");
       tag: "chooser";
 
@@ -79,7 +79,7 @@ template $SolitaireWindow: Adw.ApplicationWindow {
       };
     }
 
-    Adw.NavigationPage nav_page {
+    Adw.NavigationPage game_page {
       title: _("Game not loaded...");
       tag: "game";
       can-pop: false;
@@ -117,11 +117,24 @@ template $SolitaireWindow: Adw.ApplicationWindow {
           }
         }
 
-        content: Grid card_grid {
-          halign: center;
+        content: AspectFrame {
+          obey-child: false;
+          ratio: 0.6;
+          margin-bottom: 12;
+          hexpand: true;
           vexpand: true;
-          row-homogeneous: false;
-          overflow: hidden;
+          valign: start;
+
+          Grid card_grid {
+            halign: center;
+            hexpand: true;
+            vexpand: true;
+            height-request: 600;
+            width-request: 600;
+            row-homogeneous: false;
+            column-homogeneous: true; // Temporary, also the easiest way to do this.
+            overflow: hidden;
+          }
         };
       };
     }
@@ -135,7 +148,7 @@ menu primary_menu {
   //     action: "win.show-score-dialog";
   //   }
   //   item {
-  //     label: _("_Apperance");
+  //     label: _("A_pperance");
   //     action: "win.show-apperance-dialog";
   //   }
   // }

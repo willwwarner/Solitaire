@@ -17,8 +17,9 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
+
 use adw::gio::ListModel;
-use gtk::{glib, gdk};
+use gtk::{glib, gdk, gsk};
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use std::cell::Cell;
@@ -26,7 +27,7 @@ use crate::renderer;
 
 glib::wrapper! {
     pub struct CardStack(ObjectSubclass<imp::CardStack>)
-        @extends gtk::Fixed, gtk::Widget;
+        @extends gtk::Box, gtk::Widget;
 }
 
 pub fn get_index(card_name: &str, children: &ListModel) -> Result<u32, glib::Error> {
@@ -51,18 +52,38 @@ mod imp {
     #[derive(Default)]
     pub struct CardStack {
         pub is_stackable: Cell<bool>,
+        pub v_offset: Cell<u32>,
     }
 
     #[glib::object_subclass]
     impl ObjectSubclass for CardStack {
         const NAME: &'static str = "CardStack";
         type Type = super::CardStack;
-        type ParentType = gtk::Fixed;
+        type ParentType = gtk::Box;
     }
+
     impl ObjectImpl for CardStack {}
+
     impl WidgetImpl for CardStack {
-        fn size_allocate(&self, width: i32, height: i32, _baseline: i32) {
-            //self.parent_size_allocate(width, height, baseline);
+        fn measure(&self, orientation: gtk::Orientation, for_size: i32) -> (i32, i32, i32, i32) {
+            if for_size == 0 { panic!("solitaire: card_stack: for_size == 0!") }
+            // If orientation == horizontal, then for_size is the height
+            if for_size == -1 {
+                if orientation == gtk::Orientation::Horizontal {
+                    return (20, 30, -1, -1);
+                } else if orientation == gtk::Orientation::Vertical {
+                    return (60, 90, -1, -1);
+                }
+            }
+            if orientation == gtk::Orientation::Horizontal {
+                return (20, for_size / 3, -1, -1);
+            } else if orientation == gtk::Orientation::Vertical {
+                return (60, for_size * 3, -1, -1);
+            } else { panic!("solitaire: orientation is not vertical or horizontal"); }
+        }
+
+        fn size_allocate(&self, width: i32, height: i32, baseline: i32) {
+            self.parent_size_allocate(width, height, baseline);
             let widget = self.obj();
             let children = widget.observe_children();
             let child_count = children.n_items();
@@ -70,40 +91,48 @@ mod imp {
             if child_count == 0 {
                 return;
             }
-            
+
             if child_count == 1 {
-                widget.first_child().unwrap().set_width_request(width);
+                widget.first_child().unwrap().allocate(width, (width as f32 * renderer::ASPECT) as i32, -1, None);
                 return;
             }
-            
+
             let card_height = (width as f32 * renderer::ASPECT).floor() as i32; // Use floor() because the lower height means spacing is not messed up
-            let vertical_offset = std::cmp::min((height - card_height) / (child_count as i32 - 1), card_height / 2) as u32;
+            if height <= card_height {
+                panic!("solitaire: card_stack height is is less than card_height, height: {height}");
+            }
+
+            let vertical_offset;
+            if height > (width * 3) {
+                vertical_offset = std::cmp::min((width * 3 - card_height) / (child_count as i32 - 1), card_height / 2) as u32;
+            } else {
+                vertical_offset = std::cmp::min((height - card_height) / (child_count as i32 - 1), card_height / 2) as u32;
+            }
+            self.v_offset.set(vertical_offset);
 
             // Position each card with proper spacing
             for i in 0..child_count {
                 if let Some(child) = children.item(i) {
-                    if let Ok(picture) = child.downcast::<gtk::Picture>() {
-                        // Set the explicit size request for the picture
-                        picture.set_size_request(width, card_height);
-                        
+                    if let Ok(picture) = child.downcast::<gtk::Widget>() {
                         // Position the card vertically with the proper offset
                         // The formula ensures cards are properly staggered with the calculated offset
-                        let y_pos = (i * vertical_offset) as f64;
-                        widget.move_(&picture, 0.0, y_pos);
+                        let y_pos = (i * vertical_offset) as f32;
+                        picture.allocate(width, card_height, -1, Some(gsk::Transform::new().translate(&gtk::graphene::Point::new(0.0, y_pos))));
                     }
                 }
             }
-            widget.set_size_request(width, height);
         }
     }
-    impl FixedImpl for CardStack {}
+    
+    impl BoxImpl for CardStack {}
 }
 
 impl CardStack {
     pub fn new() -> Self {
         glib::Object::new()
     }
-    // Most stack methods could use these
+
+    // Most card stack methods could use get_card instead of whatever is implemented there
     pub fn get_card(&self, card_name: &str) -> Result<gtk::Picture, glib::Error> {
         // Attempt to locate the child with the given card name
         let children = self.observe_children();
@@ -123,11 +152,10 @@ impl CardStack {
 
     pub fn enable_drop(&self) {
         let drop_target = gtk::DropTarget::new(glib::Type::OBJECT, gdk::DragAction::MOVE);
-        //drop_target.set_highlight(false); or something, the highlighting isn't ideal 
         let stack_clone = self.clone();
         drop_target.connect_drop(move |_, val, _, _| {
             let Ok(drop_stack) = val.get::<CardStack>() else {
-                glib::g_error!("Tried to drop a non-CardStack onto a CardStack", "Solitaire");
+                glib::g_warning!("Tried to drop a non-CardStack onto a CardStack", "Solitaire");
                 return false;
             };
             stack_clone.merge_stack(&drop_stack);
@@ -136,7 +164,7 @@ impl CardStack {
         self.add_controller(drop_target);
     }
 
-    // FIXME this causes "Broken accounting of active state for widget" when the top card is moved
+    // FIXME: this causes "Broken accounting of active state for widget" when the top card is moved (occasionally)
     pub fn split_to_new_on(&self, card_name: &str) -> CardStack {
         // Attempt to locate the child with the given card name
         let children = self.observe_children();
@@ -152,6 +180,8 @@ impl CardStack {
             new_stack.add_card(&picture);
         }
         self.imp().size_allocate(self.width(), self.height(), self.baseline());
+        new_stack.set_height_request(self.height());
+        new_stack.set_width_request(self.width());
         
         new_stack
     }
@@ -171,10 +201,10 @@ impl CardStack {
     pub fn add_card(&self, card_picture: &gtk::Picture) {
         // Only add the picture if it doesn't already have a parent
         if card_picture.parent().is_none() {
-            self.put(card_picture, 0.0, 0.0);
+            self.append(card_picture);
         } else {
             // If the picture already has a parent, log a warning
-            eprintln!("Warning: Attempted to add a widget that already has a parent");
+            glib::g_warning!("solitaire", "Warning: Attempted to add a widget that already has a parent");
         }
     }
     

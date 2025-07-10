@@ -25,7 +25,6 @@ mod renderer;
 mod games;
 mod card_stack;
 mod runtime;
-mod libgnome_games_binding;
 
 use self::application::SolitaireApplication;
 use self::window::SolitaireWindow;

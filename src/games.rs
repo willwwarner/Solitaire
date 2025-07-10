@@ -25,6 +25,8 @@ use gtk::{DragSource, gdk::DragAction, gdk, glib, GestureClick};
 use crate::card_stack::*;
 use crate::renderer;
 
+mod klondike;
+
 pub const JOKERS: [&str; 2] = ["joker_red", "joker_black"];
 pub const SUITES: [&str; 4] = ["club", "diamond", "heart", "spade"];
 pub const RANKS: [&str; 13] = ["ace", "2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king"];
@@ -67,22 +69,23 @@ pub fn load_game(game: &str, grid: &gtk::Grid) {
 
         // Attach the card stack to the grid at the calculated position
         grid.attach(&card_stack, col, row, 1, 1);
+
+        // Card Stacks must have no layout manager to work correctly
+        card_stack.set_layout_manager(None::<gtk::LayoutManager>);
+        card_stack.set_vexpand(true);
     }
 
     // Store the current game type
     let mut game_string = CURRENT_GAME.lock().unwrap();
     *game_string = game.to_string();
 
-    // setup the resize handler for responsive layout
-    renderer::setup_resize(grid);
-
     // Log game loading
     println!("Loaded game: {}", game);
+    println!("Children after game load: {}", grid.first_child().is_some());
 }
 
 pub fn unload(_grid: &gtk::Grid) {
     CURRENT_GAME.lock().unwrap().clear();
-    renderer::unregister_resize();
 }
 
 pub fn load_recent() {
@@ -102,6 +105,7 @@ pub fn add_drag_to_card(card: &gtk::Picture) {
     drag_source.connect_prepare(move |src, _, _| {
         let stack = card_clone.parent().unwrap().downcast::<CardStack>().unwrap();
         let move_stack = stack.split_to_new_on(&*card_clone.widget_name());
+        move_stack.set_layout_manager(None::<gtk::LayoutManager>);
         // Convert the CardStack (a GObject) into a GValue, then a ContentProvider.
         let value = move_stack.upcast::<glib::Object>().to_value();
         let provider = gdk::ContentProvider::for_value(&value);
@@ -118,10 +122,7 @@ pub fn add_drag_to_card(card: &gtk::Picture) {
             if let Ok(original_stack) = obj.downcast::<CardStack>() {
                 let stack_clone = original_stack.clone();
                 icon.set_child(Some(&stack_clone));
-                let width = stack_clone.first_child().unwrap().width_request(); // HACK
-                println!("width: {} height: {}", width, width * 6);
-                stack_clone.imp().size_allocate(width, width * 6, 0);
-                // width * 6 is arbitrary, if you have anything better, tell me!
+                stack_clone.allocate(original_stack.width_request(), original_stack.height_request(), 0, None);
             }
         }
     });
@@ -132,14 +133,12 @@ pub fn add_drag_to_card(card: &gtk::Picture) {
 fn connect_click(card: &gtk::Picture) {
     let click = GestureClick::new();
     let card_clone = card.clone();
-    click.connect_released(move |_click, n_press, _x, _y| {
-        if n_press == 1{
-            renderer::flip_card(&card_clone);    
-        } else if n_press == 2 {
-            glib::g_message!("solitaire", "double click")
-        } else { 
-            return;
-        }
+
+    click.connect_released(move |_click, _n_press, _x, _y| {
+        /* Having separate actions for double-clicks and single-clicks will be a pain.
+         * That's why the plan for this is to have dragging the cards separate from click actions,
+         * unlike in other solitaire games. Single-clicking will auto-move cards (in the future). */
+        renderer::flip_card(&card_clone);
     });
     card.add_controller(click);
 }
