@@ -18,127 +18,58 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use adw::subclass::prelude::*;
 use std::sync::Mutex;
+use adw::{gio, glib};
 use gtk::prelude::*;
-use gtk::{DragSource, gdk::DragAction, gdk, glib, GestureClick};
-use crate::card_stack::*;
-use crate::renderer;
+use gettextrs::gettext;
+use crate::card_stack::CardStack;
 
 mod klondike;
 
 pub const JOKERS: [&str; 2] = ["joker_red", "joker_black"];
 pub const SUITES: [&str; 4] = ["club", "diamond", "heart", "spade"];
 pub const RANKS: [&str; 13] = ["ace", "2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king"];
-pub const GAMES: [&str; 6] = ["Klondike", "Spider", "FreeCell", "Tri-Peaks", "Pyramid", "Yukon"];
-static CURRENT_GAME: Mutex<String> = Mutex::new(String::new());
+static CURRENT_GAME: Mutex<Option<Box<dyn Game>>> = Mutex::new(None);
 
-// Links to all the included games
-pub fn load_game(game: &str, grid: &gtk::Grid) {
-    
+pub fn load_game(game_name: &str, grid: &gtk::Grid) {
     // Get children from the grid
-    let children = grid.observe_children();
+    let cards = grid.observe_children();
 
-    for i in 0..14 {
-        // Create a new card stack for this position
-        let card_stack = CardStack::new();
-        card_stack.set_overflow(gtk::Overflow::Hidden);
-
-        // Calculate layout position
-        let row = i / 7;
-        let col = i % 7;
-
-        // Add cards to the stack, reusing available pictures
-        for _j in 0..4 {
-            // Always get the first item from the collection (index 0)
-            // as the collection shifts when items are removed
-            if let Some(obj) = children.item(0) {
-                if let Ok(picture) = obj.downcast::<gtk::Picture>() {
-                    grid.remove(&picture);
-                    card_stack.add_card(&picture);
-                    add_drag_to_card(&picture);
-                    connect_click(&picture);
-                }
-            } else {
-                glib::g_error!("solitaire", "Failed to get child from grid");
-            }
-        }
-
-        // Enable drag and drop for gameplay
-        card_stack.enable_drop();
-
-        // Attach the card stack to the grid at the calculated position
-        grid.attach(&card_stack, col, row, 1, 1);
-
-        // Card Stacks must have no layout manager to work correctly
-        card_stack.set_layout_manager(None::<gtk::LayoutManager>);
-        card_stack.set_vexpand(true);
-    }
-
+    // Create the renderer for the game
+    glib::g_message!("solitaire", "Loading SVG");
+    let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/minimum_dark.svg", gio::ResourceLookupFlags::NONE)
+        .expect("Failed to load resource data");
+    glib::g_message!("solitaire", "loaded resource data");
+    let handle = rsvg::Loader::new()
+        .read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>)
+        .expect("Failed to load SVG");
+    let renderer = rsvg::CairoRenderer::new(&handle);
+    glib::g_message!("solitaire", "Done Loading SVG");
+    
     // Store the current game type
-    let mut game_string = CURRENT_GAME.lock().unwrap();
-    *game_string = game.to_string();
+    let mut game = CURRENT_GAME.lock().unwrap();
+    *game = Some(Box::new(klondike::Klondike::new_game(cards, &grid, &renderer)));
 
     // Log game loading
-    println!("Loaded game: {}", game);
-    println!("Children after game load: {}", grid.first_child().is_some());
+    println!("Loaded game: {}", game_name);
 }
 
-pub fn unload(_grid: &gtk::Grid) {
-    CURRENT_GAME.lock().unwrap().clear();
+pub fn unload(grid: &gtk::Grid) {
+    let mut game = CURRENT_GAME.lock().unwrap();
+    *game = None;
+    let items = grid.observe_children().n_items();
+    for i in 0..items {
+        let child = grid.first_child().expect("Couldn't get child");
+        let stack = child.downcast::<CardStack>().expect("Couldn't downcast child");
+        stack.remove_child_controllers();
+        stack.dissolve_to_row(&grid, i as i32);
+    }
 }
 
-pub fn load_recent() {
-
+pub fn get_games() -> Vec<String> {
+    vec![gettext("Klondike")] //, "Spider", "FreeCell", "Tri-Peaks", "Pyramid", "Yukon"]; not yet :)
 }
 
-// pub fn get_current_game() -> String {
-//     CURRENT_GAME.lock().unwrap().clone()
-// }
-
-pub fn add_drag_to_card(card: &gtk::Picture) {
-    let drag_source = DragSource::builder()
-        .actions(DragAction::MOVE)  // allow moving the stack
-        .build();
-
-    let card_clone = card.clone();
-    drag_source.connect_prepare(move |src, _, _| {
-        let stack = card_clone.parent().unwrap().downcast::<CardStack>().unwrap();
-        let move_stack = stack.split_to_new_on(&*card_clone.widget_name());
-        move_stack.set_layout_manager(None::<gtk::LayoutManager>);
-        // Convert the CardStack (a GObject) into a GValue, then a ContentProvider.
-        let value = move_stack.upcast::<glib::Object>().to_value();
-        let provider = gdk::ContentProvider::for_value(&value);
-        src.set_content(Some(&provider));  // attach the data provider
-        Some(provider)  // must return Some(provider) from prepare
-    });
-
-    drag_source.connect_drag_begin(|src, drag| {
-        let icon = gtk::DragIcon::for_drag(drag);
-        let provider = src.content().unwrap();
-        let value = provider.value(glib::Type::OBJECT).unwrap();
-        // I'd rather have no DnD icon instead of a crash
-        if let Ok(obj) = value.get::<glib::Object>() {
-            if let Ok(original_stack) = obj.downcast::<CardStack>() {
-                let stack_clone = original_stack.clone();
-                icon.set_child(Some(&stack_clone));
-                stack_clone.allocate(original_stack.width_request(), original_stack.height_request(), 0, None);
-            }
-        }
-    });
-    
-    card.add_controller(drag_source);
-}
-
-fn connect_click(card: &gtk::Picture) {
-    let click = GestureClick::new();
-    let card_clone = card.clone();
-
-    click.connect_released(move |_click, _n_press, _x, _y| {
-        /* Having separate actions for double-clicks and single-clicks will be a pain.
-         * That's why the plan for this is to have dragging the cards separate from click actions,
-         * unlike in other solitaire games. Single-clicking will auto-move cards (in the future). */
-        renderer::flip_card(&card_clone);
-    });
-    card.add_controller(click);
+trait Game: Send + Sync {
+    fn new_game(cards: gtk::gio::ListModel, grid: &gtk::Grid, renderer: &rsvg::CairoRenderer) -> Self where Self: Sized;
 }

@@ -60,7 +60,6 @@ mod imp {
             // Get the current window or create one if necessary
             let window = application.active_window().unwrap_or_else(|| {
                 let window = SolitaireWindow::new(&*application);
-                SolitaireWindow::window_init(&window);
                 window.upcast()
             });
 
@@ -106,13 +105,13 @@ impl SolitaireApplication {
             .developer_name("Will Warner")
             .version(VERSION)
             .developers(vec!["Will Warner"])
-            .artists(vec!["Vincent Bermel", "Will Warner"])
+            .artists(vec!["Vincent Bermel"])
             // Translators: Replace "translator-credits" with your name/username, and optionally an email or URL.
             .translator_credits(&gettext("translator-credits"))
             .copyright("© 2025 Will Warner \
                         \n© 2024 Vincent Bermel")
             .license_type(gtk::License::Gpl30)
-            .issue_url("https://gitlab.gnome.org/shbozz/solitaire/-/issues")
+            .issue_url("https://gitlab.gnome.org/wwarner/solitaire/-/issues")
             .website("https://shbozz.github.io/Solitaire")
             .comments("A simple collection of card games.")
             .build();

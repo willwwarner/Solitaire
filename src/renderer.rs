@@ -21,13 +21,13 @@
 use adw::prelude::*;
 use cairo::Context;
 use gtk::gdk::*;
-use rsvg::{CairoRenderer, Loader};
 
 pub const ASPECT:f32 = 1.4;
-pub fn draw_card(name: &str, renderer: &CairoRenderer) -> MemoryTexture {
+pub fn draw_card(name: &str, renderer: &rsvg::CairoRenderer) -> MemoryTexture {
     let surface = cairo::ImageSurface::
         create(cairo::Format::ARgb32, 250, 350)
         .expect("Couldn't create surface");
+    
     let cr = Context::new(&surface).expect("Couldn't create cairo context");
     // Render a single SVG layer, marked by a <g>
     renderer
@@ -54,12 +54,16 @@ pub fn flip_card(card: &gtk::Picture) {
     let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/minimum_dark.svg", gio::ResourceLookupFlags::NONE)
         .expect("Failed to load resource data");
     glib::g_message!("solitaire", "loaded resource data");
-    let handle = Loader::new()
+    let handle = rsvg::Loader::new()
         .read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>)
         .expect("Failed to load SVG");
     let renderer = rsvg::CairoRenderer::new(&handle);
     glib::g_message!("solitaire", "Done Loading SVG");
     
+    flip_card_full(card, &renderer);
+}
+
+pub fn flip_card_full(card: &gtk::Picture, renderer: &rsvg::CairoRenderer) {
     // It's pretty simple, the state is stored in the widget name
     let current_name = card.widget_name();
     if current_name.contains("_b") {

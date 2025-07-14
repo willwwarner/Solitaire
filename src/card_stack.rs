@@ -19,14 +19,26 @@
  */
 
 use adw::gio::ListModel;
-use gtk::{glib, gdk, gsk};
+use gtk::{glib, gdk, gsk, DragSource};
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use std::cell::Cell;
+use std::cmp::PartialEq;
+use crate::card_stack::DragCompletedAction::FlipTopCard;
 use crate::renderer;
+
+pub enum DragCompletedAction {
+    FlipTopCard,
+    None
+}
 
 glib::wrapper! {
     pub struct CardStack(ObjectSubclass<imp::CardStack>)
+        @extends gtk::Box, gtk::Widget;
+}
+
+glib::wrapper! {
+    pub struct TransferCardStack(ObjectSubclass<imp::TransferCardStack>)
         @extends gtk::Box, gtk::Widget;
 }
 
@@ -51,7 +63,7 @@ mod imp {
 
     #[derive(Default)]
     pub struct CardStack {
-        pub is_stackable: Cell<bool>,
+        pub fan_cards: Cell<bool>,
         pub v_offset: Cell<u32>,
     }
 
@@ -62,7 +74,11 @@ mod imp {
         type ParentType = gtk::Box;
     }
 
-    impl ObjectImpl for CardStack {}
+    impl ObjectImpl for CardStack {
+        fn constructed(&self) {
+            self.fan_cards.set(true);
+        }
+    }
 
     impl WidgetImpl for CardStack {
         fn measure(&self, orientation: gtk::Orientation, for_size: i32) -> (i32, i32, i32, i32) {
@@ -102,13 +118,77 @@ mod imp {
                 panic!("solitaire: card_stack height is is less than card_height, height: {height}");
             }
 
-            let vertical_offset;
-            if height > (width * 3) {
-                vertical_offset = std::cmp::min((width * 3 - card_height) / (child_count as i32 - 1), card_height / 2) as u32;
+            if self.fan_cards.get() == true {
+                let vertical_offset;
+                let max_height = width * 4;
+                if height > max_height {
+                    vertical_offset = std::cmp::min((max_height - card_height) / (child_count as i32 - 1), card_height / 3) as u32;
+                } else {
+                    vertical_offset = std::cmp::min((height - card_height) / (child_count as i32 - 1), card_height / 3) as u32;
+                }
+
+                // Position each card with proper spacing
+                for i in 0..child_count {
+                    if let Some(child) = children.item(i) {
+                        if let Ok(picture) = child.downcast::<gtk::Widget>() {
+                            // Position the card vertically with the proper offset
+                            // The formula ensures cards are properly staggered with the calculated offset
+                            let y_pos = (i * vertical_offset) as f32;
+                            picture.allocate(width, card_height, -1, Some(gsk::Transform::new().translate(&gtk::graphene::Point::new(0.0, y_pos))));
+                        }
+                    }
+                }
+                self.v_offset.set(vertical_offset);
             } else {
-                vertical_offset = std::cmp::min((height - card_height) / (child_count as i32 - 1), card_height / 2) as u32;
+                for i in 0..child_count {
+                    if let Some(child) = children.item(i) {
+                        if let Ok(picture) = child.downcast::<gtk::Widget>() {
+                            picture.allocate(width, card_height, -1, None);
+                        }
+                    }
+                }
             }
-            self.v_offset.set(vertical_offset);
+        }
+    }
+    
+    impl BoxImpl for CardStack {}
+
+    #[derive(Default)]
+    pub struct TransferCardStack {
+        pub origin_name: Cell<String>,
+        pub v_offset: Cell<u32>,
+    }
+
+    #[glib::object_subclass]
+    impl ObjectSubclass for TransferCardStack {
+        const NAME: &'static str = "TransferCardStack";
+        type Type = super::TransferCardStack;
+        type ParentType = gtk::Box;
+    }
+
+    impl ObjectImpl for TransferCardStack {}
+    impl WidgetImpl for TransferCardStack {
+        fn size_allocate(&self, width: i32, height: i32, baseline: i32) {
+            self.parent_size_allocate(width, height, baseline);
+            let widget = self.obj();
+            let children = widget.observe_children();
+            let child_count = children.n_items();
+            // Don't bother with empty stacks
+            if child_count == 0 {
+                return;
+            }
+
+            if child_count == 1 {
+                widget.first_child().unwrap().allocate(width, (width as f32 * renderer::ASPECT) as i32, -1, None);
+                return;
+            }
+
+            let card_height = (width as f32 * renderer::ASPECT).floor() as i32; // Use floor() because the lower height means spacing is not messed up
+            if height <= card_height {
+                panic!("solitaire: card_stack height is is less than card_height, height: {height}");
+            }
+
+            let vertical_offset = self.v_offset.get();
 
             // Position each card with proper spacing
             for i in 0..child_count {
@@ -123,8 +203,7 @@ mod imp {
             }
         }
     }
-    
-    impl BoxImpl for CardStack {}
+    impl BoxImpl for TransferCardStack {}
 }
 
 impl CardStack {
@@ -132,30 +211,16 @@ impl CardStack {
         glib::Object::new()
     }
 
-    // Most card stack methods could use get_card instead of whatever is implemented there
-    pub fn get_card(&self, card_name: &str) -> Result<gtk::Picture, glib::Error> {
-        // Attempt to locate the child with the given card name
-        let children = self.observe_children();
-        let total_children = children.n_items();
-
-        // Loop through all the children widgets to find the matching card
-        for i in 0..total_children {
-            let child = children.item(i).expect("Failed to get child from CardStack");
-            let picture = child.downcast::<gtk::Picture>().expect("Child is not a gtk::Picture (find)");
-            if picture.widget_name() == card_name {
-                return Ok(picture);
-            }
-        }
-
-        Err(glib::Error::new(glib::FileError::Exist, format!("Card named '{}' was not found in the stack.", card_name).as_str()))
+    pub fn set_fan_cards(&self, fan_cards: bool) {
+        self.imp().fan_cards.set(fan_cards);
     }
 
     pub fn enable_drop(&self) {
         let drop_target = gtk::DropTarget::new(glib::Type::OBJECT, gdk::DragAction::MOVE);
         let stack_clone = self.clone();
         drop_target.connect_drop(move |_, val, _, _| {
-            let Ok(drop_stack) = val.get::<CardStack>() else {
-                glib::g_warning!("Tried to drop a non-CardStack onto a CardStack", "Solitaire");
+            let Ok(drop_stack) = val.get::<TransferCardStack>() else {
+                glib::g_warning!("Tried to drop a non-TransferCardStack onto a CardStack", "Solitaire");
                 return false;
             };
             stack_clone.merge_stack(&drop_stack);
@@ -165,11 +230,11 @@ impl CardStack {
     }
 
     // FIXME: this causes "Broken accounting of active state for widget" when the top card is moved (occasionally)
-    pub fn split_to_new_on(&self, card_name: &str) -> CardStack {
+    pub fn split_to_new_on(&self, card_name: &str) -> TransferCardStack {
         // Attempt to locate the child with the given card name
         let children = self.observe_children();
         let total_children = children.n_items();
-        let new_stack = CardStack::new();
+        let new_stack = TransferCardStack::new();
 
         // First, find the starting index
         let start_index = get_index(card_name, &children).expect("Couldn't get card");
@@ -186,7 +251,7 @@ impl CardStack {
         new_stack
     }
 
-    pub fn merge_stack(&self, stack: &CardStack) {
+    pub fn merge_stack(&self, stack: &TransferCardStack) {
         let items = stack.observe_children().n_items();
         for _i in 0..items {
             let child = stack.first_child().expect("Failed to get first child from CardStack");
@@ -204,7 +269,7 @@ impl CardStack {
             self.append(card_picture);
         } else {
             // If the picture already has a parent, log a warning
-            glib::g_warning!("solitaire", "Warning: Attempted to add a widget that already has a parent");
+            glib::g_warning!("solitaire", "Attempted to add a widget that already has a parent");
         }
     }
     
@@ -215,13 +280,130 @@ impl CardStack {
             let picture = child.downcast::<gtk::Picture>().expect("Child is not a gtk::Picture (dissolve)");
             self.remove(&picture);
             grid.attach(&picture, i as i32, row, 1, 1);
-            picture.set_height_request(1);
         }
         grid.remove(&self);
         self.unrealize();
     }
+
+    pub fn remove_child_controllers(&self) {
+        let controllers = self.observe_controllers();
+        for obj in &controllers {
+            if let Ok(controller) = obj.unwrap().downcast::<gtk::EventController>() {
+                self.remove_controller(&controller);
+            }
+        }
+    }
+
+    pub fn flip_top_card(&self) {
+        let card = self.last_child().expect("Failed to get last child from CardStack").downcast::<gtk::Picture>().expect("Child is not a gtk::Picture (flip)");
+        renderer::flip_card(&card);
+    }
+
+    pub fn add_drag_to_card(&self, card: &gtk::Picture) {
+        let drag_source = DragSource::builder()
+            .actions(gdk::DragAction::MOVE)  // allow moving the stack
+            .build();
+
+        let card_clone = card.to_owned();
+        let origin = self.to_owned();
+        drag_source.connect_prepare(move |src, _x, _y| {
+            let stack = card_clone.parent().unwrap().downcast::<CardStack>().unwrap();
+            let move_stack = stack.split_to_new_on(&*card_clone.widget_name());
+            move_stack.set_layout_manager(None::<gtk::LayoutManager>);
+            // Convert the CardStack (a GObject) into a GValue, then a ContentProvider.
+            let value = move_stack.upcast::<glib::Object>().to_value();
+            let provider = gdk::ContentProvider::for_value(&value);
+            src.set_content(Some(&provider));  // attach the data provider
+            Some(provider)  // must return Some(provider) from prepare
+        });
+
+        drag_source.connect_drag_begin(|src, drag| {
+            let icon = gtk::DragIcon::for_drag(drag);
+            let provider = src.content().unwrap();
+            let value = provider.value(glib::Type::OBJECT).unwrap();
+            // I'd rather have no DnD icon instead of a crash
+            if let Ok(obj) = value.get::<glib::Object>() {
+                if let Ok(original_stack) = obj.downcast::<TransferCardStack>() {
+                    let stack_clone = original_stack.clone();
+                    icon.set_child(Some(&stack_clone));
+                    stack_clone.allocate(original_stack.width_request(), original_stack.height_request(), 0, None);
+                }
+            }
+        });
+
+        drag_source.connect_drag_cancel(move |src, _drag, _reason| {
+            let provider = src.content().unwrap();
+            let value = provider.value(glib::Type::OBJECT).unwrap();
+            if let Ok(obj) = value.get::<glib::Object>() {
+                let drag_stack = obj.downcast::<TransferCardStack>().unwrap();
+                origin.merge_stack(&drag_stack);
+            }
+            true
+        });
+
+        card.add_controller(drag_source);
+    }
+
+    pub fn add_drag_to_card_full(&self, card: &gtk::Picture, ondrag_completed: DragCompletedAction) {
+        let drag_source = DragSource::builder()
+            .actions(gdk::DragAction::MOVE)  // allow moving the stack
+            .build();
+
+
+        let card_clone = card.clone();
+        drag_source.connect_prepare(move |src, _x, _y| {
+            let stack = card_clone.parent().unwrap().downcast::<CardStack>().unwrap();
+            let move_stack = stack.split_to_new_on(&*card_clone.widget_name());
+            move_stack.set_layout_manager(None::<gtk::LayoutManager>);
+            // Convert the CardStack (a GObject) into a GValue, then a ContentProvider.
+            let value = move_stack.upcast::<glib::Object>().to_value();
+            let provider = gdk::ContentProvider::for_value(&value);
+            src.set_content(Some(&provider));  // attach the data provider
+            Some(provider)  // must return Some(provider) from prepare
+        });
+
+        drag_source.connect_drag_begin(|src, drag| {
+            let icon = gtk::DragIcon::for_drag(drag);
+            let provider = src.content().unwrap();
+            let value = provider.value(glib::Type::OBJECT).unwrap();
+            // I'd rather have no DnD icon instead of a crash
+            if let Ok(obj) = value.get::<glib::Object>() {
+                if let Ok(original_stack) = obj.downcast::<TransferCardStack>() {
+                    let stack_clone = original_stack.clone();
+                    icon.set_child(Some(&stack_clone));
+                    stack_clone.allocate(original_stack.width_request(), original_stack.height_request(), 0, None);
+                }
+            }
+        });
+
+        let stack = self.to_owned();
+        drag_source.connect_drag_end(move |_src, _drag, _reason| {
+            match ondrag_completed {
+                FlipTopCard => stack.flip_top_card(),
+                _ => return
+            }
+        });
+
+        card.add_controller(drag_source);
+    }
     
     pub fn focus_card(&self, card_name: &str) {
-        self.get_card(card_name).expect("Couldn't get card").grab_focus();
+        crate::runtime::get_child(self, card_name).expect("Couldn't get card").grab_focus();
+    }
+}
+
+impl TransferCardStack {
+    pub fn new() -> Self {
+        glib::Object::new()
+    }
+
+    pub fn add_card(&self, card_picture: &gtk::Picture) {
+        // Only add the picture if it doesn't already have a parent
+        if card_picture.parent().is_none() {
+            self.append(card_picture);
+        } else {
+            // If the picture already has a parent, log a warning
+            glib::g_warning!("solitaire", "Attempted to add a widget that already has a parent");
+        }
     }
 }

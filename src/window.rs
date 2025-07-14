@@ -25,8 +25,6 @@ use adw::subclass::prelude::*;
 use gtk::{gio, glib};
 use glib::subclass::InitializingObject;
 use gtk::gdk::Paintable;
-use rsvg::Loader;
-use crate::card_stack::CardStack;
 use crate::renderer;
 use crate::games;
 
@@ -74,6 +72,9 @@ mod imp {
             self.parent_constructed();
             let obj = self.obj();
             obj.setup_gactions();
+            obj.add_cards();
+            obj.populate_game_list(&obj.imp().list.get());
+            obj.imp().search_bar.connect_entry(&obj.imp().search_entry.get());
         }
     }
     impl WidgetImpl for SolitaireWindow {}
@@ -95,18 +96,13 @@ impl SolitaireWindow {
             .build()
     }
 
-    pub fn window_init(&self) {
-        self.add_cards();
-        self.populate_game_list(&self.imp().list.get());
-        self.imp().search_bar.connect_entry(&self.imp().search_entry.get());
-    }
     pub fn add_cards(&self) {
         let game_board = &self.imp().card_grid.get();
         glib::g_message!("solitaire", "Loading SVG");
         let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/minimum_dark.svg", gio::ResourceLookupFlags::NONE)
             .expect("Failed to load resource data");
         glib::g_message!("solitaire", "loaded resource data");
-        let handle = Loader::new()
+        let handle = rsvg::Loader::new()
             .read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>)
             .expect("Failed to load SVG");
         let renderer = rsvg::CairoRenderer::new(&handle); // We need to hand this out to the rendering functions
@@ -159,7 +155,8 @@ impl SolitaireWindow {
     #[template_callback]
     fn recent_clicked(&self, _row: &adw::ActionRow) {
         println!("Starting Recent!");
-        games::load_recent();
+        let settings = gio::Settings::new(crate::APP_ID);
+        games::load_game(&settings.get::<String>("recent-game"), &self.imp().card_grid.get());
         self.imp().nav_view.get().push_by_tag("game");
     }
 
@@ -167,7 +164,7 @@ impl SolitaireWindow {
     fn populate_game_list(&self, list: &gtk::ListBox) {
         println!("Populating game list!");
         let not_played_text = gettext("You haven't played this yet");
-        for game in games::GAMES {
+        for game in &games::get_games() {
             let action_row = adw::ActionRow::new();
             let icon = gtk::Image::new();
             icon.set_icon_name(Some("go-next-symbolic"));
@@ -178,10 +175,10 @@ impl SolitaireWindow {
             action_row.add_suffix(&icon);
             let nav_view = self.imp().nav_view.get();
             let card_grid = self.imp().card_grid.get();
+            let game_name = game.clone();
             action_row.connect_activated(move |_| {
-                glib::g_message!("solitaire", "Starting {game}!");
-                let game_id = game.to_lowercase(); 
-                games::load_game(game_id.as_str(), &card_grid);
+                glib::g_message!("solitaire", "Starting {game_name}!");
+                games::load_game(&*game_name, &card_grid);
                 nav_view.push_by_tag("game");
                 glib::g_message!("solitaire", "pushed to game");
             });
@@ -205,12 +202,6 @@ impl SolitaireWindow {
         dialog.connect_response(Some("accept"), move |_dialog, _response| {
             println!("Going to game chooser!");
             games::unload(&grid);
-            let items = grid.observe_children().n_items();
-            for i in 0..items {
-                let child = grid.first_child().expect("Couldn't get child");
-                let stack = child.downcast::<CardStack>().expect("Couldn't downcast child");
-                stack.dissolve_to_row(&grid, i as i32);
-            }
             nav_view.pop_to_tag("chooser");
         });
         dialog.connect_response(Some("delete_event"), |_dialog, _response| {

@@ -117,24 +117,15 @@ template $SolitaireWindow: Adw.ApplicationWindow {
           }
         }
 
-        content: AspectFrame {
-          obey-child: false;
-          ratio: 0.6;
-          margin-bottom: 12;
+        content: Grid card_grid {
+          halign: center;
           hexpand: true;
           vexpand: true;
-          valign: start;
-
-          Grid card_grid {
-            halign: center;
-            hexpand: true;
-            vexpand: true;
-            height-request: 600;
-            width-request: 600;
-            row-homogeneous: false;
-            column-homogeneous: true; // Temporary, also the easiest way to do this.
-            overflow: hidden;
-          }
+          height-request: 600;
+          width-request: 600;
+          row-homogeneous: false;
+          column-homogeneous: true; // Temporary, also the easiest way to do this.
+          overflow: hidden;
         };
       };
     }

@@ -18,4 +18,54 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-// I will craft a rust API for creating games soon
+use gtk::{DragSource, GestureClick, gdk, glib, prelude::Cast};
+use gtk::prelude::{ContentProviderExtManual, IsA, ListModelExt, ToValue, WidgetExt};
+use crate::card_stack::{CardStack, TransferCardStack};
+
+pub fn remove_drag(widget: &impl IsA<gtk::Widget>) {
+    let controllers = widget.observe_controllers();
+    for item in &controllers {
+        let controller = item.unwrap();
+        if let Ok(drag) = controller.downcast::<DragSource>() {
+            widget.remove_controller(&drag);
+        }
+    }
+}
+
+pub fn get_child(widget: &impl IsA<gtk::Widget>, name: &str) -> Result<gtk::Widget, glib::Error> {
+    // Attempt to locate the child with the given card name
+    let children = widget.observe_children();
+
+    // Loop through all the children widgets to find the matching card
+    for i in 0..children.n_items() {
+        let child = children.item(i).expect("Failed to get child from a Widget");
+        let child_widget = child.downcast::<gtk::Widget>().expect("Failed to downcast child to a Widget");
+        if child_widget.widget_name() == name {
+            return Ok(child_widget);
+        }
+    }
+
+    Err(glib::Error::new(glib::FileError::Exist, format!("Card named '{}' was not found in the stack.", name).as_str()))
+}
+
+pub fn connect_click(widget: &impl IsA<gtk::Widget>, onclick: impl Fn() + 'static) {
+    let click = GestureClick::new();
+
+    click.connect_released(move |_click, _n_press, _x, _y| {
+        /* Having separate actions for double-clicks and single-clicks will be a pain.
+         * That's why the plan for this is to have dragging the cards separate from click actions,
+         * unlike in other solitaire games. Single-clicking will auto-move cards (in the future). */
+        onclick();
+    });
+    widget.add_controller(click);
+}
+
+pub fn remove_click(widget: &impl IsA<gtk::Widget>) {
+    let controllers = widget.observe_controllers();
+    for item in &controllers {
+        let controller = item.unwrap();
+        if let Ok(click) = controller.downcast::<GestureClick>() {
+            widget.remove_controller(&click);
+        }
+    }
+}
