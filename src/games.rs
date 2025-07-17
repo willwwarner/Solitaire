@@ -37,7 +37,7 @@ pub fn load_game(game_name: &str, grid: &gtk::Grid) {
 
     // Create the renderer for the game
     glib::g_message!("solitaire", "Loading SVG");
-    let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/minimum_dark.svg", gio::ResourceLookupFlags::NONE)
+    let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/anglo_poker.svg", gio::ResourceLookupFlags::NONE)
         .expect("Failed to load resource data");
     glib::g_message!("solitaire", "loaded resource data");
     let handle = rsvg::Loader::new()
@@ -45,7 +45,7 @@ pub fn load_game(game_name: &str, grid: &gtk::Grid) {
         .expect("Failed to load SVG");
     let renderer = rsvg::CairoRenderer::new(&handle);
     glib::g_message!("solitaire", "Done Loading SVG");
-    
+
     // Store the current game type
     let mut game = CURRENT_GAME.lock().unwrap();
     *game = Some(Box::new(klondike::Klondike::new_game(cards, &grid, &renderer)));

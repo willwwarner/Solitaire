@@ -27,7 +27,7 @@ pub fn draw_card(name: &str, renderer: &rsvg::CairoRenderer) -> MemoryTexture {
     let surface = cairo::ImageSurface::
         create(cairo::Format::ARgb32, 250, 350)
         .expect("Couldn't create surface");
-    
+
     let cr = Context::new(&surface).expect("Couldn't create cairo context");
     // Render a single SVG layer, marked by a <g>
     renderer
@@ -51,7 +51,7 @@ pub fn draw_card(name: &str, renderer: &rsvg::CairoRenderer) -> MemoryTexture {
 pub fn flip_card(card: &gtk::Picture) {
     // There has to be a better way to do this
     glib::g_message!("solitaire", "Loading SVG");
-    let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/minimum_dark.svg", gio::ResourceLookupFlags::NONE)
+    let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/anglo_poker.svg", gio::ResourceLookupFlags::NONE)
         .expect("Failed to load resource data");
     glib::g_message!("solitaire", "loaded resource data");
     let handle = rsvg::Loader::new()

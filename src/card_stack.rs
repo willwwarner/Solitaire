@@ -350,10 +350,10 @@ impl CardStack {
             .build();
 
 
-        let card_clone = card.clone();
         drag_source.connect_prepare(move |src, _x, _y| {
-            let stack = card_clone.parent().unwrap().downcast::<CardStack>().unwrap();
-            let move_stack = stack.split_to_new_on(&*card_clone.widget_name());
+            let widget = src.widget().unwrap();
+            let stack = widget.parent().unwrap().downcast::<CardStack>().unwrap();
+            let move_stack = stack.split_to_new_on(&*widget.widget_name());
             move_stack.set_layout_manager(None::<gtk::LayoutManager>);
             // Convert the CardStack (a GObject) into a GValue, then a ContentProvider.
             let value = move_stack.upcast::<glib::Object>().to_value();
@@ -377,7 +377,7 @@ impl CardStack {
         });
 
         let stack = self.to_owned();
-        drag_source.connect_drag_end(move |_src, _drag, _reason| {
+        drag_source.connect_drag_end(move |src, _drag, _reason| {
             match ondrag_completed {
                 FlipTopCard => stack.flip_top_card(),
                 _ => return

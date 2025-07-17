@@ -99,7 +99,7 @@ impl SolitaireWindow {
     pub fn add_cards(&self) {
         let game_board = &self.imp().card_grid.get();
         glib::g_message!("solitaire", "Loading SVG");
-        let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/minimum_dark.svg", gio::ResourceLookupFlags::NONE)
+        let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/anglo_poker.svg", gio::ResourceLookupFlags::NONE)
             .expect("Failed to load resource data");
         glib::g_message!("solitaire", "loaded resource data");
         let handle = rsvg::Loader::new()
