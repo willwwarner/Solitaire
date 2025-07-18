@@ -18,11 +18,17 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+use std::sync::Arc;
 use crate::{renderer, runtime, card_stack::CardStack, card_stack};
-use gtk::prelude::{Cast, GridExt, WidgetExt, ListModelExt, BoxExt};
-use gtk::glib;
+use gtk::prelude::{Cast, GridExt, WidgetExt, ListModelExt};
+use gtk::{glib, Picture};
 
-pub struct Klondike;
+pub struct Klondike {
+    foundation_heart: Arc<String>,
+    foundation_diamond: Arc<String>,
+    foundation_club: Arc<String>,
+    foundation_spade: Arc<String>,
+}
 
 impl Klondike {}
 impl super::Game for Klondike {
@@ -39,10 +45,8 @@ impl super::Game for Klondike {
                         grid.remove(&picture);
                         card_stack.add_card(&picture);
                         if j < i { renderer::flip_card_full(&picture, &renderer) }
-                        else {
-                            card_stack.add_drag_to_card_full(&picture, card_stack::DragCompletedAction::FlipTopCard);
-                            runtime::connect_click(&picture, || distribute());
-                        }
+                        card_stack.add_drag_to_card(&picture);
+                        runtime::connect_click(&picture);
                     }
                 } else {
                     glib::g_error!("solitaire", "Failed to get child from grid");
@@ -83,7 +87,7 @@ impl super::Game for Klondike {
                     stock.add_card(&picture);
                     renderer::flip_card_full(&picture, &renderer);
                     let card_clone = picture.clone();
-                    runtime::connect_click(&picture, move || {
+                    runtime::connect_click(&picture/*move || {
                         let stock = card_clone.parent().unwrap().downcast::<CardStack>().unwrap();
                         stock.remove(&card_clone);
                         let waste = runtime::get_child(&stock.parent().unwrap(), "waste").unwrap().downcast::<CardStack>().unwrap();
@@ -91,7 +95,7 @@ impl super::Game for Klondike {
                         renderer::flip_card(&card_clone);
                         waste.add_drag_to_card(&card_clone);
                         runtime::remove_click(&card_clone); // TODO: one click to distribute card
-                    });
+                    }*/);
                 }
             } else {
                 glib::g_error!("solitaire", "Failed to get child from grid");
@@ -100,15 +104,34 @@ impl super::Game for Klondike {
         }
         grid.attach(&stock, 0, 0, 1, 1);
         stock.set_layout_manager(None::<gtk::LayoutManager>); // Card Stacks must have no layout manager to work correctly
-        
-        Self
-    }
-}
 
-fn distribute() {
-    // TODO: Implement distribute logic
-    // Uncomment when current_name is available
-    // if current_name.contains("_b") {
-    //
-    // }
+        Self { foundation_heart: Arc::new(String::new()), foundation_diamond: Arc::new(String::new()),
+               foundation_club:  Arc::new(String::new()), foundation_spade:   Arc::new(String::new()) }
+    }
+    fn verify_drag(&self, bottom_card: &Picture, from_stack: &CardStack) -> bool {
+        todo!()
+    }
+
+    fn verify_drop(&self, bottom_card: &Picture, to_stack: &CardStack) -> bool {
+        todo!()
+    }
+
+    fn on_drag_completed(&self, origin_stack: &CardStack) {
+        if origin_stack.widget_name().starts_with("tableau") {
+            origin_stack.face_up_top_card();
+        }
+    }
+
+    fn on_card_click(&self, card: &Picture) {
+        let card_stack = card.parent().unwrap().downcast::<CardStack>().unwrap();
+        let grid = card_stack.parent().unwrap().downcast::<gtk::Grid>().unwrap();
+        if card_stack.widget_name() == "stock" {
+            let waste = runtime::get_child(&grid, "waste").unwrap().downcast::<CardStack>().unwrap();
+            card_stack.remove_card(card);
+            renderer::flip_card(card);
+            waste.add_card(card);
+            waste.add_drag_to_card(card);
+            runtime::remove_click(card);
+        }
+    }
 }

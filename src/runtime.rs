@@ -18,9 +18,12 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use gtk::{DragSource, GestureClick, gdk, glib, prelude::Cast};
-use gtk::prelude::{ContentProviderExtManual, IsA, ListModelExt, ToValue, WidgetExt};
-use crate::card_stack::{CardStack, TransferCardStack};
+use gtk::{DragSource, GestureClick, glib, prelude::Cast};
+use gtk::prelude::{IsA, ListModelExt, WidgetExt};
+
+thread_local! {
+    static GRID: std::cell::RefCell<Option<gtk::Grid>> = std::cell::RefCell::new(None);
+}
 
 pub fn remove_drag(widget: &impl IsA<gtk::Widget>) {
     let controllers = widget.observe_controllers();
@@ -48,16 +51,17 @@ pub fn get_child(widget: &impl IsA<gtk::Widget>, name: &str) -> Result<gtk::Widg
     Err(glib::Error::new(glib::FileError::Exist, format!("Card named '{}' was not found in the stack.", name).as_str()))
 }
 
-pub fn connect_click(widget: &impl IsA<gtk::Widget>, onclick: impl Fn() + 'static) {
+pub fn connect_click(picture: &gtk::Picture) {
     let click = GestureClick::new();
 
+    let picture_clone = picture.to_owned();
     click.connect_released(move |_click, _n_press, _x, _y| {
         /* Having separate actions for double-clicks and single-clicks will be a pain.
          * That's why the plan for this is to have dragging the cards separate from click actions,
          * unlike in other solitaire games. Single-clicking will auto-move cards (in the future). */
-        onclick();
+        crate::games::on_card_click(&picture_clone);
     });
-    widget.add_controller(click);
+    picture.add_controller(click);
 }
 
 pub fn remove_click(widget: &impl IsA<gtk::Widget>) {
@@ -68,4 +72,12 @@ pub fn remove_click(widget: &impl IsA<gtk::Widget>) {
             widget.remove_controller(&click);
         }
     }
+}
+
+pub fn get_grid() -> Option<gtk::Grid> {
+    GRID.with(|grid| grid.borrow().clone())
+}
+
+pub fn set_grid(grid: gtk::Grid) {
+    GRID.set(Some(grid));
 }

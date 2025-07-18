@@ -24,13 +24,7 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use std::cell::Cell;
 use std::cmp::PartialEq;
-use crate::card_stack::DragCompletedAction::FlipTopCard;
-use crate::renderer;
-
-pub enum DragCompletedAction {
-    FlipTopCard,
-    None
-}
+use crate::{games, renderer, runtime};
 
 glib::wrapper! {
     pub struct CardStack(ObjectSubclass<imp::CardStack>)
@@ -235,6 +229,8 @@ impl CardStack {
         let children = self.observe_children();
         let total_children = children.n_items();
         let new_stack = TransferCardStack::new();
+        new_stack.imp().v_offset.set(self.imp().v_offset.get());
+        new_stack.imp().origin_name.set(self.widget_name().to_string());
 
         // First, find the starting index
         let start_index = get_index(card_name, &children).expect("Couldn't get card");
@@ -294,9 +290,9 @@ impl CardStack {
         }
     }
 
-    pub fn flip_top_card(&self) {
+    pub fn face_up_top_card(&self) {
         let card = self.last_child().expect("Failed to get last child from CardStack").downcast::<gtk::Picture>().expect("Child is not a gtk::Picture (flip)");
-        renderer::flip_card(&card);
+        renderer::flip_to_face(&card);
     }
 
     pub fn add_drag_to_card(&self, card: &gtk::Picture) {
@@ -304,11 +300,9 @@ impl CardStack {
             .actions(gdk::DragAction::MOVE)  // allow moving the stack
             .build();
 
-        let card_clone = card.to_owned();
-        let origin = self.to_owned();
         drag_source.connect_prepare(move |src, _x, _y| {
-            let stack = card_clone.parent().unwrap().downcast::<CardStack>().unwrap();
-            let move_stack = stack.split_to_new_on(&*card_clone.widget_name());
+            let stack = src.widget().unwrap().parent().unwrap().downcast::<CardStack>().unwrap();
+            let move_stack = stack.split_to_new_on(&*src.widget().unwrap().widget_name());
             move_stack.set_layout_manager(None::<gtk::LayoutManager>);
             // Convert the CardStack (a GObject) into a GValue, then a ContentProvider.
             let value = move_stack.upcast::<glib::Object>().to_value();
@@ -331,57 +325,22 @@ impl CardStack {
             }
         });
 
-        drag_source.connect_drag_cancel(move |src, _drag, _reason| {
+        drag_source.connect_drag_cancel(|src, _drag, _reason| {
             let provider = src.content().unwrap();
             let value = provider.value(glib::Type::OBJECT).unwrap();
             if let Ok(obj) = value.get::<glib::Object>() {
                 let drag_stack = obj.downcast::<TransferCardStack>().unwrap();
+                let origin = runtime::get_child(&runtime::get_grid().unwrap(), drag_stack.get_origin_name().as_str()).unwrap().downcast::<CardStack>().unwrap();
                 origin.merge_stack(&drag_stack);
             }
             true
         });
 
-        card.add_controller(drag_source);
-    }
-
-    pub fn add_drag_to_card_full(&self, card: &gtk::Picture, ondrag_completed: DragCompletedAction) {
-        let drag_source = DragSource::builder()
-            .actions(gdk::DragAction::MOVE)  // allow moving the stack
-            .build();
-
-
-        drag_source.connect_prepare(move |src, _x, _y| {
-            let widget = src.widget().unwrap();
-            let stack = widget.parent().unwrap().downcast::<CardStack>().unwrap();
-            let move_stack = stack.split_to_new_on(&*widget.widget_name());
-            move_stack.set_layout_manager(None::<gtk::LayoutManager>);
-            // Convert the CardStack (a GObject) into a GValue, then a ContentProvider.
-            let value = move_stack.upcast::<glib::Object>().to_value();
-            let provider = gdk::ContentProvider::for_value(&value);
-            src.set_content(Some(&provider));  // attach the data provider
-            Some(provider)  // must return Some(provider) from prepare
-        });
-
-        drag_source.connect_drag_begin(|src, drag| {
-            let icon = gtk::DragIcon::for_drag(drag);
-            let provider = src.content().unwrap();
-            let value = provider.value(glib::Type::OBJECT).unwrap();
-            // I'd rather have no DnD icon instead of a crash
-            if let Ok(obj) = value.get::<glib::Object>() {
-                if let Ok(original_stack) = obj.downcast::<TransferCardStack>() {
-                    let stack_clone = original_stack.clone();
-                    icon.set_child(Some(&stack_clone));
-                    stack_clone.allocate(original_stack.width_request(), original_stack.height_request(), 0, None);
-                }
-            }
-        });
-
-        let stack = self.to_owned();
-        drag_source.connect_drag_end(move |src, _drag, _reason| {
-            match ondrag_completed {
-                FlipTopCard => stack.flip_top_card(),
-                _ => return
-            }
+        drag_source.connect_drag_end(|src, _drag, _result| {
+            let value = src.content().unwrap().value(glib::Type::OBJECT).unwrap();
+            let stack = value.get::<TransferCardStack>().unwrap();
+            let origin = runtime::get_child(&runtime::get_grid().unwrap(), stack.get_origin_name().as_str()).unwrap();
+            games::on_drag_completed(&origin.downcast::<CardStack>().unwrap());
         });
 
         card.add_controller(drag_source);
@@ -389,6 +348,10 @@ impl CardStack {
     
     pub fn focus_card(&self, card_name: &str) {
         crate::runtime::get_child(self, card_name).expect("Couldn't get card").grab_focus();
+    }
+
+    pub fn remove_card(&self, picture: &gtk::Picture) {
+        self.remove(picture);
     }
 }
 
@@ -405,5 +368,11 @@ impl TransferCardStack {
             // If the picture already has a parent, log a warning
             glib::g_warning!("solitaire", "Attempted to add a widget that already has a parent");
         }
+    }
+
+    pub fn get_origin_name(&self) -> String {
+        let name = self.imp().origin_name.take();
+        self.imp().origin_name.set(name.clone());
+        name
     }
 }

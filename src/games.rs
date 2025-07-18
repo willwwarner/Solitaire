@@ -18,11 +18,16 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
+use std::clone::Clone;
+use std::format;
 use adw::{gio, glib};
+use adw::gdk::Paintable;
 use gtk::prelude::*;
 use gettextrs::gettext;
+use gtk::Picture;
 use crate::card_stack::CardStack;
+use crate::{card_stack, games, renderer, runtime};
 
 mod klondike;
 
@@ -45,6 +50,19 @@ pub fn load_game(game_name: &str, grid: &gtk::Grid) {
         .expect("Failed to load SVG");
     let renderer = rsvg::CairoRenderer::new(&handle);
     glib::g_message!("solitaire", "Done Loading SVG");
+
+    for i in 0..cards.n_items() {
+        let picture = cards.item(i).unwrap().downcast::<gtk::Picture>().unwrap();
+
+        let suite_index = (i / 13) as usize;
+        let rank_index = (i % 13) as usize;
+        let card_name = format!("{}_{}", SUITES[suite_index], RANKS[rank_index]);
+
+        picture.set_widget_name(card_name.as_str());
+        picture.set_property("sensitive", true);
+        let texture = renderer::draw_card(&card_name, &renderer);
+        picture.set_paintable(Some(texture.upcast_ref::<Paintable>()));
+    }
 
     // Store the current game type
     let mut game = CURRENT_GAME.lock().unwrap();
@@ -70,6 +88,24 @@ pub fn get_games() -> Vec<String> {
     vec![gettext("Klondike")] //, "Spider", "FreeCell", "Tri-Peaks", "Pyramid", "Yukon"]; not yet :)
 }
 
-trait Game: Send + Sync {
+pub fn on_card_click(card: &Picture) {
+    let mut game = CURRENT_GAME.lock().unwrap();
+    if let Some(game) = game.as_mut() {
+        game.on_card_click(card);
+    }
+}
+
+pub fn on_drag_completed(origin_stack: &CardStack) {
+    let mut game = CURRENT_GAME.lock().unwrap();
+    if let Some(game) = game.as_mut() {
+        game.on_drag_completed(origin_stack)
+    }
+}
+
+pub trait Game: Send + Sync {
     fn new_game(cards: gtk::gio::ListModel, grid: &gtk::Grid, renderer: &rsvg::CairoRenderer) -> Self where Self: Sized;
+    fn verify_drag(&self, bottom_card: &gtk::Picture, from_stack: &CardStack) -> bool;
+    fn verify_drop(&self, bottom_card: &gtk::Picture, to_stack: &CardStack) -> bool;
+    fn on_drag_completed(&self, origin_stack: &CardStack);
+    fn on_card_click(&self, card: &Picture);
 }

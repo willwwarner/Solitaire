@@ -24,8 +24,6 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gio, glib};
 use glib::subclass::InitializingObject;
-use gtk::gdk::Paintable;
-use crate::renderer;
 use crate::games;
 
 mod imp {
@@ -75,6 +73,7 @@ mod imp {
             obj.add_cards();
             obj.populate_game_list(&obj.imp().list.get());
             obj.imp().search_bar.connect_entry(&obj.imp().search_entry.get());
+            crate::runtime::set_grid(self.card_grid.get());
         }
     }
     impl WidgetImpl for SolitaireWindow {}
@@ -98,15 +97,6 @@ impl SolitaireWindow {
 
     pub fn add_cards(&self) {
         let game_board = &self.imp().card_grid.get();
-        glib::g_message!("solitaire", "Loading SVG");
-        let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/anglo_poker.svg", gio::ResourceLookupFlags::NONE)
-            .expect("Failed to load resource data");
-        glib::g_message!("solitaire", "loaded resource data");
-        let handle = rsvg::Loader::new()
-            .read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>)
-            .expect("Failed to load SVG");
-        let renderer = rsvg::CairoRenderer::new(&handle); // We need to hand this out to the rendering functions
-        glib::g_message!("solitaire", "Done Loading SVG");
         
         let mut cards_to_add:u8 = 52; // The number of gtk Pictures (cards) to add to the grid, a standard deck has 52 cards
 
@@ -120,8 +110,6 @@ impl SolitaireWindow {
             picture.set_widget_name(card_name.as_str());
             picture.set_property("sensitive", true);
             game_board.attach(&picture, rank_index as i32, suite_index as i32, 1, 1);
-            let texture = renderer::draw_card(&card_name, &renderer);
-            picture.set_paintable(Some(texture.upcast_ref::<Paintable>()));
 
             cards_to_add -= 1;
         }

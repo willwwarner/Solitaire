@@ -63,10 +63,31 @@ pub fn flip_card(card: &gtk::Picture) {
     flip_card_full(card, &renderer);
 }
 
+pub fn flip_to_face(card: &gtk::Picture) {
+    // It's pretty simple, the state is stored in the widget name
+    let current_name = card.widget_name();
+    if current_name.ends_with("_b") {
+        // There has to be a better way to do this
+        glib::g_message!("solitaire", "Loading SVG");
+        let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/anglo_poker.svg", gio::ResourceLookupFlags::NONE)
+            .expect("Failed to load resource data");
+        glib::g_message!("solitaire", "loaded resource data");
+        let handle = rsvg::Loader::new()
+            .read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>)
+            .expect("Failed to load SVG");
+        let renderer = rsvg::CairoRenderer::new(&handle);
+        glib::g_message!("solitaire", "Done Loading SVG");
+    
+        card.set_widget_name(&current_name.replace("_b", ""));
+        let texture = draw_card(&card.widget_name(), &renderer);
+        card.set_paintable(Some(texture.upcast_ref::<Paintable>()));
+    }
+}
+
 pub fn flip_card_full(card: &gtk::Picture, renderer: &rsvg::CairoRenderer) {
     // It's pretty simple, the state is stored in the widget name
     let current_name = card.widget_name();
-    if current_name.contains("_b") {
+    if current_name.ends_with("_b") {
         card.set_widget_name(&current_name.replace("_b", ""));
         let texture = draw_card(&card.widget_name(), &renderer);
         card.set_paintable(Some(texture.upcast_ref::<Paintable>()));
