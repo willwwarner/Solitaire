@@ -5,11 +5,11 @@
   <project_license>GPL-3.0-or-later</project_license>
 
   <name>Solitaire</name>
-  <summary>A simple collection of Solitaire games.</summary>
+  <summary>Play solitaire games</summary>
   <description>
     <p>
-      A simple collection of Solitaire games.
-      Made for Gnome
+      Play solitaire games.
+      Solitaire is made for the GNOME desktop.
     </p>
   </description>
   <screenshots>
@@ -28,8 +28,6 @@
   <url type="vcs-browser">https://gitlab.gnome.org/shbozz/solitaire/</url>
   <!-- Should point to the software's bug tracking system, for users to report new bugs -->
   <url type="bugtracker">https://gitlab.gnome.org/shbozz/solitaire/-/issues</url>
-  <!-- URLs of this type should point to a webpage showing information on how to donate to the described software project -->
-  <url type="donation">https://www.gnome.org/donate/</url>
 
   <translation type="gettext">solitaire</translation>
   <!-- All graphical applications having a desktop file must have this tag in the MetaInfo.
