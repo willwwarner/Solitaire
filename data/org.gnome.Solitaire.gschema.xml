@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist gettext-domain="solitaire">
-	<schema id="@app-id@" path="@base-id-slashed@/">
+	<schema id="@app-id@" path="/org/gnome/Solitaire/">
 		<key name="recent-game" type="s">
 			<default>'none'</default>
 			<summary>The most recently played game</summary>

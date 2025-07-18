@@ -40,7 +40,6 @@ test('Validate appstream file', appstreamcli,
 
 gschema_conf = configuration_data()
 gschema_conf.set('app-id', app_id)
-gschema_conf.set('base-id-slashed', '/' + base_id.replace('.', '/'))
 
 configure_file(
   input: 'org.gnome.Solitaire.gschema.xml',
