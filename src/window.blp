@@ -118,15 +118,13 @@ template $SolitaireWindow: Adw.ApplicationWindow {
         }
 
         content: Grid card_grid {
-          halign: center;
-          hexpand: true;
-          vexpand: true;
-          height-request: 600;
-          width-request: 600;
           row-homogeneous: false;
-          column-homogeneous: true; // Temporary, also the easiest way to do this.
+          column-homogeneous: false;
+          row-spacing: 6;
           column-spacing: 2;
-          overflow: hidden;
+          margin-start: 6;
+          margin-end: 6;
+          margin-bottom: 12;
         };
       };
     }

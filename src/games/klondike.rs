@@ -58,7 +58,6 @@ impl super::Game for Klondike {
 
             // Card Stacks must have no layout manager to work correctly
             card_stack.set_layout_manager(None::<gtk::LayoutManager>);
-            card_stack.set_vexpand(true);
             card_stack.enable_drop();
         }
 
@@ -86,16 +85,7 @@ impl super::Game for Klondike {
                     grid.remove(&picture);
                     stock.add_card(&picture);
                     renderer::flip_card_full(&picture, &renderer);
-                    let card_clone = picture.clone();
-                    runtime::connect_click(&picture/*move || {
-                        let stock = card_clone.parent().unwrap().downcast::<CardStack>().unwrap();
-                        stock.remove(&card_clone);
-                        let waste = runtime::get_child(&stock.parent().unwrap(), "waste").unwrap().downcast::<CardStack>().unwrap();
-                        waste.add_card(&card_clone);
-                        renderer::flip_card(&card_clone);
-                        waste.add_drag_to_card(&card_clone);
-                        runtime::remove_click(&card_clone); // TODO: one click to distribute card
-                    }*/);
+                    runtime::connect_click(&picture);
                 }
             } else {
                 glib::g_error!("solitaire", "Failed to get child from grid");
@@ -118,7 +108,7 @@ impl super::Game for Klondike {
 
     fn on_drag_completed(&self, origin_stack: &CardStack) {
         if origin_stack.widget_name().starts_with("tableau") {
-            origin_stack.face_up_top_card();
+            origin_stack.face_up_top_card(); // This returns if the stack is empty or not
         }
     }
 

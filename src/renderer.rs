@@ -23,6 +23,7 @@ use cairo::Context;
 use gtk::gdk::*;
 
 pub const ASPECT:f32 = 1.4;
+
 pub fn draw_card(name: &str, renderer: &rsvg::CairoRenderer) -> MemoryTexture {
     let surface = cairo::ImageSurface::
         create(cairo::Format::ARgb32, 250, 350)
@@ -77,7 +78,7 @@ pub fn flip_to_face(card: &gtk::Picture) {
             .expect("Failed to load SVG");
         let renderer = rsvg::CairoRenderer::new(&handle);
         glib::g_message!("solitaire", "Done Loading SVG");
-    
+
         card.set_widget_name(&current_name.replace("_b", ""));
         let texture = draw_card(&card.widget_name(), &renderer);
         card.set_paintable(Some(texture.upcast_ref::<Paintable>()));
