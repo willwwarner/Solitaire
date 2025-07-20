@@ -80,12 +80,12 @@ mod imp {
             // If orientation == horizontal, then for_size is the height
             // if for_size == -1 {
             if orientation == gtk::Orientation::Horizontal {
-                return (-1, 250, -1, -1);
+                return (25, 250, -1, -1);
             } else { // orientation == gtk::Orientation::Vertical
                 if self.fan_cards.get() == true {
-                    return (-1, 1400, -1, -1)
+                    return (140, 1400, -1, -1)
                 } else {
-                    return (-1, 350, -1, -1)
+                    return (35, 350, -1, -1)
                 }
             }
             // }
@@ -106,72 +106,7 @@ mod imp {
             // }
         }
 
-    // A size_allocate that keeps the correct Aspect ratio for each stack
-    //     fn size_allocate(&self, width: i32, height: i32, baseline: i32) {
-    //         let widget = self.obj();
-    //         let children = widget.observe_children();
-    //         let child_count = children.n_items();
-    //         // Don't bother with empty stacks
-    //         if child_count == 0 {
-    //             return;
-    //         }
-    //
-    //         let allocation_width;
-    //         let allocation_height;
-    //         if self.fan_cards.get() == true {
-    //             let max_height = width * 4;
-    //             if child_count == 1 {
-    //                 if height > max_height {
-    //                     widget.first_child().unwrap().allocate(width, (width as f32 * renderer::ASPECT) as i32, -1, None);
-    //                 } else {
-    //                     widget.first_child().unwrap().allocate(height / 4, ((height / 4) as f32 * renderer::ASPECT) as i32, -1, None);
-    //                 }
-    //                 return;
-    //             }
-    //
-    //             let vertical_offset;
-    //
-    //             if height > max_height {
-    //                 allocation_height = (width as f32 * renderer::ASPECT).floor() as i32;
-    //                 vertical_offset = std::cmp::min((max_height - allocation_height) / (child_count as i32 - 1), allocation_height / 3) as u32;
-    //                 allocation_width = width;
-    //             } else {
-    //                 allocation_height = ((height / 4) as f32 * renderer::ASPECT).floor() as i32;
-    //                 vertical_offset = std::cmp::min((height - allocation_height) / (child_count as i32 - 1), allocation_height / 3) as u32;
-    //                 allocation_width = height / 4;
-    //             }
-    //
-    //             // Position each card with proper spacing
-    //             for i in 0..child_count {
-    //                 if let Some(child) = children.item(i) {
-    //                     if let Ok(picture) = child.downcast::<gtk::Widget>() {
-    //                         let y_pos = (i * vertical_offset) as f32;
-    //                         picture.allocate(allocation_width, allocation_height, -1, Some(gsk::Transform::new().translate(&gtk::graphene::Point::new(0.0, y_pos))));
-    //                     }
-    //                 }
-    //             }
-    //             self.v_offset.set(vertical_offset);
-    //         } else {
-    //             let card_height = (width as f32 * renderer::ASPECT).floor() as i32;
-    //             if height > card_height {
-    //                 allocation_width = width;
-    //                 allocation_height = card_height;
-    //             } else {
-    //                 allocation_width = (height as f32 / renderer::ASPECT) as i32;
-    //                 allocation_height = height;
-    //             }
-    //
-    //             for i in 0..child_count {
-    //                 if let Some(child) = children.item(i) {
-    //                     if let Ok(picture) = child.downcast::<gtk::Widget>() {
-    //                         picture.allocate(allocation_width, allocation_height, -1, None);
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
+        // A size_allocate that keeps the correct Aspect ratio for each stack
         fn size_allocate(&self, width: i32, height: i32, baseline: i32) {
             let widget = self.obj();
             let children = widget.observe_children();
@@ -181,20 +116,29 @@ mod imp {
                 return;
             }
 
-            if child_count == 1 {
-                widget.first_child().unwrap().allocate(width, (width as f32 * renderer::ASPECT) as i32, -1, None);
-                return;
-            }
-            let card_height = (width as f32 * renderer::ASPECT).floor() as i32;
-
+            let allocation_width;
+            let allocation_height;
             if self.fan_cards.get() == true {
                 let max_height = width * 4;
+                if child_count == 1 {
+                    if height > max_height {
+                        widget.first_child().unwrap().allocate(width, (width as f32 * renderer::ASPECT) as i32, -1, None);
+                    } else {
+                        widget.first_child().unwrap().allocate(height / 4, ((height / 4) as f32 * renderer::ASPECT) as i32, -1, None);
+                    }
+                    return;
+                }
+
                 let vertical_offset;
 
                 if height > max_height {
-                    vertical_offset = std::cmp::min((max_height - card_height) / (child_count as i32 - 1), card_height / 3) as u32;
+                    allocation_height = (width as f32 * renderer::ASPECT).floor() as i32;
+                    vertical_offset = std::cmp::min((max_height - allocation_height) / (child_count as i32 - 1), allocation_height / 3) as u32;
+                    allocation_width = width;
                 } else {
-                    vertical_offset = std::cmp::min((height - card_height) / (child_count as i32 - 1), card_height / 3) as u32;
+                    allocation_height = ((height / 4) as f32 * renderer::ASPECT).floor() as i32;
+                    vertical_offset = std::cmp::min((height - allocation_height) / (child_count as i32 - 1), allocation_height / 3) as u32;
+                    allocation_width = height / 4;
                 }
 
                 // Position each card with proper spacing
@@ -202,21 +146,76 @@ mod imp {
                     if let Some(child) = children.item(i) {
                         if let Ok(picture) = child.downcast::<gtk::Widget>() {
                             let y_pos = (i * vertical_offset) as f32;
-                            picture.allocate(width, card_height, -1, Some(gsk::Transform::new().translate(&gtk::graphene::Point::new(0.0, y_pos))));
+                            picture.allocate(allocation_width, allocation_height, -1, Some(gsk::Transform::new().translate(&gtk::graphene::Point::new(0.0, y_pos))));
                         }
                     }
                 }
                 self.v_offset.set(vertical_offset);
             } else {
+                let card_height = (width as f32 * renderer::ASPECT).floor() as i32;
+                if height > card_height {
+                    allocation_width = width;
+                    allocation_height = card_height;
+                } else {
+                    allocation_width = (height as f32 / renderer::ASPECT) as i32;
+                    allocation_height = height;
+                }
+
                 for i in 0..child_count {
                     if let Some(child) = children.item(i) {
                         if let Ok(picture) = child.downcast::<gtk::Widget>() {
-                            picture.allocate(width, card_height, -1, None);
+                            picture.allocate(allocation_width, allocation_height, -1, None);
                         }
                     }
                 }
             }
         }
+
+        // fn size_allocate(&self, width: i32, height: i32, baseline: i32) {
+        //     let widget = self.obj();
+        //     let children = widget.observe_children();
+        //     let child_count = children.n_items();
+        //     // Don't bother with empty stacks
+        //     if child_count == 0 {
+        //         return;
+        //     }
+        //
+        //     if child_count == 1 {
+        //         widget.first_child().unwrap().allocate(width, (width as f32 * renderer::ASPECT) as i32, -1, None);
+        //         return;
+        //     }
+        //     let card_height = (width as f32 * renderer::ASPECT).floor() as i32;
+        //
+        //     if self.fan_cards.get() == true {
+        //         let max_height = width * 4;
+        //         let vertical_offset;
+        //
+        //         if height > max_height {
+        //             vertical_offset = std::cmp::min((max_height - card_height) / (child_count as i32 - 1), card_height / 3) as u32;
+        //         } else {
+        //             vertical_offset = std::cmp::min((height - card_height) / (child_count as i32 - 1), card_height / 3) as u32;
+        //         }
+        //
+        //         // Position each card with proper spacing
+        //         for i in 0..child_count {
+        //             if let Some(child) = children.item(i) {
+        //                 if let Ok(picture) = child.downcast::<gtk::Widget>() {
+        //                     let y_pos = (i * vertical_offset) as f32;
+        //                     picture.allocate(width, card_height, -1, Some(gsk::Transform::new().translate(&gtk::graphene::Point::new(0.0, y_pos))));
+        //                 }
+        //             }
+        //         }
+        //         self.v_offset.set(vertical_offset);
+        //     } else {
+        //         for i in 0..child_count {
+        //             if let Some(child) = children.item(i) {
+        //                 if let Ok(picture) = child.downcast::<gtk::Widget>() {
+        //                     picture.allocate(width, card_height, -1, None);
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
     }
 
     #[derive(Default)]
@@ -282,14 +281,20 @@ impl CardStack {
 
     pub fn enable_drop(&self) {
         let drop_target = gtk::DropTarget::new(glib::Type::OBJECT, gdk::DragAction::MOVE);
-        let stack_clone = self.clone();
-        drop_target.connect_drop(move |_, val, _, _| {
-            let Ok(drop_stack) = val.get::<TransferCardStack>() else {
-                glib::g_warning!("Tried to drop a non-TransferCardStack onto a CardStack", "Solitaire");
+        drop_target.connect_drop(|drop, val, _x, _y| {
+            let to_stack = drop.widget().unwrap().downcast::<CardStack>().unwrap();
+            if let Ok(transfer_stack) = val.get::<TransferCardStack>() {
+                if games::verify_drop(&transfer_stack.first_child().unwrap(), &to_stack) {
+                    drop.widget().unwrap().downcast::<CardStack>().unwrap().merge_stack(&transfer_stack);
+                    games::on_drop_completed(&to_stack);
+                    return true;
+                }
+                else { return false; }
+            } else {
+                let type_name = drop.value_type().to_string();
+                glib::g_warning!("solitaire", "Tried to drop a non-TransferCardStack onto a CardStack type: {type_name}");
                 return false;
-            };
-            stack_clone.merge_stack(&drop_stack);
-            true
+            }
         });
         self.add_controller(drop_target);
     }
@@ -377,13 +382,16 @@ impl CardStack {
 
         drag_source.connect_prepare(move |src, _x, _y| {
             let stack = src.widget().unwrap().parent().unwrap().downcast::<CardStack>().unwrap();
-            let move_stack = stack.split_to_new_on(&*src.widget().unwrap().widget_name());
-            move_stack.set_layout_manager(None::<gtk::LayoutManager>);
-            // Convert the CardStack (a GObject) into a GValue, then a ContentProvider.
-            let value = move_stack.upcast::<glib::Object>().to_value();
-            let provider = gdk::ContentProvider::for_value(&value);
-            src.set_content(Some(&provider));  // attach the data provider
-            Some(provider)  // must return Some(provider) from prepare
+            if games::verify_drag(&src.widget().unwrap(), &stack) {
+                let move_stack = stack.split_to_new_on(&*src.widget().unwrap().widget_name());
+                // Convert the CardStack (a GObject) into a GValue, then a ContentProvider.
+                let value = move_stack.upcast::<glib::Object>().to_value();
+                let provider = gdk::ContentProvider::for_value(&value);
+                src.set_content(Some(&provider));  // attach the data provider
+                Some(provider)  // must return Some(provider) from prepare
+            } else {
+                None
+            }
         });
 
         drag_source.connect_drag_begin(|src, drag| {

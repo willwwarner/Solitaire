@@ -7,6 +7,7 @@ Right now, a minimal poc for moving cards around (with scaling)
 To test, compile with meson or GNOME Builder.
 
 TODO:
+ * Subclass LayoutManager for the Grid
  * Implement more games
  * Add animations
  * Add scoring

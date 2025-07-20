@@ -20,6 +20,7 @@
 
 use gtk::{DragSource, GestureClick, glib, prelude::Cast};
 use gtk::prelude::{IsA, ListModelExt, WidgetExt};
+use crate::games;
 
 thread_local! {
     static GRID: std::cell::RefCell<Option<gtk::Grid>> = std::cell::RefCell::new(None);
@@ -80,4 +81,29 @@ pub fn get_grid() -> Option<gtk::Grid> {
 
 pub fn set_grid(grid: gtk::Grid) {
     GRID.set(Some(grid));
+}
+
+pub fn is_one_rank_above(card_lower: &glib::GString, card_higher: &glib::GString) -> bool {
+    let lower_rank = card_lower.split("_").nth(1).unwrap();
+    let higher_rank = card_higher.split("_").nth(1).unwrap();
+    let lower_index = games::RANKS.iter().position(|x| x == &lower_rank).unwrap();
+    let higher_index = games::RANKS.iter().position(|x| x == &higher_rank).unwrap();
+
+    if lower_index + 1 == higher_index {
+        true
+    } else {
+        false
+    }
+}
+
+pub fn is_same_suit(card_1: &glib::GString, card_2: &glib::GString) -> bool {
+    (card_1.starts_with("heart")   && card_2.starts_with("heart")   ) ||
+    (card_1.starts_with("diamond") && card_2.starts_with("diamond") ) ||
+    (card_1.starts_with("club")    && card_2.starts_with("club")    ) ||
+    (card_1.starts_with("spade")   && card_2.starts_with("spade")   )
+}
+
+pub fn is_similar_suit(card_1: &glib::GString, card_2: &glib::GString) -> bool {
+    (card_1.starts_with("heart") || card_1.starts_with("diamond")) ==
+    (card_2.starts_with("heart") || card_2.starts_with("diamond"))
 }

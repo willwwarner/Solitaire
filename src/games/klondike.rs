@@ -18,16 +18,16 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use std::sync::Arc;
-use crate::{renderer, runtime, card_stack::CardStack, card_stack};
+use std::sync::Mutex;
+use crate::{renderer, runtime, card_stack::CardStack};
 use gtk::prelude::{Cast, GridExt, WidgetExt, ListModelExt};
-use gtk::{glib, Picture};
+use gtk::glib;
 
 pub struct Klondike {
-    foundation_heart: Arc<String>,
-    foundation_diamond: Arc<String>,
-    foundation_club: Arc<String>,
-    foundation_spade: Arc<String>,
+    foundation_heart: Mutex<String>,
+    foundation_diamond: Mutex<String>,
+    foundation_club: Mutex<String>,
+    foundation_spade: Mutex<String>,
 }
 
 impl Klondike {}
@@ -54,10 +54,8 @@ impl super::Game for Klondike {
                 n_cards -= 1;
             }
 
-            grid.attach(&card_stack, i, 1, 1, 1);
+            grid.attach(&card_stack, i, 1, 1, 2);
 
-            // Card Stacks must have no layout manager to work correctly
-            card_stack.set_layout_manager(None::<gtk::LayoutManager>);
             card_stack.enable_drop();
         }
 
@@ -66,7 +64,6 @@ impl super::Game for Klondike {
             card_stack.set_widget_name(format!("foundation_{i}").as_str());
             card_stack.set_fan_cards(false);
             grid.attach(&card_stack, i, 0, 1, 1);
-            card_stack.set_layout_manager(None::<gtk::LayoutManager>);
             card_stack.enable_drop();
         }
 
@@ -74,7 +71,6 @@ impl super::Game for Klondike {
         waste.set_widget_name("waste");
         waste.set_fan_cards(false);
         grid.attach(&waste, 1, 0, 1, 1);
-        waste.set_layout_manager(None::<gtk::LayoutManager>); // Card Stacks must have no layout manager to work correctly
 
         let stock = CardStack::new();
         stock.set_widget_name("stock");
@@ -93,17 +89,34 @@ impl super::Game for Klondike {
             n_cards -= 1;
         }
         grid.attach(&stock, 0, 0, 1, 1);
-        stock.set_layout_manager(None::<gtk::LayoutManager>); // Card Stacks must have no layout manager to work correctly
 
-        Self { foundation_heart: Arc::new(String::new()), foundation_diamond: Arc::new(String::new()),
-               foundation_club:  Arc::new(String::new()), foundation_spade:   Arc::new(String::new()) }
+        Self { foundation_heart: Mutex::new(String::new()), foundation_diamond: Mutex::new(String::new()),
+               foundation_club:  Mutex::new(String::new()), foundation_spade:   Mutex::new(String::new()) }
     }
-    fn verify_drag(&self, bottom_card: &Picture, from_stack: &CardStack) -> bool {
-        todo!()
+    fn verify_drag(&self, bottom_card: &gtk::Widget, _from_stack: &CardStack) -> bool {
+        if bottom_card.widget_name().ends_with("_b") { false }
+        else { true }
     }
 
-    fn verify_drop(&self, bottom_card: &Picture, to_stack: &CardStack) -> bool {
-        todo!()
+    fn verify_drop(&self, bottom_card: &gtk::Widget, to_stack: &CardStack) -> bool {
+        let stack_name = to_stack.widget_name();
+        let bottom_card_name = bottom_card.widget_name();
+
+        if stack_name.starts_with("tableau") {
+            if to_stack.first_child().is_none() && bottom_card_name.ends_with("king") { return true }
+            else if to_stack.first_child().is_none() { return false }
+            let top_card_name = to_stack.last_child().unwrap().widget_name();
+            if (!runtime::is_similar_suit(&bottom_card_name, &top_card_name)) && runtime::is_one_rank_above(&bottom_card_name, &top_card_name) { return true }
+            else { false }
+        }
+        else if stack_name.starts_with("foundation") {
+            if to_stack.first_child().is_none() && bottom_card_name.ends_with("ace") { return true }
+            else if to_stack.first_child().is_none() { return false }
+            let top_card_name = to_stack.last_child().unwrap().widget_name();
+            if runtime::is_same_suit (&bottom_card_name, &top_card_name) && runtime::is_one_rank_above(&top_card_name, &bottom_card_name) { return true }
+            else { false }
+        }
+        else { false }
     }
 
     fn on_drag_completed(&self, origin_stack: &CardStack) {
@@ -112,7 +125,29 @@ impl super::Game for Klondike {
         }
     }
 
-    fn on_card_click(&self, card: &Picture) {
+    fn on_drop_completed(&self, recipient_stack: &CardStack) {
+        if recipient_stack.widget_name().starts_with("foundation") {
+            let top_card_name = recipient_stack.last_child().unwrap().widget_name();
+            if top_card_name.starts_with("heart") {
+                let mut heart = self.foundation_heart.lock().unwrap();
+                *heart = top_card_name.to_string();
+            }
+            else if top_card_name.starts_with("diamond") {
+                let mut diamond = self.foundation_diamond.lock().unwrap();
+                *diamond = top_card_name.to_string();
+            }
+            else if top_card_name.starts_with("club") {
+                let mut club = self.foundation_club.lock().unwrap();
+                *club = top_card_name.to_string();
+            }
+            else if top_card_name.starts_with("spade") {
+                let mut spade = self.foundation_spade.lock().unwrap();
+                *spade = top_card_name.to_string();
+            }
+        }
+    }
+
+    fn on_card_click(&self, card: &gtk::Picture) {
         let card_stack = card.parent().unwrap().downcast::<CardStack>().unwrap();
         let grid = card_stack.parent().unwrap().downcast::<gtk::Grid>().unwrap();
         if card_stack.widget_name() == "stock" {
@@ -121,7 +156,8 @@ impl super::Game for Klondike {
             renderer::flip_card(card);
             waste.add_card(card);
             waste.add_drag_to_card(card);
-            runtime::remove_click(card);
+        } else {
+            println!("distribution time!!!");
         }
     }
 }
