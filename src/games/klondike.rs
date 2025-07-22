@@ -18,17 +18,11 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use std::sync::Mutex;
 use crate::{renderer, runtime, card_stack::CardStack};
 use gtk::prelude::{Cast, GridExt, WidgetExt, ListModelExt};
 use gtk::glib;
 
-pub struct Klondike {
-    foundation_heart: Mutex<String>,
-    foundation_diamond: Mutex<String>,
-    foundation_club: Mutex<String>,
-    foundation_spade: Mutex<String>,
-}
+pub struct Klondike {}
 
 impl Klondike {}
 impl super::Game for Klondike {
@@ -90,8 +84,7 @@ impl super::Game for Klondike {
         }
         grid.attach(&stock, 0, 0, 1, 1);
 
-        Self { foundation_heart: Mutex::new(String::new()), foundation_diamond: Mutex::new(String::new()),
-               foundation_club:  Mutex::new(String::new()), foundation_spade:   Mutex::new(String::new()) }
+        Self {}
     }
     fn verify_drag(&self, bottom_card: &gtk::Widget, _from_stack: &CardStack) -> bool {
         if bottom_card.widget_name().ends_with("_b") { false }
@@ -125,27 +118,7 @@ impl super::Game for Klondike {
         }
     }
 
-    fn on_drop_completed(&self, _recipient_stack: &CardStack) {
-        // if recipient_stack.widget_name().starts_with("foundation") {
-        //     let top_card_name = recipient_stack.last_child().unwrap().widget_name();
-        //     if top_card_name.starts_with("heart") {
-        //         let mut heart = self.foundation_heart.lock().unwrap();
-        //         *heart = top_card_name.to_string();
-        //     }
-        //     else if top_card_name.starts_with("diamond") {
-        //         let mut diamond = self.foundation_diamond.lock().unwrap();
-        //         *diamond = top_card_name.to_string();
-        //     }
-        //     else if top_card_name.starts_with("club") {
-        //         let mut club = self.foundation_club.lock().unwrap();
-        //         *club = top_card_name.to_string();
-        //     }
-        //     else if top_card_name.starts_with("spade") {
-        //         let mut spade = self.foundation_spade.lock().unwrap();
-        //         *spade = top_card_name.to_string();
-        //     }
-        // }
-    }
+    fn on_drop_completed(&self, _recipient_stack: &CardStack) {}
 
     fn on_card_click(&self, card: &gtk::Picture) {
         let card_stack = card.parent().unwrap().downcast::<CardStack>().unwrap();
