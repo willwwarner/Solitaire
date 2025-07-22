@@ -9,6 +9,7 @@ To test, compile with meson or GNOME Builder.
 TODO:
  * Subclass LayoutManager for the Grid
  * Implement more games
+ * Add sounds
  * Add animations
  * Add scoring
  * Add preferences
