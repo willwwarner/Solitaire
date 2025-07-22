@@ -59,11 +59,11 @@ impl super::Game for Klondike {
             card_stack.enable_drop();
         }
 
-        for i in 3..7 {
+        for i in 0..4 {
             let card_stack = CardStack::new();
             card_stack.set_widget_name(format!("foundation_{i}").as_str());
             card_stack.set_fan_cards(false);
-            grid.attach(&card_stack, i, 0, 1, 1);
+            grid.attach(&card_stack, i + 3, 0, 1, 1);
             card_stack.enable_drop();
         }
 
@@ -125,26 +125,26 @@ impl super::Game for Klondike {
         }
     }
 
-    fn on_drop_completed(&self, recipient_stack: &CardStack) {
-        if recipient_stack.widget_name().starts_with("foundation") {
-            let top_card_name = recipient_stack.last_child().unwrap().widget_name();
-            if top_card_name.starts_with("heart") {
-                let mut heart = self.foundation_heart.lock().unwrap();
-                *heart = top_card_name.to_string();
-            }
-            else if top_card_name.starts_with("diamond") {
-                let mut diamond = self.foundation_diamond.lock().unwrap();
-                *diamond = top_card_name.to_string();
-            }
-            else if top_card_name.starts_with("club") {
-                let mut club = self.foundation_club.lock().unwrap();
-                *club = top_card_name.to_string();
-            }
-            else if top_card_name.starts_with("spade") {
-                let mut spade = self.foundation_spade.lock().unwrap();
-                *spade = top_card_name.to_string();
-            }
-        }
+    fn on_drop_completed(&self, _recipient_stack: &CardStack) {
+        // if recipient_stack.widget_name().starts_with("foundation") {
+        //     let top_card_name = recipient_stack.last_child().unwrap().widget_name();
+        //     if top_card_name.starts_with("heart") {
+        //         let mut heart = self.foundation_heart.lock().unwrap();
+        //         *heart = top_card_name.to_string();
+        //     }
+        //     else if top_card_name.starts_with("diamond") {
+        //         let mut diamond = self.foundation_diamond.lock().unwrap();
+        //         *diamond = top_card_name.to_string();
+        //     }
+        //     else if top_card_name.starts_with("club") {
+        //         let mut club = self.foundation_club.lock().unwrap();
+        //         *club = top_card_name.to_string();
+        //     }
+        //     else if top_card_name.starts_with("spade") {
+        //         let mut spade = self.foundation_spade.lock().unwrap();
+        //         *spade = top_card_name.to_string();
+        //     }
+        // }
     }
 
     fn on_card_click(&self, card: &gtk::Picture) {
@@ -156,8 +156,36 @@ impl super::Game for Klondike {
             renderer::flip_card(card);
             waste.add_card(card);
             waste.add_drag_to_card(card);
+        } else if card_stack.widget_name().starts_with("foundation") {
+            return
         } else {
-            println!("distribution time!!!");
+            try_distribute(card, &card_stack);
+            self.on_drag_completed(&card_stack);
+        }
+    }
+}
+
+fn try_distribute(card: &gtk::Picture, parent: &CardStack) {
+    let card_name = card.widget_name();
+    if card_name.ends_with("_b") { return }
+    if &parent.last_child().unwrap() != card { return }
+
+    let grid = runtime::get_grid().unwrap();
+    let card_suit = card_name.split("_").nth(0).unwrap();
+    for i in 0..4 {
+        let stack = runtime::get_child(&grid, format!("foundation_{i}").as_str()).unwrap().downcast::<CardStack>().unwrap();
+        if let Some(last_child) = stack.last_child() {
+            if last_child.widget_name().starts_with(card_suit) && runtime::is_one_rank_above(&last_child.widget_name(), &card_name) {
+                parent.remove_card(card);
+                stack.add_card(card);
+                return
+            }
+        } else {
+            if card_name.ends_with("ace") {
+                parent.remove_card(card);
+                stack.add_card(card);
+                return
+            }
         }
     }
 }
