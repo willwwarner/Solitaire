@@ -19,12 +19,13 @@
  */
 
 use gettextrs::gettext;
+use std::cell::Cell;
 use gtk::prelude::*;
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gio, glib};
 use glib::subclass::InitializingObject;
-use crate::games;
+use crate::{games, runtime};
 
 mod imp {
     use super::*;
@@ -47,6 +48,10 @@ mod imp {
         pub search_bar: TemplateChild<gtk::SearchBar>,
         #[template_child]
         pub search_entry: TemplateChild<gtk::SearchEntry>,
+        #[template_child]
+        pub undo: TemplateChild<gtk::Button>,
+        #[template_child]
+        pub redo: TemplateChild<gtk::Button>,
     }
 
     #[glib::object_subclass]
@@ -73,7 +78,7 @@ mod imp {
             obj.add_cards();
             obj.populate_game_list(&obj.imp().list.get());
             obj.imp().search_bar.connect_entry(&obj.imp().search_entry.get());
-            crate::runtime::set_grid(self.card_grid.get());
+            runtime::set_grid(self.card_grid.get());
         }
     }
     impl WidgetImpl for SolitaireWindow {}
@@ -120,11 +125,13 @@ impl SolitaireWindow {
     }
     
     fn undo(&self) {
-        println!("Undo!");
+        runtime::undo_last_move();
+        runtime::update_redo_actions(self);
     }
 
     fn redo(&self) {
-        println!("Redo!");
+        runtime::redo_first_move();
+        runtime::update_redo_actions(self);
     }
 
     fn setup_gactions(&self) {

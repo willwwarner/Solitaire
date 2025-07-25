@@ -118,7 +118,11 @@ impl super::Game for Klondike {
         }
     }
 
-    fn on_drop_completed(&self, _recipient_stack: &CardStack) {}
+    fn on_drop_completed(&self, recipient_stack: &CardStack) {
+        if recipient_stack.widget_name() == "waste" {
+            recipient_stack.face_up_top_card();
+        }
+    }
 
     fn on_card_click(&self, card: &gtk::Picture) {
         let card_stack = card.parent().unwrap().downcast::<CardStack>().unwrap();
@@ -129,11 +133,20 @@ impl super::Game for Klondike {
             renderer::flip_card(card);
             waste.add_card(card);
             waste.add_drag_to_card(card);
+            runtime::add_to_history(card_stack.widget_name().as_str(), card.widget_name().as_str(), "waste");
         } else if card_stack.widget_name().starts_with("foundation") {
             return
         } else {
             try_distribute(card, &card_stack);
             self.on_drag_completed(&card_stack);
+        }
+    }
+
+    fn pre_undo_drag(&self, origin_stack: &CardStack, dropped_stack: &CardStack) {
+        if origin_stack.widget_name().starts_with("tableau") {
+            origin_stack.face_down_top_card(); // This returns if the stack is empty or not
+        } else if origin_stack.widget_name() == "stock" {
+            dropped_stack.face_down_top_card();
         }
     }
 }
@@ -151,12 +164,14 @@ fn try_distribute(card: &gtk::Picture, parent: &CardStack) {
             if last_child.widget_name().starts_with(card_suit) && runtime::is_one_rank_above(&last_child.widget_name(), &card_name) {
                 parent.remove_card(card);
                 stack.add_card(card);
+                runtime::add_to_history(parent.widget_name().as_str(), card.widget_name().as_str(), stack.widget_name().as_str());
                 return
             }
         } else {
             if card_name.ends_with("ace") {
                 parent.remove_card(card);
                 stack.add_card(card);
+                runtime::add_to_history(parent.widget_name().as_str(), card.widget_name().as_str(), stack.widget_name().as_str());
                 return
             }
         }

@@ -18,12 +18,14 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use gtk::{DragSource, GestureClick, glib, prelude::Cast};
-use gtk::prelude::{IsA, ListModelExt, WidgetExt};
-use crate::games;
+use gtk::{DragSource, GestureClick, gio, glib};
+use gtk::prelude::{IsA, ListModelExt, WidgetExt, Cast, ActionMapExt};
+use crate::{games, card_stack::CardStack};
 
 thread_local! {
     static GRID: std::cell::RefCell<Option<gtk::Grid>> = std::cell::RefCell::new(None);
+    static ACTION_HISTORY: std::cell::RefCell<Vec<String>> = std::cell::RefCell::new(Vec::new());
+    static HISTORY_INDEX: std::cell::RefCell<usize> = std::cell::RefCell::new(0);
 }
 
 pub fn remove_drag(widget: &impl IsA<gtk::Widget>) {
@@ -57,10 +59,7 @@ pub fn connect_click(picture: &gtk::Picture) {
 
     let picture_clone = picture.to_owned();
     click.connect_released(move |_click, _n_press, _x, _y| {
-        /* Having separate actions for double-clicks and single-clicks will be a pain.
-         * That's why the plan for this is to have dragging the cards separate from click actions,
-         * unlike in other solitaire games. Single-clicking will auto-move cards (in the future). */
-        crate::games::on_card_click(&picture_clone);
+        games::on_card_click(&picture_clone);
     });
     picture.add_controller(click);
 }
@@ -81,6 +80,11 @@ pub fn get_grid() -> Option<gtk::Grid> {
 
 pub fn set_grid(grid: gtk::Grid) {
     GRID.set(Some(grid));
+}
+
+pub fn perform_move(destination_stack:&CardStack, card_name: &str, origin_stack: &CardStack) {
+    let transfer_stack = origin_stack.try_split_to_new_on(card_name).unwrap_or_else(|_| origin_stack.split_to_new_on(&*(card_name.to_owned() + "_b")));
+    destination_stack.merge_stack(&transfer_stack);
 }
 
 pub fn is_one_rank_above(card_lower: &glib::GString, card_higher: &glib::GString) -> bool {
@@ -106,4 +110,76 @@ pub fn is_same_suit(card_1: &glib::GString, card_2: &glib::GString) -> bool {
 pub fn is_similar_suit(card_1: &glib::GString, card_2: &glib::GString) -> bool {
     (card_1.starts_with("heart") || card_1.starts_with("diamond")) ==
     (card_2.starts_with("heart") || card_2.starts_with("diamond"))
+}
+
+pub fn add_to_history(origin_stack: &str, card_name: &str, destination_stack: &str) {
+    let move_index = HISTORY_INDEX.with(|index| index.borrow().clone());
+    // Remove invalidated entries
+    if ACTION_HISTORY.with(|history| history.borrow().len() > move_index) {
+        for _ in move_index..ACTION_HISTORY.with(|history| history.borrow().len()) {
+            ACTION_HISTORY.with(|history| history.borrow_mut().pop());
+            let window = get_grid().unwrap().root().unwrap().downcast::<gtk::Window>().unwrap().downcast::<crate::window::SolitaireWindow>().unwrap();
+            window.lookup_action("redo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
+        }
+    }
+    if move_index == 0 {
+        let window = get_grid().unwrap().root().unwrap().downcast::<gtk::Window>().unwrap().downcast::<crate::window::SolitaireWindow>().unwrap();
+        window.lookup_action("undo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(true);
+    }
+
+    if card_name.ends_with("_b") {
+        ACTION_HISTORY.with(|history| history.borrow_mut().push(format!("{}&>{}&>{}", origin_stack, card_name.replace("_b", ""), destination_stack)));
+    } else {
+        ACTION_HISTORY.with(|history| history.borrow_mut().push(format!("{}&>{}&>{}", origin_stack, card_name, destination_stack)));
+    }
+    HISTORY_INDEX.set(move_index + 1);
+}
+
+pub fn get_n_move(n: usize) -> (String, String, String) { // origin_stack, card_name, destination_stack
+    let last_entry = ACTION_HISTORY.with(|history| history.borrow().iter().nth(n).unwrap().clone());
+    let mut last_entry_parts = last_entry.splitn(3, "&>");
+    (
+        last_entry_parts.next().unwrap().to_string(),
+        last_entry_parts.next().unwrap().to_string(),
+        last_entry_parts.next().unwrap().to_string()
+    )
+}
+
+pub fn undo_last_move() {
+    let move_index = HISTORY_INDEX.with(|index| index.borrow().clone());
+    if !(move_index == 0) {
+        let (origin_stack, card_name, destination_stack) = get_n_move(move_index - 1);
+        let grid = get_grid().unwrap();
+        let origin_stack_widget = get_child(&grid, &origin_stack).unwrap().downcast::<CardStack>().unwrap();
+        let destination_stack_widget = get_child(&grid, &destination_stack).unwrap().downcast::<CardStack>().unwrap();
+        games::pre_undo_drag(&origin_stack_widget, &destination_stack_widget);
+        perform_move(&origin_stack_widget, &card_name, &destination_stack_widget);
+        HISTORY_INDEX.set(move_index - 1);
+    }
+}
+
+pub fn redo_first_move() {
+    let move_index = HISTORY_INDEX.with(|index| index.borrow().clone());
+    if let Some(first_entry) = ACTION_HISTORY.with(|history| history.borrow().get(move_index).cloned()) {
+        let mut last_entry_parts = first_entry.splitn(3, "&>");
+        let destination_stack = last_entry_parts.next().unwrap().to_string();
+        let card_name = last_entry_parts.next().unwrap().to_string();
+        let origin_stack = last_entry_parts.next().unwrap().to_string();
+
+        let grid = get_grid().unwrap();
+        let origin_stack_widget = get_child(&grid, &origin_stack).unwrap().downcast::<CardStack>().unwrap();
+        let destination_stack_widget = get_child(&grid, &destination_stack).unwrap().downcast::<CardStack>().unwrap();
+        perform_move(&origin_stack_widget, &card_name, &destination_stack_widget);
+        games::on_drag_completed(&destination_stack_widget);
+        games::on_drop_completed(&origin_stack_widget);
+        HISTORY_INDEX.set(move_index + 1);
+    }
+}
+
+pub fn update_redo_actions(window: &crate::window::SolitaireWindow) {
+    let move_index = HISTORY_INDEX.with(|index| index.borrow().clone());
+    let undo_action = window.lookup_action("undo").unwrap().downcast::<gio::SimpleAction>().unwrap();
+    let redo_action = window.lookup_action("redo").unwrap().downcast::<gio::SimpleAction>().unwrap();
+    undo_action.set_enabled(move_index > 0);
+    redo_action.set_enabled(move_index < ACTION_HISTORY.with(|history| history.borrow().len()));
 }

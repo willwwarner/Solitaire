@@ -284,9 +284,11 @@ impl CardStack {
         drop_target.connect_drop(|drop, val, _x, _y| {
             let to_stack = drop.widget().unwrap().downcast::<CardStack>().unwrap();
             if let Ok(transfer_stack) = val.get::<TransferCardStack>() {
-                if games::verify_drop(&transfer_stack.first_child().unwrap(), &to_stack) {
-                    drop.widget().unwrap().downcast::<CardStack>().unwrap().merge_stack(&transfer_stack);
+                let first_card = transfer_stack.first_child().unwrap();
+                if games::verify_drop(&first_card, &to_stack) {
+                    to_stack.merge_stack(&transfer_stack);
                     games::on_drop_completed(&to_stack);
+                    runtime::add_to_history(transfer_stack.get_origin_name().as_str(), first_card.widget_name().as_str(), to_stack.widget_name().as_str());
                     return true;
                 }
                 else { return false; }
@@ -321,6 +323,29 @@ impl CardStack {
         new_stack.set_width_request(self.width());
         
         new_stack
+    }
+
+    pub fn try_split_to_new_on(&self, card_name: &str) -> Result<TransferCardStack, glib::Error> {
+        // Attempt to locate the child with the given card name
+        let children = self.observe_children();
+        let total_children = children.n_items();
+        let new_stack = TransferCardStack::new();
+        new_stack.imp().v_offset.set(self.imp().v_offset.get());
+        new_stack.imp().origin_name.set(self.widget_name().to_string());
+
+        // First, find the starting index
+        let start_index = get_index(card_name, &children)?;
+        for _i in start_index..total_children {
+            let child = children.item(start_index).expect("Failed to get child from CardStack");
+            let picture = child.downcast::<gtk::Picture>().expect("Child is not a gtk::Picture (split:1)");
+            self.remove_card(&picture);
+            new_stack.add_card(&picture);
+        }
+        self.imp().size_allocate(self.width(), self.height(), self.baseline());
+        new_stack.set_height_request(self.height());
+        new_stack.set_width_request(self.width());
+
+        Ok(new_stack)
     }
 
     pub fn merge_stack(&self, stack: &TransferCardStack) {
@@ -370,6 +395,15 @@ impl CardStack {
         if let Some(widget) = self.last_child() {
             let card = widget.downcast::<gtk::Picture>().expect("Child is not a gtk::Picture (flip)");
             renderer::flip_to_face(&card);
+            return false; // The stack is not empty
+        }
+        true // The stack is empty
+    }
+
+    pub fn face_down_top_card(&self) -> bool {
+        if let Some(widget) = self.last_child() {
+            let card = widget.downcast::<gtk::Picture>().expect("Child is not a gtk::Picture (flip)");
+            renderer::flip_to_back(&card);
             return false; // The stack is not empty
         }
         true // The stack is empty
@@ -430,7 +464,7 @@ impl CardStack {
     }
     
     pub fn focus_card(&self, card_name: &str) {
-        crate::runtime::get_child(self, card_name).expect("Couldn't get card").grab_focus();
+        runtime::get_child(self, card_name).expect("Couldn't get card").grab_focus();
     }
 
     pub fn remove_card(&self, picture: &gtk::Picture) {

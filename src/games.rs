@@ -18,15 +18,12 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use std::sync::{Mutex};
-use std::clone::Clone;
+use std::sync::Mutex;
 use std::format;
-use adw::{gio, glib};
-use adw::gdk::Paintable;
 use gtk::prelude::*;
+use gtk::{gio, glib, gdk::Paintable};
 use gettextrs::gettext;
-use crate::card_stack::{CardStack, TransferCardStack};
-use crate::{card_stack, games, renderer, runtime};
+use crate::{renderer, card_stack::CardStack, window::SolitaireWindow};
 
 mod klondike;
 
@@ -36,6 +33,11 @@ pub const RANKS: [&str; 13] = ["ace", "2", "3", "4", "5", "6", "7", "8", "9", "1
 static CURRENT_GAME: Mutex<Option<Box<dyn Game>>> = Mutex::new(None);
 
 pub fn load_game(game_name: &str, grid: &gtk::Grid) {
+    let window = grid.root().unwrap().downcast::<gtk::Window>().unwrap().downcast::<SolitaireWindow>().unwrap();
+    window.lookup_action("undo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
+    window.lookup_action("redo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
+
+
     // Get children from the grid
     let cards = grid.observe_children();
 
@@ -101,10 +103,17 @@ pub fn on_drag_completed(origin_stack: &CardStack) {
     }
 }
 
-pub fn on_drop_completed(origin_stack: &CardStack) {
+pub fn on_drop_completed(recipient_stack: &CardStack) {
     let mut game = CURRENT_GAME.lock().unwrap();
     if let Some(game) = game.as_mut() {
-        game.on_drag_completed(origin_stack);
+        game.on_drop_completed(recipient_stack);
+    }
+}
+
+pub fn pre_undo_drag(origin_stack: &CardStack, dropped_stack: &CardStack) {
+    let mut game = CURRENT_GAME.lock().unwrap();
+    if let Some(game) = game.as_mut() {
+        game.pre_undo_drag(origin_stack, dropped_stack);
     }
 }
 
@@ -132,6 +141,7 @@ pub trait Game: Send + Sync {
     fn verify_drop(&self, bottom_card: &gtk::Widget, to_stack: &CardStack) -> bool;
     fn on_drag_completed(&self, origin_stack: &CardStack);
     fn on_drop_completed(&self, recipient_stack: &CardStack);
+    fn pre_undo_drag(&self, origin_stack: &CardStack, dropped_stack: &CardStack);
 
     fn on_card_click(&self, card: &gtk::Picture);
 }
