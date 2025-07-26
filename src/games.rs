@@ -61,9 +61,11 @@ pub fn load_game(game_name: &str, grid: &gtk::Grid) {
 
         picture.set_widget_name(card_name.as_str());
         picture.set_property("sensitive", true);
-        let texture = renderer::draw_card(&card_name, &renderer);
+        let texture = renderer::set_and_return_texture(&card_name, &renderer);
         picture.set_paintable(Some(texture.upcast_ref::<Paintable>()));
     }
+
+    renderer::set_back_texture(&renderer);
 
     // Store the current game type
     let mut game = CURRENT_GAME.lock().unwrap();

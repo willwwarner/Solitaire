@@ -21,6 +21,12 @@
 use adw::prelude::*;
 use cairo::Context;
 use gtk::gdk::*;
+use crate::games;
+
+thread_local! {
+    static TEXTURES: std::cell::RefCell<Vec<MemoryTexture>> = std::cell::RefCell::new(Vec::new());
+    static BACK_TEXTURE: std::cell::RefCell<Option<MemoryTexture>> = std::cell::RefCell::new(None);
+}
 
 pub const ASPECT:f32 = 1.4;
 
@@ -49,38 +55,48 @@ pub fn draw_card(name: &str, renderer: &rsvg::CairoRenderer) -> MemoryTexture {
     )
 }
 
+pub fn set_and_return_texture(name: &str, renderer: &rsvg::CairoRenderer) -> MemoryTexture {
+    let texture = draw_card(name, renderer);
+    TEXTURES.with(|t| { t.borrow_mut().push(texture.to_owned()) });
+    texture
+}
+
+pub fn set_back_texture(renderer: &rsvg::CairoRenderer) {
+    let texture = draw_card("back", renderer);
+    BACK_TEXTURE.with(|t| { t.borrow_mut().replace(texture) });
+}
+
+fn get_texture_index(name: &str) -> usize {
+    let mut name_parts = name.split('_');
+    let suit = name_parts.next().unwrap();
+    let rank = name_parts.next().unwrap();
+    let suit_index = games::SUITES.iter().position(|x| x == &suit).unwrap();
+    let rank_index = games::RANKS.iter().position(|x| x == &rank).unwrap();
+
+    (suit_index * 13) + rank_index
+}
+
 pub fn flip_card(card: &gtk::Picture) {
-    // There has to be a better way to do this
-    glib::g_message!("solitaire", "Loading SVG");
-    let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/anglo_poker.svg", gio::ResourceLookupFlags::NONE)
-        .expect("Failed to load resource data");
-    glib::g_message!("solitaire", "loaded resource data");
-    let handle = rsvg::Loader::new()
-        .read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>)
-        .expect("Failed to load SVG");
-    let renderer = rsvg::CairoRenderer::new(&handle);
-    glib::g_message!("solitaire", "Done Loading SVG");
-    
-    flip_card_full(card, &renderer);
+    // It's pretty simple, the state is stored in the widget name
+    let current_name = card.widget_name();
+    if current_name.ends_with("_b") {
+        card.set_widget_name(&current_name.replace("_b", ""));
+        let texture = TEXTURES.with(|t| { t.borrow_mut().get(get_texture_index(&card.widget_name())).unwrap().to_owned() });
+        card.set_paintable(Some(texture.upcast_ref::<Paintable>()));
+    }
+    else {
+        card.set_widget_name((current_name.to_string() + "_b").as_str());
+        let texture = BACK_TEXTURE.with(|t| { t.borrow().to_owned().unwrap() });
+        card.set_paintable(Some(texture.upcast_ref::<Paintable>()));
+    }
 }
 
 pub fn flip_to_face(card: &gtk::Picture) {
     // It's pretty simple, the state is stored in the widget name
     let current_name = card.widget_name();
     if current_name.ends_with("_b") {
-        // There has to be a better way to do this
-        glib::g_message!("solitaire", "Loading SVG");
-        let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/anglo_poker.svg", gio::ResourceLookupFlags::NONE)
-            .expect("Failed to load resource data");
-        glib::g_message!("solitaire", "loaded resource data");
-        let handle = rsvg::Loader::new()
-            .read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>)
-            .expect("Failed to load SVG");
-        let renderer = rsvg::CairoRenderer::new(&handle);
-        glib::g_message!("solitaire", "Done Loading SVG");
-
         card.set_widget_name(&current_name.replace("_b", ""));
-        let texture = draw_card(&card.widget_name(), &renderer);
+        let texture = TEXTURES.with(|t| { t.borrow_mut().get(get_texture_index(&card.widget_name())).unwrap().to_owned() });
         card.set_paintable(Some(texture.upcast_ref::<Paintable>()));
     }
 }
@@ -89,19 +105,8 @@ pub fn flip_to_back(card: &gtk::Picture) {
     // It's pretty simple, the state is stored in the widget name
     let current_name = card.widget_name();
     if !current_name.ends_with("_b") {
-        // There has to be a better way to do this
-        glib::g_message!("solitaire", "Loading SVG");
-        let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/anglo_poker.svg", gio::ResourceLookupFlags::NONE)
-            .expect("Failed to load resource data");
-        glib::g_message!("solitaire", "loaded resource data");
-        let handle = rsvg::Loader::new()
-            .read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>)
-            .expect("Failed to load SVG");
-        let renderer = rsvg::CairoRenderer::new(&handle);
-        glib::g_message!("solitaire", "Done Loading SVG");
-
         card.set_widget_name((current_name.to_string() + "_b").as_str());
-        let texture = draw_card("back", &renderer);
+        let texture = BACK_TEXTURE.with(|t| { t.borrow().to_owned().unwrap() });
         card.set_paintable(Some(texture.upcast_ref::<Paintable>()));
     }
 }
