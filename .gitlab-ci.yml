@@ -7,11 +7,11 @@ include:
       tarball-artifact-path: "${TARBALL_ARTIFACT_PATH}"
 
 variables:
-    MANIFEST_PATH: "org.gnome.wwarner.Solitaire.Devel.json"
+    MANIFEST_PATH: "org.gnome.gitlab.wwarner.Solitaire.Devel.json"
     FLATPAK_MODULE: "solitaire"
-    APP_ID: "org.gnome.wwarner.Solitaire.Devel"
+    APP_ID: "org.gnome.gitlab.wwarner.Solitaire.Devel"
     RUNTIME_REPO: "https://nightly.gnome.org/gnome-nightly.flatpakrepo"
-    BUNDLE: "org.gnome.wwarner.Solitaire.Devel.flatpak"
+    BUNDLE: "org.gnome.gitlab.wwarner.Solitaire.Devel.flatpak"
     TARBALL_ARTIFACT_PATH: ".flatpak-builder/build/${FLATPAK_MODULE}/_flatpak_build/meson-dist/${CI_PROJECT_NAME}-${CI_COMMIT_TAG}.tar.xz"
 
 # Build Flatpak for x86_64

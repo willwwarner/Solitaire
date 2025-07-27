@@ -31,7 +31,7 @@ mod imp {
     use super::*;
 
     #[derive(Default, gtk::CompositeTemplate)]
-    #[template(resource = "/org/gnome/Solitaire/window.ui")]
+    #[template(resource = "/org/gnome/gitlab/wwarner/Solitaire/window.ui")]
     pub struct SolitaireWindow {
         // Template widgets
         #[template_child]

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
-  <gresource prefix="/org/gnome/Solitaire">
+  <gresource prefix="/org/gnome/gitlab/wwarner/Solitaire">
     <file preprocess="xml-stripblanks">window.ui</file>
     <file>style.css</file>
     <file preprocess="xml-stripblanks">gtk/help-overlay.ui</file>
@@ -8,7 +8,7 @@
     <file preprocess="xml-stripblanks">assets/minimum_dark.svg</file>
     <file preprocess="xml-stripblanks">assets/anglo_poker.svg</file>
   </gresource>
-  <gresource prefix="/org/gnome/Solitaire/icons/scalable/actions/">
+  <gresource prefix="/org/gnome/gitlab/wwarner/Solitaire/icons/scalable/actions/">
     <file preprocess="xml-stripblanks">lightbulb-symbolic.svg</file>
   </gresource>
 </gresources>

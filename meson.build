@@ -13,10 +13,10 @@ cargo_opt += [ '--target-dir', meson.project_build_root()  / 'src' ]
 if get_option('buildtype') == 'release'
   cargo_opt += [ '--release' ]
   rust_target = 'release'
-  app_id = 'org.gnome.Solitaire'
+  app_id = 'org.gnome.gitlab.wwarner.Solitaire'
 else
   rust_target = 'debug'
-  app_id = 'org.gnome.Solitaire.Devel'
+  app_id = 'org.gnome.gitlab.wwarner.Solitaire.Devel'
 endif
 
 subdir('data')

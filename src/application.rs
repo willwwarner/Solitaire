@@ -83,7 +83,7 @@ impl SolitaireApplication {
         glib::Object::builder()
             .property("application-id", application_id)
             .property("flags", flags)
-            .property("resource-base-path", "/org/gnome/Solitaire")
+            .property("resource-base-path", "/org/gnome/gitlab/wwarner/Solitaire")
             .build()
     }
 

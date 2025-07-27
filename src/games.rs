@@ -43,7 +43,7 @@ pub fn load_game(game_name: &str, grid: &gtk::Grid) {
 
     // Create the renderer for the game
     glib::g_message!("solitaire", "Loading SVG");
-    let resource = gio::resources_lookup_data("/org/gnome/Solitaire/assets/anglo_poker.svg", gio::ResourceLookupFlags::NONE)
+    let resource = gio::resources_lookup_data("/org/gnome/gitlab/wwarner/Solitaire/assets/anglo_poker.svg", gio::ResourceLookupFlags::NONE)
         .expect("Failed to load resource data");
     glib::g_message!("solitaire", "loaded resource data");
     let handle = rsvg::Loader::new()

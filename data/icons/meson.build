@@ -6,7 +6,7 @@ install_data(
 
 symbolic_dir = 'hicolor' / 'symbolic' / 'apps'
 install_data(
-  symbolic_dir / ('@0@-symbolic.svg').format('org.gnome.Solitaire'),
+  symbolic_dir / ('@0@-symbolic.svg').format('org.gnome.gitlab.wwarner.Solitaire'),
   install_dir: get_option('datadir') / 'icons' / symbolic_dir,
   rename: '@0@-symbolic.svg'.format(app_id)
 )

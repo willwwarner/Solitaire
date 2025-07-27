@@ -3,7 +3,8 @@
 (goal)
 A Solitaire game designed for the Gnome Desktop Environment with many variations
 
-Right now, an in development app with one solitaire game: Klondike
+Right now, an in development app with one solitaire game: Klondike.
+
 To test, compile with meson or GNOME Builder.
 
 TODO:

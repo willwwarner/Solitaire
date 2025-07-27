@@ -1,14 +1,13 @@
 {
-    "id": "org.gnome.Solitaire.Devel",
+    "id": "org.gnome.gitlab.wwarner.Solitaire.Devel",
     "runtime": "org.gnome.Platform",
-    "runtime-version": "47",
+    "runtime-version": "master",
     "sdk": "org.gnome.Sdk",
     "sdk-extensions": [
         "org.freedesktop.Sdk.Extension.rust-stable"
     ],
     "command": "solitaire",
     "finish-args": [
-        "--share=network",
         "--share=ipc",
         "--socket=fallback-x11",
         "--device=dri",

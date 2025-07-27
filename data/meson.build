@@ -3,7 +3,7 @@ desktop_conf.set('app-id', app_id)
 
 desktop_file = i18n.merge_file(
         input: configure_file(
-      		        input: 'org.gnome.Solitaire.desktop.in',
+      		        input: 'org.gnome.gitlab.wwarner.Solitaire.desktop.in',
       		       output: '@BASENAME@',
       		configuration: desktop_conf
                ),
@@ -24,7 +24,7 @@ appstream_conf.set('app-id', app_id)
 
 appstream_file = i18n.merge_file(
         input: configure_file(
-        	 	 input: 'org.gnome.Solitaire.metainfo.xml.in',
+        	 	 input: 'org.gnome.gitlab.wwarner.Solitaire.metainfo.xml.in',
         		output: '@BASENAME@',
          	 configuration: appstream_conf
         	),
@@ -42,7 +42,7 @@ gschema_conf = configuration_data()
 gschema_conf.set('app-id', app_id)
 
 configure_file(
-  input: 'org.gnome.Solitaire.gschema.xml',
+  input: 'org.gnome.gitlab.wwarner.Solitaire.gschema.xml',
   output: '@0@.gschema.xml'.format(app_id),
   install: true,
   install_dir: get_option('datadir') / 'glib-2.0' / 'schemas',
@@ -60,7 +60,7 @@ service_conf.set('bindir', get_option('prefix') / get_option('bindir'))
 service_conf.set('app-id', app_id)
 
 configure_file(
-  input: 'org.gnome.Solitaire.service.in',
+  input: 'org.gnome.gitlab.wwarner.Solitaire.service.in',
   output: '@0@.service'.format(app_id),
   install: true,
   configuration: service_conf,
