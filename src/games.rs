@@ -23,7 +23,7 @@ use std::format;
 use gtk::prelude::*;
 use gtk::{gio, glib, gdk::Paintable};
 use gettextrs::gettext;
-use crate::{renderer, card_stack::CardStack, window::SolitaireWindow};
+use crate::{renderer, card_stack::CardStack, window::SolitaireWindow, runtime};
 
 mod klondike;
 
@@ -62,7 +62,7 @@ pub fn load_game(game_name: &str, grid: &gtk::Grid) {
         picture.set_widget_name(card_name.as_str());
         picture.set_property("sensitive", true);
         let texture = renderer::set_and_return_texture(&card_name, &renderer);
-        picture.set_paintable(Some(texture.upcast_ref::<Paintable>()));
+        picture.set_paintable(Some(&texture));
     }
 
     renderer::set_back_texture(&renderer);
@@ -78,6 +78,7 @@ pub fn load_game(game_name: &str, grid: &gtk::Grid) {
 pub fn unload(grid: &gtk::Grid) {
     let mut game = CURRENT_GAME.lock().unwrap();
     *game = None;
+    runtime::clear_history_and_moves();
     let items = grid.observe_children().n_items();
     for i in 0..items {
         let child = grid.first_child().expect("Couldn't get child");
@@ -95,6 +96,13 @@ pub fn on_card_click(card: &gtk::Picture) {
     let mut game = CURRENT_GAME.lock().unwrap();
     if let Some(game) = game.as_mut() {
         game.on_card_click(card);
+    }
+}
+
+pub fn on_slot_click(slot: &CardStack) {
+    let mut game = CURRENT_GAME.lock().unwrap();
+    if let Some(game) = game.as_mut() {
+        game.on_slot_click(slot);
     }
 }
 
@@ -144,6 +152,7 @@ pub trait Game: Send + Sync {
     fn on_drag_completed(&self, origin_stack: &CardStack);
     fn on_drop_completed(&self, recipient_stack: &CardStack);
     fn pre_undo_drag(&self, origin_stack: &CardStack, dropped_stack: &CardStack);
-
     fn on_card_click(&self, card: &gtk::Picture);
+    fn undo_deal(&self, stock: &CardStack);
+    fn on_slot_click(&self, slot: &CardStack);
 }

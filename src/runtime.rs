@@ -58,7 +58,7 @@ pub fn connect_click(picture: &gtk::Picture) {
     let click = GestureClick::new();
 
     let picture_clone = picture.to_owned();
-    click.connect_released(move |_click, _n_press, _x, _y| {
+    click.connect_pressed(move |_click, _n_press, _x, _y| {
         games::on_card_click(&picture_clone);
     });
     picture.add_controller(click);
@@ -85,6 +85,21 @@ pub fn set_grid(grid: gtk::Grid) {
 pub fn perform_move(destination_stack:&CardStack, card_name: &str, origin_stack: &CardStack) {
     let transfer_stack = origin_stack.try_split_to_new_on(card_name).unwrap_or_else(|_| origin_stack.split_to_new_on(&*(card_name.to_owned() + "_b")));
     destination_stack.merge_stack(&transfer_stack);
+}
+
+pub fn perform_move_complex(destination_stack:&CardStack, card_name: &str, origin_stack: &CardStack, instruction: &str) {
+    if instruction == "flip" {
+        let origin_children = origin_stack.observe_children();
+        for i in 0..origin_children.n_items() {
+            let card = origin_stack.last_child().unwrap().downcast::<gtk::Picture>().unwrap();
+            crate::renderer::flip_card(&card);
+            card.unparent();
+            destination_stack.add_card(&card);
+        }
+    } else {
+        let transfer_stack = origin_stack.try_split_to_new_on(card_name).unwrap_or_else(|_| origin_stack.split_to_new_on(&*(card_name.to_owned() + "_b")));
+        destination_stack.merge_stack(&transfer_stack);
+    }
 }
 
 pub fn is_one_rank_above(card_lower: &glib::GString, card_higher: &glib::GString) -> bool {
@@ -150,10 +165,18 @@ pub fn undo_last_move() {
     if !(move_index == 0) {
         let (origin_stack, card_name, destination_stack) = get_n_move(move_index - 1);
         let grid = get_grid().unwrap();
-        let origin_stack_widget = get_child(&grid, &origin_stack).unwrap().downcast::<CardStack>().unwrap();
         let destination_stack_widget = get_child(&grid, &destination_stack).unwrap().downcast::<CardStack>().unwrap();
-        games::pre_undo_drag(&origin_stack_widget, &destination_stack_widget);
-        perform_move(&origin_stack_widget, &card_name, &destination_stack_widget);
+        if origin_stack.contains("->") {
+            let mut origin_parts = origin_stack.split("->");
+            let instruction = origin_parts.next().unwrap();
+            let destination_stack = origin_parts.next().unwrap().to_string();
+            let origin_stack_widget = get_child(&grid, &destination_stack).unwrap().downcast::<CardStack>().unwrap();
+            perform_move_complex(&origin_stack_widget, &card_name, &destination_stack_widget, instruction);
+        } else {
+            let origin_stack_widget = get_child(&grid, &origin_stack).unwrap().downcast::<CardStack>().unwrap();
+            games::pre_undo_drag(&origin_stack_widget, &destination_stack_widget);
+            perform_move(&origin_stack_widget, &card_name, &destination_stack_widget);
+        }
         HISTORY_INDEX.set(move_index - 1);
     }
 }
@@ -161,16 +184,25 @@ pub fn undo_last_move() {
 pub fn redo_first_move() {
     let move_index = HISTORY_INDEX.with(|index| index.borrow().clone());
     if let Some(first_entry) = ACTION_HISTORY.with(|history| history.borrow().get(move_index).cloned()) {
-        let mut last_entry_parts = first_entry.splitn(3, "&>");
-        let destination_stack = last_entry_parts.next().unwrap().to_string();
-        let card_name = last_entry_parts.next().unwrap().to_string();
-        let origin_stack = last_entry_parts.next().unwrap().to_string();
+        let mut first_entry_parts = first_entry.splitn(3, "&>");
+        let destination_stack = first_entry_parts.next().unwrap().to_string();
+        let card_name = first_entry_parts.next().unwrap().to_string();
+        let origin_stack = first_entry_parts.next().unwrap().to_string();
 
         let grid = get_grid().unwrap();
         let origin_stack_widget = get_child(&grid, &origin_stack).unwrap().downcast::<CardStack>().unwrap();
-        let destination_stack_widget = get_child(&grid, &destination_stack).unwrap().downcast::<CardStack>().unwrap();
-        perform_move(&origin_stack_widget, &card_name, &destination_stack_widget);
-        games::on_drag_completed(&destination_stack_widget);
+        if destination_stack.contains("->") {
+            let mut destination_parts = destination_stack.split("->");
+            let instruction = destination_parts.next().unwrap().to_string();
+            let destination_stack = destination_parts.next().unwrap().to_string();
+            let destination_stack_widget = get_child(&grid, &destination_stack).unwrap().downcast::<CardStack>().unwrap();
+            perform_move_complex(&origin_stack_widget, &card_name, &destination_stack_widget, &instruction);
+            games::on_drag_completed(&destination_stack_widget);
+        } else {
+            let destination_stack_widget = get_child(&grid, &destination_stack).unwrap().downcast::<CardStack>().unwrap();
+            perform_move(&origin_stack_widget, &card_name, &destination_stack_widget);
+            games::on_drag_completed(&destination_stack_widget);
+        }
         games::on_drop_completed(&origin_stack_widget);
         HISTORY_INDEX.set(move_index + 1);
     }
@@ -182,4 +214,9 @@ pub fn update_redo_actions(window: &crate::window::SolitaireWindow) {
     let redo_action = window.lookup_action("redo").unwrap().downcast::<gio::SimpleAction>().unwrap();
     undo_action.set_enabled(move_index > 0);
     redo_action.set_enabled(move_index < ACTION_HISTORY.with(|history| history.borrow().len()));
+}
+
+pub fn clear_history_and_moves() {
+    ACTION_HISTORY.set(Vec::new());
+    HISTORY_INDEX.set(0);
 }

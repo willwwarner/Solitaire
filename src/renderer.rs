@@ -96,7 +96,7 @@ pub fn flip_to_face(card: &gtk::Picture) {
     let current_name = card.widget_name();
     if current_name.ends_with("_b") {
         card.set_widget_name(&current_name.replace("_b", ""));
-        let texture = TEXTURES.with(|t| { t.borrow_mut().get(get_texture_index(&card.widget_name())).unwrap().to_owned() });
+        let texture = TEXTURES.with(|t| { t.borrow().get(get_texture_index(&card.widget_name())).unwrap().to_owned() });
         card.set_paintable(Some(texture.upcast_ref::<Paintable>()));
     }
 }

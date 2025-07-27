@@ -67,6 +67,7 @@ impl super::Game for Klondike {
         grid.attach(&waste, 1, 0, 1, 1);
 
         let stock = CardStack::new();
+        stock.add_click_to_slot();
         stock.set_widget_name("stock");
         stock.set_fan_cards(false);
         while n_cards > 0 {
@@ -124,6 +125,14 @@ impl super::Game for Klondike {
         }
     }
 
+    fn pre_undo_drag(&self, origin_stack: &CardStack, dropped_stack: &CardStack) {
+        if origin_stack.widget_name().starts_with("tableau") {
+            origin_stack.face_down_top_card(); // This returns if the stack is empty or not
+        } else if origin_stack.widget_name() == "stock" {
+            dropped_stack.face_down_top_card();
+        }
+    }
+
     fn on_card_click(&self, card: &gtk::Picture) {
         let card_stack = card.parent().unwrap().downcast::<CardStack>().unwrap();
         let grid = card_stack.parent().unwrap().downcast::<gtk::Grid>().unwrap();
@@ -142,11 +151,21 @@ impl super::Game for Klondike {
         }
     }
 
-    fn pre_undo_drag(&self, origin_stack: &CardStack, dropped_stack: &CardStack) {
-        if origin_stack.widget_name().starts_with("tableau") {
-            origin_stack.face_down_top_card(); // This returns if the stack is empty or not
-        } else if origin_stack.widget_name() == "stock" {
-            dropped_stack.face_down_top_card();
+    fn undo_deal(&self, stock: &CardStack) {
+        todo!()
+    }
+
+    fn on_slot_click(&self, slot: &CardStack) {
+        if slot.first_child().is_none() {
+            let grid = slot.parent().unwrap().downcast::<gtk::Grid>().unwrap();
+            let waste = runtime::get_child(&grid, "waste").unwrap().downcast::<CardStack>().unwrap();
+            for i in 0..waste.observe_children().n_items() {
+                let card = waste.last_child().unwrap().downcast::<gtk::Picture>().unwrap();
+                waste.remove_card(&card);
+                slot.add_card(&card);
+                renderer::flip_card(&card);
+            }
+            runtime::add_to_history("flip->waste", slot.first_child().unwrap().widget_name().as_str(), slot.widget_name().as_str());
         }
     }
 }

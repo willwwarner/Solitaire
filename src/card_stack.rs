@@ -19,7 +19,7 @@
  */
 
 use adw::gio::ListModel;
-use gtk::{glib, gdk, gsk, DragSource};
+use gtk::{glib, gdk, gsk, DragSource, GestureClick};
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use std::cell::Cell;
@@ -71,6 +71,7 @@ mod imp {
     impl ObjectImpl for CardStack {
         fn constructed(&self) {
             self.fan_cards.set(true);
+            self.obj().add_css_class("card-stack-marker");
         }
     }
 
@@ -107,7 +108,7 @@ mod imp {
         }
 
         // A size_allocate that keeps the correct Aspect ratio for each stack
-        fn size_allocate(&self, width: i32, height: i32, baseline: i32) {
+        fn size_allocate(&self, width: i32, height: i32, _baseline: i32) {
             let widget = self.obj();
             let children = widget.observe_children();
             let child_count = children.n_items();
@@ -233,11 +234,11 @@ mod imp {
 
     impl ObjectImpl for TransferCardStack {}
     impl WidgetImpl for TransferCardStack {
-        fn size_allocate(&self, width: i32, height: i32, baseline: i32) {
+        fn size_allocate(&self, width: i32, height: i32, _baseline: i32) {
             let widget = self.obj();
             let children = widget.observe_children();
             let child_count = children.n_items();
-            // Don't bother with empty stacks
+
             if child_count == 0 {
                 return;
             }
@@ -258,8 +259,6 @@ mod imp {
             for i in 0..child_count {
                 if let Some(child) = children.item(i) {
                     if let Ok(picture) = child.downcast::<gtk::Widget>() {
-                        // Position the card vertically with the proper offset
-                        // The formula ensures cards are properly staggered with the calculated offset
                         let y_pos = (i * vertical_offset) as f32;
                         picture.allocate(width, card_height, -1, Some(gsk::Transform::new().translate(&gtk::graphene::Point::new(0.0, y_pos))));
                     }
@@ -299,6 +298,15 @@ impl CardStack {
             }
         });
         self.add_controller(drop_target);
+    }
+
+    pub fn add_click_to_slot(&self) {
+        let click = GestureClick::new();
+        let slot_clone = self.to_owned();
+        click.connect_begin(move |_click, _sequence| {
+            games::on_slot_click(&slot_clone);
+        });
+        self.add_controller(click);
     }
 
     // FIXME: this causes "Broken accounting of active state for widget" when the top card is moved (occasionally)
@@ -364,6 +372,7 @@ impl CardStack {
         // Only add the picture if it doesn't already have a parent
         if card_picture.parent().is_none() {
             card_picture.insert_before(self, None::<&gtk::Widget>);
+            self.remove_css_class("card-stack-marker");
         }  else {
             // If the picture already has a parent, log a warning
             glib::g_warning!("solitaire", "Attempted to add a widget that already has a parent");
@@ -468,6 +477,9 @@ impl CardStack {
     }
 
     pub fn remove_card(&self, picture: &gtk::Picture) {
+        if self.first_child().expect("Tried to remove a card from a stack that has no children") == *picture {
+            self.add_css_class("card-stack-marker");
+        }
         picture.unparent();
     }
 }
