@@ -12,9 +12,16 @@
       Solitaire is made for the GNOME desktop.
     </p>
   </description>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <recommends>
+    <control>pointing</control>
+    <control>touch</control>
+  </recommends>
   <screenshots>
     <screenshot type="default" width="700" height="448">
-      <image>https://shbozz.github.io/Solitaire/Screenshot-03.png</image>
+      <image>https://gitlab.gnome.org/wwarner/solitaire/-/raw/main/data/screenshot-1.png</image>
     </screenshot>
   </screenshots>
 
@@ -23,11 +30,11 @@
   </developer>
 
   <!-- Required: Should be a link to the upstream homepage for the component -->
-  <url type="homepage">https://shbozz.github.io/Solitaire/</url>
+  <url type="homepage">https://gitlab.gnome.org/wwarner/solitaire</url>
   <!-- Recommended: It is highly recommended for open-source projects to display the source code repository -->
-  <url type="vcs-browser">https://gitlab.gnome.org/shbozz/solitaire/</url>
+  <url type="vcs-browser">https://gitlab.gnome.org/wwarner/solitaire/</url>
   <!-- Should point to the software's bug tracking system, for users to report new bugs -->
-  <url type="bugtracker">https://gitlab.gnome.org/shbozz/solitaire/-/issues</url>
+  <url type="bugtracker">https://gitlab.gnome.org/wwarner/solitaire/-/issues</url>
 
   <translation type="gettext">solitaire</translation>
   <!-- All graphical applications having a desktop file must have this tag in the MetaInfo.
