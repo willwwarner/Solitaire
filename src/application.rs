@@ -112,7 +112,7 @@ impl SolitaireApplication {
                         \n© 2024 Vincent Bermel")
             .license_type(gtk::License::Gpl30)
             .issue_url("https://gitlab.gnome.org/wwarner/solitaire/-/issues")
-            .website("https://shbozz.github.io/Solitaire")
+            .website("https://gitlab.gnome.org/wwarner/solitaire")
             .comments("Play solitaire games")
             .build();
 
