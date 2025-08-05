@@ -57,7 +57,7 @@ mod imp {
 
     #[derive(Default)]
     pub struct CardStack {
-        pub fan_cards: Cell<bool>,
+        pub aspect: Cell<f32>,
         pub v_offset: Cell<u32>,
     }
 
@@ -70,8 +70,7 @@ mod imp {
 
     impl ObjectImpl for CardStack {
         fn constructed(&self) {
-            self.fan_cards.set(true);
-            self.obj().add_css_class("card-stack-marker");
+            self.aspect.set(1.4);
         }
     }
 
@@ -79,32 +78,21 @@ mod imp {
         fn measure(&self, orientation: gtk::Orientation, for_size: i32) -> (i32, i32, i32, i32) {
             if for_size == 0 { panic!("solitaire: card_stack: for_size == 0!") }
             // If orientation == horizontal, then for_size is the height
-            // if for_size == -1 {
-            if orientation == gtk::Orientation::Horizontal {
-                return (25, 250, -1, -1);
-            } else { // orientation == gtk::Orientation::Vertical
-                if self.fan_cards.get() == true {
-                    return (140, 1400, -1, -1)
-                } else {
-                    return (35, 350, -1, -1)
+            if for_size == -1 {
+                if orientation == gtk::Orientation::Horizontal {
+                    return (25, 250, -1, -1);
+                } else { // orientation == gtk::Orientation::Vertical
+                    let aspect = self.aspect.get();
+                    return (25 * aspect as i32, (250.0 * aspect) as i32, -1, -1);
+                }
+            } else {
+                let aspect = self.aspect.get();
+                if orientation == gtk::Orientation::Horizontal {
+                    return (25, (for_size as f32 / aspect) as i32, -1, -1);
+                } else { // orientation == gtk::Orientation::Vertical
+                    return (25 * aspect as i32, (for_size as f32 * aspect) as i32, -1, -1);
                 }
             }
-            // }
-            // if self.fan_cards.get() == true {
-            //     println!("fan_cards: true");
-            //     if orientation == gtk::Orientation::Horizontal {
-            //         return ((for_size / 4) - 10, 250, -1, -1);
-            //     } else { // orientation == gtk::Orientation::Vertical
-            //         return ((for_size * 4) - 10, 1400, 0, 0);
-            //     }
-            // } else {
-            //     if orientation == gtk::Orientation::Horizontal {
-            //         return (20, 250, -1, -1);
-            //     } else { // orientation == gtk::Orientation::Vertical
-            //         let min_height = (for_size as f32 * renderer::ASPECT) as i32 - 10;
-            //         return (min_height, min_height, 0, 0);
-            //     }
-            // }
         }
 
         // A size_allocate that keeps the correct Aspect ratio for each stack
@@ -112,6 +100,7 @@ mod imp {
             let widget = self.obj();
             let children = widget.observe_children();
             let child_count = children.n_items();
+            let stack_aspect = self.aspect.get();
             // Don't bother with empty stacks
             if child_count == 0 {
                 return;
@@ -119,13 +108,14 @@ mod imp {
 
             let allocation_width;
             let allocation_height;
-            if self.fan_cards.get() == true {
-                let max_height = width * 4;
+            if stack_aspect != 1.4 {
+                let max_height = (width as f32 * stack_aspect).floor() as i32;
                 if child_count == 1 {
                     if height > max_height {
                         widget.first_child().unwrap().allocate(width, (width as f32 * renderer::ASPECT) as i32, -1, None);
                     } else {
-                        widget.first_child().unwrap().allocate(height / 4, ((height / 4) as f32 * renderer::ASPECT) as i32, -1, None);
+                        let max_width = (height as f32 / stack_aspect) as i32;
+                        widget.first_child().unwrap().allocate(max_width, (max_width as f32 * renderer::ASPECT) as i32, -1, None);
                     }
                     return;
                 }
@@ -134,12 +124,12 @@ mod imp {
 
                 if height > max_height {
                     allocation_height = (width as f32 * renderer::ASPECT).floor() as i32;
-                    vertical_offset = std::cmp::min((max_height - allocation_height) / (child_count as i32 - 1), allocation_height / 3) as u32;
+                    vertical_offset = std::cmp::min((max_height - allocation_height) / (child_count as i32 - 1), allocation_height / 5) as u32;
                     allocation_width = width;
                 } else {
-                    allocation_height = ((height / 4) as f32 * renderer::ASPECT).floor() as i32;
-                    vertical_offset = std::cmp::min((height - allocation_height) / (child_count as i32 - 1), allocation_height / 3) as u32;
-                    allocation_width = height / 4;
+                    allocation_width = (height as f32 / stack_aspect).floor() as i32;
+                    allocation_height = (allocation_width as f32 * renderer::ASPECT).floor() as i32;
+                    vertical_offset = std::cmp::min((height - allocation_height) / (child_count as i32 - 1), allocation_height / 5) as u32;
                 }
 
                 // Position each card with proper spacing
@@ -153,12 +143,12 @@ mod imp {
                 }
                 self.v_offset.set(vertical_offset);
             } else {
-                let card_height = (width as f32 * renderer::ASPECT).floor() as i32;
-                if height > card_height {
+                let max_card_height = (width as f32 * renderer::ASPECT).floor() as i32;
+                if height > max_card_height {
                     allocation_width = width;
-                    allocation_height = card_height;
+                    allocation_height = max_card_height;
                 } else {
-                    allocation_width = (height as f32 / renderer::ASPECT) as i32;
+                    allocation_width = (height as f32 / renderer::ASPECT).floor() as i32;
                     allocation_height = height;
                 }
 
@@ -274,8 +264,9 @@ impl CardStack {
         glib::Object::new()
     }
 
-    pub fn set_fan_cards(&self, fan_cards: bool) {
-        self.imp().fan_cards.set(fan_cards);
+    pub fn set_aspect(&self, aspect: f32) {
+        if aspect < 1.4 { panic!("solitaire: set_aspect() called with aspect < 1.4"); }
+        self.imp().aspect.set(aspect);
     }
 
     pub fn enable_drop(&self) {
@@ -372,7 +363,6 @@ impl CardStack {
         // Only add the picture if it doesn't already have a parent
         if card_picture.parent().is_none() {
             card_picture.insert_before(self, None::<&gtk::Widget>);
-            self.remove_css_class("card-stack-marker");
         }  else {
             // If the picture already has a parent, log a warning
             glib::g_warning!("solitaire", "Attempted to add a widget that already has a parent");
@@ -477,9 +467,6 @@ impl CardStack {
     }
 
     pub fn remove_card(&self, picture: &gtk::Picture) {
-        if self.first_child().expect("Tried to remove a card from a stack that has no children") == *picture {
-            self.add_css_class("card-stack-marker");
-        }
         picture.unparent();
     }
 }
