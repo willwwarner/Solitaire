@@ -21,7 +21,7 @@
 use std::sync::Mutex;
 use std::format;
 use gtk::prelude::*;
-use gtk::{gio, glib, gdk::Paintable};
+use gtk::{gio, glib};
 use gettextrs::gettext;
 use crate::{renderer, card_stack::CardStack, window::SolitaireWindow, runtime};
 
@@ -31,6 +31,7 @@ pub const JOKERS: [&str; 2] = ["joker_red", "joker_black"];
 pub const SUITES: [&str; 4] = ["club", "diamond", "heart", "spade"];
 pub const RANKS: [&str; 13] = ["ace", "2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king"];
 static CURRENT_GAME: Mutex<Option<Box<dyn Game>>> = Mutex::new(None);
+static CURRENT_SOLVER: Mutex<Option<Box<dyn Solver>>> = Mutex::new(None);
 
 pub fn load_game(game_name: &str, grid: &gtk::Grid) {
     let window = grid.root().unwrap().downcast::<gtk::Window>().unwrap().downcast::<SolitaireWindow>().unwrap();
@@ -70,6 +71,8 @@ pub fn load_game(game_name: &str, grid: &gtk::Grid) {
     // Store the current game type
     let mut game = CURRENT_GAME.lock().unwrap();
     *game = Some(Box::new(klondike::Klondike::new_game(cards, &grid, &renderer)));
+    let mut solver = CURRENT_SOLVER.lock().unwrap();
+    *solver = None;
 
     // Log game loading
     println!("Loaded game: {}", game_name);
@@ -155,4 +158,9 @@ pub trait Game: Send + Sync {
     fn on_card_click(&self, card: &gtk::Picture);
     fn undo_deal(&self, stock: &CardStack);
     fn on_slot_click(&self, slot: &CardStack);
+    fn is_won (&self) -> bool;
+}
+
+pub trait Solver: Send + Sync {
+    fn get_next_move(&self) -> Option<String>;
 }

@@ -32,6 +32,7 @@ impl super::Game for Klondike {
         for i in 0..7 {
             let card_stack = CardStack::new();
             card_stack.set_widget_name(format!("tableau_{i}").as_str());
+            card_stack.set_aspect(2.8); // 2 card heights
 
             for j in 0..(i + 1) {
                 if let Some(obj) = cards.item(glib::random_int_range(0, n_cards) as u32) {
@@ -56,20 +57,17 @@ impl super::Game for Klondike {
         for i in 0..4 {
             let card_stack = CardStack::new();
             card_stack.set_widget_name(format!("foundation_{i}").as_str());
-            card_stack.set_fan_cards(false);
             grid.attach(&card_stack, i + 3, 0, 1, 1);
             card_stack.enable_drop();
         }
 
         let waste = CardStack::new();
         waste.set_widget_name("waste");
-        waste.set_fan_cards(false);
         grid.attach(&waste, 1, 0, 1, 1);
 
         let stock = CardStack::new();
         stock.add_click_to_slot();
         stock.set_widget_name("stock");
-        stock.set_fan_cards(false);
         while n_cards > 0 {
             if let Some(obj) = cards.item(glib::random_int_range(0, n_cards) as u32) {
                 if let Ok(picture) = obj.downcast::<gtk::Picture>() {
@@ -167,6 +165,19 @@ impl super::Game for Klondike {
             }
             runtime::add_to_history("flip->waste", slot.first_child().unwrap().widget_name().as_str(), slot.widget_name().as_str());
         }
+    }
+
+    fn is_won(&self) -> bool {
+        let grid = runtime::get_grid().unwrap();
+        for i in 0..4 {
+            let stack = runtime::get_child(&grid, format!("foundation_{i}").as_str()).unwrap().downcast::<CardStack>().unwrap();
+            if let Some(last_child) = stack.last_child() {
+                if !last_child.widget_name().ends_with("king") {
+                    return false;
+                }
+            }
+        }
+        true
     }
 }
 
