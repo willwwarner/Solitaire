@@ -28,12 +28,14 @@ use crate::{games, renderer, runtime};
 
 glib::wrapper! {
     pub struct CardStack(ObjectSubclass<imp::CardStack>)
-        @extends gtk::Widget;
+        @extends gtk::Widget,
+        @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
 glib::wrapper! {
     pub struct TransferCardStack(ObjectSubclass<imp::TransferCardStack>)
-        @extends gtk::Widget;
+        @extends gtk::Widget,
+        @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
 pub fn get_index(card_name: &str, children: &ListModel) -> Result<u32, glib::Error> {
@@ -256,7 +258,6 @@ mod imp {
             }
         }
     }
-    impl BoxImpl for TransferCardStack {}
 }
 
 impl CardStack {
@@ -460,6 +461,18 @@ impl CardStack {
         });
 
         card.add_controller(drag_source);
+    }
+    
+    pub fn get_card_names(&self) -> Vec<String> {
+        let mut card_names = Vec::new();
+        let children = self.observe_children();
+        let total_children = children.n_items();
+        for i in 0..total_children {
+            let child = children.item(i).expect("Failed to get child from CardStack");
+            let picture = child.downcast::<gtk::Picture>().expect("Child is not a gtk::Picture (get_card_names)");
+            card_names.push(picture.widget_name().to_string());
+        }
+        card_names
     }
     
     pub fn focus_card(&self, card_name: &str) {
