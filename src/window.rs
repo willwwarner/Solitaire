@@ -19,7 +19,6 @@
  */
 
 use gettextrs::gettext;
-use std::cell::Cell;
 use gtk::prelude::*;
 use adw::prelude::*;
 use adw::subclass::prelude::*;
@@ -89,7 +88,10 @@ mod imp {
 
 glib::wrapper! {
     pub struct SolitaireWindow(ObjectSubclass<imp::SolitaireWindow>)
-        @extends gtk::Widget, gtk::Window, gtk::ApplicationWindow, adw::ApplicationWindow,        @implements gio::ActionGroup, gio::ActionMap;
+        @extends gtk::Widget, gtk::Window, gtk::ApplicationWindow, adw::ApplicationWindow,
+        @implements gio::ActionMap, gio::ActionGroup,
+                    gtk::Root, gtk::Native, gtk::ShortcutManager,
+                    gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
 #[gtk::template_callbacks]
@@ -121,7 +123,23 @@ impl SolitaireWindow {
     }
     
     fn hint(&self) {
-        println!("Hint!");
+        if let Some((from, card, to)) = games::get_hint() {
+            println!("Hint: Move {} from {} to {}", card, from, to);
+
+            let grid = self.imp().card_grid.get();
+
+            // Focus the source stack
+            if let Ok(source_stack) = runtime::get_child(&grid, &from) {
+                let source_stack = source_stack.downcast::<crate::card_stack::CardStack>().unwrap();
+
+                // Focus the card
+                if card != "draw" && card != "recycle" {
+                    source_stack.focus_card(&card);
+                }
+            }
+        } else {
+            println!("No hints available!");
+        }
     }
     
     fn undo(&self) {

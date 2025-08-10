@@ -23,7 +23,7 @@ use std::format;
 use gtk::prelude::*;
 use gtk::{gio, glib};
 use gettextrs::gettext;
-use crate::{renderer, card_stack::CardStack, window::SolitaireWindow, runtime};
+use crate::{renderer, card_stack::CardStack, runtime};
 
 mod klondike;
 
@@ -34,9 +34,10 @@ static CURRENT_GAME: Mutex<Option<Box<dyn Game>>> = Mutex::new(None);
 static CURRENT_SOLVER: Mutex<Option<Box<dyn Solver>>> = Mutex::new(None);
 
 pub fn load_game(game_name: &str, grid: &gtk::Grid) {
-    let window = grid.root().unwrap().downcast::<gtk::Window>().unwrap().downcast::<SolitaireWindow>().unwrap();
+    let window = grid.root().unwrap().downcast::<gtk::Window>().unwrap().downcast::<crate::window::SolitaireWindow>().unwrap();
     window.lookup_action("undo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
     window.lookup_action("redo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
+    window.lookup_action("hint").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
 
 
     // Get children from the grid
@@ -148,6 +149,18 @@ pub fn verify_drop(bottom_card: &gtk::Widget, to_stack: &CardStack) -> bool {
     }
 }
 
+pub fn get_hint() -> Option<(String, String, String)> {
+    let mut solver = CURRENT_SOLVER.lock().unwrap();
+    if solver.is_none() { panic!("Get hint called on a game that doesn't have a solver"); }
+
+    // Get the next move hint
+    if let Some(solver) = solver.as_ref() {
+        solver.get_next_move()
+    } else {
+        None
+    }
+}
+
 pub trait Game: Send + Sync {
     fn new_game(cards: gtk::gio::ListModel, grid: &gtk::Grid, renderer: &rsvg::CairoRenderer) -> Self where Self: Sized;
     fn verify_drag(&self, bottom_card: &gtk::Widget, from_stack: &CardStack) -> bool;
@@ -162,5 +175,5 @@ pub trait Game: Send + Sync {
 }
 
 pub trait Solver: Send + Sync {
-    fn get_next_move(&self) -> Option<String>;
+    fn get_next_move(&self) -> Option<(String, String, String)>;
 }
