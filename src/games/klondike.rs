@@ -26,7 +26,7 @@ pub struct Klondike {}
 
 impl Klondike {}
 impl super::Game for Klondike {
-    fn new_game(cards: gtk::gio::ListModel, grid: &gtk::Grid, renderer: &rsvg::CairoRenderer) -> Self {
+    fn new_game(cards: gtk::gio::ListStore, grid: &gtk::Grid, renderer: &rsvg::CairoRenderer) -> Self {
         let mut n_cards = cards.n_items() as i32;
 
         for i in 0..7 {
@@ -37,11 +37,10 @@ impl super::Game for Klondike {
             for j in 0..(i + 1) {
                 if let Some(obj) = cards.item(glib::random_int_range(0, n_cards) as u32) {
                     if let Ok(picture) = obj.downcast::<gtk::Picture>() {
-                        grid.remove(&picture);
                         card_stack.add_card(&picture);
                         if j < i { renderer::flip_card_full(&picture, &renderer) }
                         card_stack.add_drag_to_card(&picture);
-                        runtime::connect_click(&picture);
+                        runtime::connect_double_click(&picture);
                     }
                 } else {
                     glib::g_error!("solitaire", "Failed to get child from grid");
@@ -71,10 +70,9 @@ impl super::Game for Klondike {
         while n_cards > 0 {
             if let Some(obj) = cards.item(glib::random_int_range(0, n_cards) as u32) {
                 if let Ok(picture) = obj.downcast::<gtk::Picture>() {
-                    grid.remove(&picture);
                     stock.add_card(&picture);
                     renderer::flip_card_full(&picture, &renderer);
-                    runtime::connect_click(&picture);
+                    runtime::connect_double_click(&picture);
                 }
             } else {
                 glib::g_error!("solitaire", "Failed to get child from grid");
@@ -131,17 +129,9 @@ impl super::Game for Klondike {
         }
     }
 
-    fn on_card_click(&self, card: &gtk::Picture) {
+    fn on_double_click(&self, card: &gtk::Picture) {
         let card_stack = card.parent().unwrap().downcast::<CardStack>().unwrap();
-        let grid = card_stack.parent().unwrap().downcast::<gtk::Grid>().unwrap();
-        if card_stack.widget_name() == "stock" {
-            let waste = runtime::get_child(&grid, "waste").unwrap().downcast::<CardStack>().unwrap();
-            card_stack.remove_card(card);
-            renderer::flip_card(card);
-            waste.add_card(card);
-            waste.add_drag_to_card(card);
-            runtime::add_to_history(card_stack.widget_name().as_str(), card.widget_name().as_str(), "waste");
-        } else if card_stack.widget_name().starts_with("foundation") {
+        if card_stack.widget_name().starts_with("foundation") {
             return
         } else {
             try_distribute(card, &card_stack);
@@ -154,16 +144,28 @@ impl super::Game for Klondike {
     }
 
     fn on_slot_click(&self, slot: &CardStack) {
-        if slot.first_child().is_none() {
+        if slot.widget_name() == "stock" {
             let grid = slot.parent().unwrap().downcast::<gtk::Grid>().unwrap();
             let waste = runtime::get_child(&grid, "waste").unwrap().downcast::<CardStack>().unwrap();
-            for i in 0..waste.observe_children().n_items() {
-                let card = waste.last_child().unwrap().downcast::<gtk::Picture>().unwrap();
-                waste.remove_card(&card);
-                slot.add_card(&card);
+
+            if slot.first_child().is_none() {
+                for i in 0..waste.observe_children().n_items() {
+                    let card = waste.last_child().unwrap().downcast::<gtk::Picture>().unwrap();
+                    waste.remove_card(&card);
+                    slot.add_card(&card);
+                    renderer::flip_card(&card);
+                    runtime::remove_click(&card);
+                }
+                runtime::add_to_history("flip->waste", slot.first_child().unwrap().widget_name().as_str(), slot.widget_name().as_str());
+            } else {
+                let waste = runtime::get_child(&grid, "waste").unwrap().downcast::<CardStack>().unwrap();
+                let card = slot.last_child().unwrap().downcast::<gtk::Picture>().unwrap();
+                slot.remove_card(&card);
                 renderer::flip_card(&card);
+                waste.add_card(&card);
+                waste.add_drag_to_card(&card);
+                runtime::add_to_history(slot.widget_name().as_str(), card.widget_name().as_str(), "waste");
             }
-            runtime::add_to_history("flip->waste", slot.first_child().unwrap().widget_name().as_str(), slot.widget_name().as_str());
         }
     }
 
@@ -178,6 +180,14 @@ impl super::Game for Klondike {
             }
         }
         true
+    }
+
+    fn get_best_next_move(&self) -> Option<(String, String, String)> {
+        todo!()
+    }
+
+    fn is_winnable(&self) -> bool {
+        todo!()
     }
 }
 

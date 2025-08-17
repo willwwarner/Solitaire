@@ -19,7 +19,6 @@
  */
 
 use adw::prelude::*;
-use cairo::Context;
 use gtk::gdk::*;
 use crate::games;
 
@@ -35,7 +34,7 @@ pub fn draw_card(name: &str, renderer: &rsvg::CairoRenderer) -> MemoryTexture {
         create(cairo::Format::ARgb32, 250, 350)
         .expect("Couldn't create surface");
 
-    let cr = Context::new(&surface).expect("Couldn't create cairo context");
+    let cr = cairo::Context::new(&surface).expect("Couldn't create cairo context");
     // Render a single SVG layer, marked by a <g>
     renderer
         .render_element(&cr, Some(&format!("#{name}")), &cairo::Rectangle::new(0.0, 0.0, 250.0, 350.0))

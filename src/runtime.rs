@@ -54,12 +54,14 @@ pub fn get_child(widget: &impl IsA<gtk::Widget>, name: &str) -> Result<gtk::Widg
     Err(glib::Error::new(glib::FileError::Exist, format!("Card named '{}' was not found in the stack.", name).as_str()))
 }
 
-pub fn connect_click(picture: &gtk::Picture) {
+pub fn connect_double_click(picture: &gtk::Picture) {
     let click = GestureClick::new();
 
     let picture_clone = picture.to_owned();
-    click.connect_pressed(move |_click, _n_press, _x, _y| {
-        games::on_card_click(&picture_clone);
+    click.connect_pressed(move |_click, n_press, _x, _y| {
+        if n_press == 2 {
+            games::on_double_click(&picture_clone);
+        }
     });
     picture.add_controller(click);
 }
@@ -219,4 +221,14 @@ pub fn update_redo_actions(window: &crate::window::SolitaireWindow) {
 pub fn clear_history_and_moves() {
     ACTION_HISTORY.set(Vec::new());
     HISTORY_INDEX.set(0);
+}
+
+pub fn get_stack(name: &str) -> Option<CardStack> {
+    let grid = get_grid().unwrap();
+    if let Ok(widget) = get_child(&grid, name) {
+        if let Ok(stack) = widget.downcast::<CardStack>() {
+            return Some(stack);
+        }
+    }
+    None
 }
