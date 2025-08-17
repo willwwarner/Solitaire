@@ -1,8 +1,34 @@
+:root {
+    --bg: #57E389;
+}
+
 .card-stack {
     box-shadow: none;
+}
+
+.stack-placeholder {
+    background-color: #26A269;
+    border-radius: 8px;
+    box-shadow: 0 0 8px #25835c;
 }
 
 .highlight {
     filter: brightness(60%);
     transition: filter 200ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
+
+window {
+    background-color: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #207351;
+    }
+
+    .stack-placeholder {
+        background-color: #57E389;
+        box-shadow: 0 0 8px #33d17a;
+    }
+}
+

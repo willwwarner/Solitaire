@@ -43,9 +43,8 @@ pub fn get_index(card_name: &str, children: &ListModel) -> Result<u32, glib::Err
 
     // Loop through all the children widgets to find the matching card
     for i in 0..total_children {
-        let child = children.item(i).expect("Failed to get child from CardStack");
-        let card = child.downcast::<Card>().expect("Child is not a Card (find)");
-        if card.widget_name() == card_name {
+        let child = children.item(i).expect("Failed to get child from CardStack").downcast::<gtk::Widget>().unwrap();
+        if child.widget_name() == card_name {
             return Ok(i);
         }
     }
@@ -72,6 +71,9 @@ mod imp {
 
     impl ObjectImpl for CardStack {
         fn constructed(&self) {
+            let placeholder = gtk::Picture::new();
+            placeholder.add_css_class("stack-placeholder");
+            placeholder.insert_before(&self.obj().to_owned(), None::<&gtk::Widget>);
             self.obj().add_css_class("card-stack");
         }
     }
@@ -103,61 +105,64 @@ mod imp {
             let child_count = children.n_items();
             let stack_aspect = self.aspect.get();
             let card_aspect = renderer::ASPECT.get();
-            // Don't bother with empty stacks
-            if child_count == 0 {
-                return;
-            }
 
             let allocation_width;
             let allocation_height;
             if stack_aspect != 1.4 {
                 let max_height = (width as f32 * stack_aspect).floor() as i32;
-                if child_count == 1 {
-                    if height > max_height {
-                        widget.first_child().unwrap().allocate(width, (width as f32 * card_aspect) as i32, -1, None);
-                    } else {
-                        let max_width = (height as f32 / stack_aspect) as i32;
-                        widget.first_child().unwrap().allocate(max_width, (max_width as f32 * card_aspect) as i32, -1, None);
-                    }
-                    return;
-                }
-
                 let vertical_offset;
 
-                if height > max_height {
+                if child_count < 3 {
+                    if height > max_height {
+                        allocation_width = width;
+                        allocation_height = (width as f32 * card_aspect) as i32;
+                    } else {
+                        allocation_width = (height as f32 / stack_aspect) as i32;
+                        allocation_height = (allocation_width as f32 * card_aspect) as i32;
+                    }
+                    vertical_offset = 0;
+                } else if height > max_height {
                     allocation_height = (width as f32 * card_aspect).floor() as i32;
-                    vertical_offset = std::cmp::min((max_height - allocation_height) / (child_count as i32 - 1), allocation_height / 5) as u32;
+                    vertical_offset = std::cmp::min((max_height - allocation_height) / (child_count as i32 - 2), allocation_height / 5) as u32;
                     allocation_width = width;
                 } else {
                     allocation_width = (height as f32 / stack_aspect).floor() as i32;
                     allocation_height = (allocation_width as f32 * card_aspect).floor() as i32;
-                    vertical_offset = std::cmp::min((height - allocation_height) / (child_count as i32 - 1), allocation_height / 5) as u32;
+                    vertical_offset = std::cmp::min((height - allocation_height) / (child_count as i32 - 2), allocation_height / 5) as u32;
                 }
+                let x_offset = (width - allocation_width) / 2;
 
                 // Position each card with proper spacing
-                for i in 0..child_count {
+                widget.first_child().unwrap().downcast::<gtk::Widget>().unwrap().
+                    size_allocate(&gtk::Allocation::new(x_offset + 2, 2, allocation_width - 4, allocation_height - 4), -1);
+                for i in 1..child_count {
                     if let Some(child) = children.item(i) {
                         if let Ok(card) = child.downcast::<gtk::Widget>() {
-                            let y_pos = (i * vertical_offset) as f32;
-                            card.allocate(allocation_width, allocation_height, -1, Some(gsk::Transform::new().translate(&gtk::graphene::Point::new(0.0, y_pos))));
+                            let y_pos = ((i - 1) * vertical_offset) as i32;
+                            let allocation = gtk::Allocation::new(x_offset, y_pos, allocation_width, allocation_height);
+                            card.size_allocate(&allocation, -1);
                         }
                     }
                 }
                 self.v_offset.set(vertical_offset);
             } else {
-                let max_card_height = (width as f32 * renderer::ASPECT.get()).floor() as i32;
+                let max_card_height = (width as f32 * card_aspect).floor() as i32;
                 if height > max_card_height {
                     allocation_width = width;
                     allocation_height = max_card_height;
                 } else {
-                    allocation_width = (height as f32 / renderer::ASPECT.get()).floor() as i32;
+                    allocation_width = (height as f32 / card_aspect).floor() as i32;
                     allocation_height = height;
                 }
+                let x_offset = (width - allocation_width) / 2;
 
-                for i in 0..child_count {
+                widget.first_child().unwrap().downcast::<gtk::Widget>().unwrap()
+                    .size_allocate(&gtk::Allocation::new(x_offset + 2, 2, allocation_width - 4, allocation_height - 4), -1);
+                for i in 1..child_count {
                     if let Some(child) = children.item(i) {
                         if let Ok(card) = child.downcast::<gtk::Widget>() {
-                            card.allocate(allocation_width, allocation_height, -1, None);
+                            let allocation = gtk::Allocation::new(x_offset, 0, allocation_width, allocation_height);
+                            card.size_allocate(&allocation, -1);
                         }
                     }
                 }
@@ -166,10 +171,8 @@ mod imp {
 
         fn unrealize(&self) {
             while let Some(child) = self.obj().first_child() {
-                if let Ok(child) = child.downcast::<gtk::Widget>() {
-                    child.unparent();
-                    child.unrealize();
-                }
+                child.unparent();
+                child.unrealize();
             }
             self.parent_unrealize();
         }
@@ -340,12 +343,11 @@ impl CardStack {
             glib::g_warning!("solitaire", "Attempted to add a widget that already has a parent");
         }
     }
-    
-    pub fn destroy_and_return_cards(&self, cards: &mut Vec<Card>) {
-        let items = self.observe_children().n_items();
+
+    pub fn destroy_and_return_cards(self, cards: &mut Vec<Card>) {
+        let items = self.observe_children().n_items() - 1;
         for _ in 0..items {
-            let child = self.first_child().expect("Failed to get first child from CardStack");
-            let card = child.downcast::<Card>().expect("Child is not a Card (dissolve)");
+            let card = self.first_card().expect("Failed to get first card from CardStack");
             card.remove_css_class("highlight");
             for controller in &card.observe_controllers() {
                 if let Ok(controller) = controller {
@@ -356,6 +358,7 @@ impl CardStack {
             card.flip_to_face();
             cards.push(card);
         }
+        self.first_child().unwrap().downcast::<gtk::Widget>().unwrap().unparent();
 
         self.unparent();
         self.unrealize();
@@ -371,7 +374,7 @@ impl CardStack {
     }
 
     pub fn face_up_top_card(&self) -> bool {
-        if let Some(widget) = self.last_child() {
+        if let Some(widget) = self.last_card() {
             let card = widget.downcast::<Card>().expect("Child is not a Card (flip)");
             card.flip_to_face();
             return false; // The stack is not empty
@@ -380,7 +383,7 @@ impl CardStack {
     }
 
     pub fn face_down_top_card(&self) -> bool {
-        if let Some(widget) = self.last_child() {
+        if let Some(widget) = self.last_card() {
             let card = widget.downcast::<Card>().expect("Child is not a Card (flip)");
             card.flip_to_back();
             return false; // The stack is not empty
@@ -440,7 +443,7 @@ impl CardStack {
         let mut solver_cards = Vec::new();
         let children = self.observe_children();
         let total_children = children.n_items();
-        for i in 0..total_children {
+        for i in 1..total_children {
             let child = children.item(i).expect("Failed to get child from CardStack");
             let card = child.downcast::<Card>().expect("Child is not a Card (get_solver_stack)");
             solver_cards.push(games::solver::card_name_to_solver(&card.widget_name(), !card.imp().is_face_up.get()));
@@ -459,7 +462,7 @@ impl CardStack {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.first_child().is_none()
+        self.observe_children().n_items() == 1
     }
 
     pub fn last_card(&self) -> Option<Card> {
@@ -467,7 +470,7 @@ impl CardStack {
     }
 
     pub fn first_card(&self) -> Option<Card> {
-        self.first_child()?.downcast::<Card>().ok()
+        self.observe_children().item(1)?.downcast::<Card>().ok()
     }
 
     pub fn n_cards(&self) -> usize {
