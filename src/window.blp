@@ -118,6 +118,7 @@ template $SolitaireWindow: Adw.ApplicationWindow {
         }
 
         content: Grid card_grid {
+          halign: center;
           row-homogeneous: false;
           column-homogeneous: false;
           row-spacing: 6;
@@ -150,7 +151,7 @@ menu primary_menu {
 
     item {
       label: _("_Keyboard Shortcuts");
-      action: "win.show-help-overlay";
+      action: "app.shortcuts";
     }
 
     item {
