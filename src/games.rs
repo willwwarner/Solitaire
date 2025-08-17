@@ -38,7 +38,7 @@ pub fn load_game(game_name: &str, grid: &gtk::Grid) {
     window.lookup_action("redo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
     window.lookup_action("hint").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
 
-    let cards = gio::ListStore::new::<gtk::Picture>();
+    let cards = grid.observe_children();
 
     // Create the renderer for the game
     glib::g_message!("solitaire", "Loading SVG");
@@ -52,7 +52,7 @@ pub fn load_game(game_name: &str, grid: &gtk::Grid) {
     glib::g_message!("solitaire", "Done Loading SVG");
 
     for i in 0..grid.observe_children().n_items() {
-        let picture = grid.last_child().unwrap().downcast::<gtk::Picture>().unwrap();
+        let picture = cards.item(i).unwrap().downcast::<gtk::Picture>().unwrap();
 
         let suite_index = (i / 13) as usize;
         let rank_index = (i % 13) as usize;
@@ -62,9 +62,6 @@ pub fn load_game(game_name: &str, grid: &gtk::Grid) {
         picture.set_property("sensitive", true);
         let texture = renderer::set_and_return_texture(&card_name, &renderer);
         picture.set_paintable(Some(&texture));
-
-        grid.remove(&picture);
-        cards.append(&picture);
     }
 
     renderer::set_back_texture(&renderer);
@@ -87,7 +84,7 @@ pub fn unload(grid: &gtk::Grid) {
         let child = grid.first_child().expect("Couldn't get child");
         let stack = child.downcast::<CardStack>().expect("Couldn't downcast child");
         stack.remove_child_controllers();
-        stack.dissolve_to_row(&grid, i as i32);
+        stack.dissolve_to_row(&grid, i as i32 + 100);
     }
 }
 
@@ -167,7 +164,7 @@ pub fn is_winnable() -> bool {
 }
 
 pub trait Game: Send + Sync {
-    fn new_game(cards: gio::ListStore, grid: &gtk::Grid, renderer: &rsvg::CairoRenderer) -> Self where Self: Sized;
+    fn new_game(cards: gio::ListModel, grid: &gtk::Grid, renderer: &rsvg::CairoRenderer) -> Self where Self: Sized;
     fn verify_drag(&self, bottom_card: &gtk::Widget, from_stack: &CardStack) -> bool;
     fn verify_drop(&self, bottom_card: &gtk::Widget, to_stack: &CardStack) -> bool;
     fn on_drag_completed(&self, origin_stack: &CardStack);

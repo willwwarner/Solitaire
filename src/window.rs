@@ -116,7 +116,7 @@ impl SolitaireWindow {
 
             picture.set_widget_name(card_name.as_str());
             picture.set_property("sensitive", true);
-            game_board.attach(&picture, rank_index as i32, suite_index as i32, 1, 1);
+            game_board.attach(&picture, rank_index as i32, suite_index as i32 + 100, 1, 1);
 
             cards_to_add -= 1;
         }
@@ -209,12 +209,8 @@ impl SolitaireWindow {
         let nav_view = self.imp().nav_view.get();
         let grid = self.imp().card_grid.get();
         dialog.connect_response(Some("accept"), move |_dialog, _response| {
-            println!("Going to game chooser!");
             games::unload(&grid);
             nav_view.pop_to_tag("chooser");
-        });
-        dialog.connect_response(Some("delete_event"), |_dialog, _response| {
-            println!("Keeping current game!");
         });
         dialog.set_response_appearance("accept", adw::ResponseAppearance::Destructive);
         dialog.present(Some(self));
