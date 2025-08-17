@@ -136,6 +136,9 @@ impl Game for Klondike {
             let waste = runtime::get_stack("waste").unwrap();
 
             if slot.is_empty() {
+                let n_deals = runtime::get_deals();
+                if n_deals >= 3 { return }
+                runtime::update_deals(n_deals + 1);
                 //Fixme: Don't use widget_name
                 let mut move_ = runtime::create_move("waste",
                                                      &waste.first_card().unwrap().widget_name(),
