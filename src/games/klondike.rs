@@ -151,6 +151,7 @@ impl super::Game for Klondike {
             let waste = runtime::get_child(&grid, "waste").unwrap().downcast::<CardStack>().unwrap();
 
             if slot.first_child().is_none() {
+                if runtime::get_n_moves_from_stack("flip->waste") >= 3 { return }
                 for _i in 0..waste.observe_children().n_items() {
                     let card = waste.last_child().unwrap().downcast::<gtk::Picture>().unwrap();
                     waste.remove_card(&card);

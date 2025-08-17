@@ -92,7 +92,7 @@ pub fn perform_move(destination_stack:&CardStack, card_name: &str, origin_stack:
 pub fn perform_move_complex(destination_stack:&CardStack, card_name: &str, origin_stack: &CardStack, instruction: &str) {
     if instruction == "flip" {
         let origin_children = origin_stack.observe_children();
-        for i in 0..origin_children.n_items() {
+        for _i in 0..origin_children.n_items() {
             let card = origin_stack.last_child().unwrap().downcast::<gtk::Picture>().unwrap();
             crate::renderer::flip_card(&card);
             card.unparent();
@@ -231,4 +231,15 @@ pub fn get_stack(name: &str) -> Option<CardStack> {
         }
     }
     None
+}
+
+pub fn get_n_moves_from_stack(stack: &str) -> usize {
+    let mut n_moves = 0;
+    for i in 0..HISTORY_INDEX.with(|index| index.borrow().clone()) {
+        let (origin_stack, _card_name, _destination_stack) = get_n_move(i);
+        if origin_stack == *stack {
+            n_moves += 1;
+        }
+    }
+    n_moves
 }
