@@ -71,6 +71,7 @@ mod imp {
 
     impl ObjectImpl for CardStack {
         fn constructed(&self) {
+            self.obj().add_css_class("card-stack");
             self.aspect.set(1.4);
         }
     }
