@@ -31,7 +31,6 @@ pub const JOKERS: [&str; 2] = ["joker_red", "joker_black"];
 pub const SUITES: [&str; 4] = ["club", "diamond", "heart", "spade"];
 pub const RANKS: [&str; 13] = ["ace", "2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king"];
 static CURRENT_GAME: Mutex<Option<Box<dyn Game>>> = Mutex::new(None);
-static CURRENT_SOLVER: Mutex<Option<Box<dyn Solver>>> = Mutex::new(None);
 
 pub fn load_game(game_name: &str, grid: &gtk::Grid) {
     let window = grid.root().unwrap().downcast::<gtk::Window>().unwrap().downcast::<crate::window::SolitaireWindow>().unwrap();
@@ -39,9 +38,7 @@ pub fn load_game(game_name: &str, grid: &gtk::Grid) {
     window.lookup_action("redo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
     window.lookup_action("hint").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
 
-
-    // Get children from the grid
-    let cards = grid.observe_children();
+    let cards = gio::ListStore::new::<gtk::Picture>();
 
     // Create the renderer for the game
     glib::g_message!("solitaire", "Loading SVG");
@@ -54,8 +51,8 @@ pub fn load_game(game_name: &str, grid: &gtk::Grid) {
     let renderer = rsvg::CairoRenderer::new(&handle);
     glib::g_message!("solitaire", "Done Loading SVG");
 
-    for i in 0..cards.n_items() {
-        let picture = cards.item(i).unwrap().downcast::<gtk::Picture>().unwrap();
+    for i in 0..grid.observe_children().n_items() {
+        let picture = grid.last_child().unwrap().downcast::<gtk::Picture>().unwrap();
 
         let suite_index = (i / 13) as usize;
         let rank_index = (i % 13) as usize;
@@ -65,15 +62,17 @@ pub fn load_game(game_name: &str, grid: &gtk::Grid) {
         picture.set_property("sensitive", true);
         let texture = renderer::set_and_return_texture(&card_name, &renderer);
         picture.set_paintable(Some(&texture));
+
+        grid.remove(&picture);
+        cards.append(&picture);
     }
 
     renderer::set_back_texture(&renderer);
+    glib::g_message!("solitaire", "Done setting textures");
 
     // Store the current game type
     let mut game = CURRENT_GAME.lock().unwrap();
     *game = Some(Box::new(klondike::Klondike::new_game(cards, &grid, &renderer)));
-    let mut solver = CURRENT_SOLVER.lock().unwrap();
-    *solver = None;
 
     // Log game loading
     println!("Loaded game: {}", game_name);
@@ -96,10 +95,10 @@ pub fn get_games() -> Vec<String> {
     vec![gettext("Klondike")] //, "Spider", "FreeCell", "Tri-Peaks", "Pyramid", "Yukon"]; not yet :)
 }
 
-pub fn on_card_click(card: &gtk::Picture) {
+pub fn on_double_click(card: &gtk::Picture) {
     let mut game = CURRENT_GAME.lock().unwrap();
     if let Some(game) = game.as_mut() {
-        game.on_card_click(card);
+        game.on_double_click(card);
     }
 }
 
@@ -149,31 +148,35 @@ pub fn verify_drop(bottom_card: &gtk::Widget, to_stack: &CardStack) -> bool {
     }
 }
 
-pub fn get_hint() -> Option<(String, String, String)> {
-    let mut solver = CURRENT_SOLVER.lock().unwrap();
-    if solver.is_none() { panic!("Get hint called on a game that doesn't have a solver"); }
-
-    // Get the next move hint
-    if let Some(solver) = solver.as_ref() {
-        solver.get_next_move()
+pub fn get_best_next_move() -> Option<(String, String, String)> {
+    let mut game = CURRENT_GAME.lock().unwrap();
+    if let Some(game) = game.as_mut() {
+        game.get_best_next_move()
     } else {
         None
     }
 }
 
+pub fn is_winnable() -> bool {
+    let mut game = CURRENT_GAME.lock().unwrap();
+    if let Some(game) = game.as_mut() {
+        game.is_winnable()
+    } else {
+        false
+    }
+}
+
 pub trait Game: Send + Sync {
-    fn new_game(cards: gtk::gio::ListModel, grid: &gtk::Grid, renderer: &rsvg::CairoRenderer) -> Self where Self: Sized;
+    fn new_game(cards: gio::ListStore, grid: &gtk::Grid, renderer: &rsvg::CairoRenderer) -> Self where Self: Sized;
     fn verify_drag(&self, bottom_card: &gtk::Widget, from_stack: &CardStack) -> bool;
     fn verify_drop(&self, bottom_card: &gtk::Widget, to_stack: &CardStack) -> bool;
     fn on_drag_completed(&self, origin_stack: &CardStack);
     fn on_drop_completed(&self, recipient_stack: &CardStack);
     fn pre_undo_drag(&self, origin_stack: &CardStack, dropped_stack: &CardStack);
-    fn on_card_click(&self, card: &gtk::Picture);
+    fn on_double_click(&self, card: &gtk::Picture);
     fn undo_deal(&self, stock: &CardStack);
     fn on_slot_click(&self, slot: &CardStack);
-    fn is_won (&self) -> bool;
-}
-
-pub trait Solver: Send + Sync {
-    fn get_next_move(&self) -> Option<(String, String, String)>;
+    fn is_won(&self) -> bool;
+    fn get_best_next_move(&self) -> Option<(String, String, String)>;
+    fn is_winnable(&self) -> bool;
 }

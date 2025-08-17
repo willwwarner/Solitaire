@@ -123,7 +123,7 @@ impl SolitaireWindow {
     }
     
     fn hint(&self) {
-        if let Some((from, card, to)) = games::get_hint() {
+        if let Some((from, card, to)) = games::get_best_next_move() {
             println!("Hint: Move {} from {} to {}", card, from, to);
 
             let grid = self.imp().card_grid.get();
@@ -131,11 +131,7 @@ impl SolitaireWindow {
             // Focus the source stack
             if let Ok(source_stack) = runtime::get_child(&grid, &from) {
                 let source_stack = source_stack.downcast::<crate::card_stack::CardStack>().unwrap();
-
-                // Focus the card
-                if card != "draw" && card != "recycle" {
-                    source_stack.focus_card(&card);
-                }
+                source_stack.focus_card(&card);
             }
         } else {
             println!("No hints available!");
