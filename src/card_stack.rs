@@ -180,7 +180,7 @@ mod imp {
 
     impl ObjectImpl for TransferCardStack {}
     impl WidgetImpl for TransferCardStack {
-        fn size_allocate(&self, width: i32, height: i32, _baseline: i32) {
+        fn size_allocate(&self, _width: i32, height: i32, _baseline: i32) {
             let widget = self.obj();
             let children = widget.observe_children();
             let child_count = children.n_items();

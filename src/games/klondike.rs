@@ -143,17 +143,19 @@ impl super::Game for Klondike {
 
     fn on_slot_click(&self, slot: &CardStack) {
         if slot.widget_name() == "stock" {
-            let grid = runtime::get_grid().unwrap();
             let waste = runtime::get_stack("waste").unwrap();
 
             if slot.is_empty() {
+                let n_deals = runtime::get_deals();
+                if n_deals >= 3 { return }
+                runtime::update_deals(n_deals + 1);
                 for _i in 0..waste.observe_children().n_items() {
                     let card = waste.last_card().unwrap();
                     waste.remove_card(&card);
                     slot.add_card(&card);
                     card.flip();
                 }
-                runtime::add_to_history(runtime::Move { origin_stack: "waste".to_string(), 
+                runtime::add_to_history(runtime::Move { origin_stack: "waste".to_string(),
                                                                card_name: slot.first_card().unwrap().widget_name().to_string(),
                                                                destination_stack: slot.widget_name().to_string(),
                                                                instruction: Some("flip".to_string()) });
@@ -164,8 +166,8 @@ impl super::Game for Klondike {
                 card.flip();
                 waste.add_card(&card);
                 waste.add_drag_to_card(&card);
-                runtime::add_to_history(runtime::Move { origin_stack: slot.widget_name().to_string(), 
-                                                               card_name: card.widget_name().to_string(), 
+                runtime::add_to_history(runtime::Move { origin_stack: slot.widget_name().to_string(),
+                                                               card_name: card.widget_name().to_string(),
                                                                destination_stack: "waste".to_string(),
                                                                instruction: None });
             }
@@ -173,7 +175,6 @@ impl super::Game for Klondike {
     }
 
     fn is_won(&self) -> bool {
-        let grid = runtime::get_grid().unwrap();
         for i in 0..4 {
             let stack = runtime::get_stack(format!("foundation_{i}").as_str()).unwrap();
             if let Some(last_card) = stack.last_card() {
@@ -198,7 +199,6 @@ fn try_distribute(card: &Card, parent: &CardStack) {
     if !card.imp().is_face_up.get() { return }
     if &parent.last_card().unwrap() != card { return }
 
-    let grid = runtime::get_grid().unwrap();
     for i in 0..4 {
         let stack = runtime::get_stack(format!("foundation_{i}").as_str()).unwrap();
         if let Some(last_card) = stack.last_card() {
@@ -206,8 +206,8 @@ fn try_distribute(card: &Card, parent: &CardStack) {
                 parent.remove_card(card);
                 stack.add_card(card);
                 runtime::add_to_history(runtime::Move { origin_stack: parent.widget_name().to_string(),
-                                                               card_name: card.widget_name().to_string(), 
-                                                               destination_stack: stack.widget_name().to_string(), 
+                                                               card_name: card.widget_name().to_string(),
+                                                               destination_stack: stack.widget_name().to_string(),
                                                                instruction: None });
                 return
             }

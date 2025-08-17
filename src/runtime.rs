@@ -34,6 +34,7 @@ thread_local! {
     static GRID: std::cell::RefCell<Option<gtk::Grid>> = std::cell::RefCell::new(None);
     static ACTION_HISTORY: std::cell::RefCell<Vec<Move>> = std::cell::RefCell::new(Vec::new());
     static HISTORY_INDEX: std::cell::RefCell<usize> = std::cell::RefCell::new(0);
+    static N_DEALS: std::cell::RefCell<u8> = std::cell::RefCell::new(0);
     static CARDS: std::cell::RefCell<Vec<Card>> = std::cell::RefCell::new(Vec::new());
 }
 
@@ -192,4 +193,12 @@ pub fn set_cards(cards: Vec<Card>) {
 
 pub fn get_cards() -> Vec<Card> {
     CARDS.with(|cards| cards.borrow().to_owned())
+}
+
+pub fn get_deals() -> u8 {
+    N_DEALS.with(|n| n.borrow().to_owned())
+}
+
+pub fn update_deals(n: u8) {
+    N_DEALS.set(n);
 }
