@@ -57,13 +57,14 @@ pub fn move_from_strings(origin_stack: String, card_name: String, destination_st
     }
 }
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 thread_local! {
     static STACK_NAMES: RefCell<Vec<String>> = RefCell::new(Vec::new());
     static STACKS: RefCell<Vec<CardStack>> = RefCell::new(Vec::new());
     static HISTORY: RefCell<Vec<Move>> = RefCell::new(Vec::new());
     static UNDO_HISTORY: RefCell<Vec<Move>> = RefCell::new(Vec::new());
     static CARDS: RefCell<Vec<Card>> = RefCell::new(Vec::new());
+    static N_DEALS: Cell<u8> = Cell::new(0);
 }
 
 pub fn remove_drag(widget: &impl IsA<gtk::Widget>) {
@@ -208,4 +209,12 @@ pub fn set_cards(cards: Vec<Card>) {
 
 pub fn get_cards() -> Vec<Card> {
     CARDS.with(|cards| cards.borrow().to_owned())
+}
+
+pub fn get_deals() -> u8 {
+    N_DEALS.get()
+}
+
+pub fn update_deals(n: u8) {
+    N_DEALS.set(n);
 }
