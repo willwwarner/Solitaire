@@ -26,7 +26,7 @@ pub struct Klondike {}
 
 impl Klondike {}
 impl super::Game for Klondike {
-    fn new_game(cards: gtk::gio::ListStore, grid: &gtk::Grid, renderer: &rsvg::CairoRenderer) -> Self {
+    fn new_game(cards: gtk::gio::ListModel, grid: &gtk::Grid, renderer: &rsvg::CairoRenderer) -> Self {
         let mut n_cards = cards.n_items() as i32;
 
         for i in 0..7 {
@@ -37,6 +37,7 @@ impl super::Game for Klondike {
             for j in 0..(i + 1) {
                 if let Some(obj) = cards.item(glib::random_int_range(0, n_cards) as u32) {
                     if let Ok(picture) = obj.downcast::<gtk::Picture>() {
+                        grid.remove(&picture);
                         card_stack.add_card(&picture);
                         if j < i { renderer::flip_card_full(&picture, &renderer) }
                         card_stack.add_drag_to_card(&picture);
@@ -70,6 +71,7 @@ impl super::Game for Klondike {
         while n_cards > 0 {
             if let Some(obj) = cards.item(glib::random_int_range(0, n_cards) as u32) {
                 if let Ok(picture) = obj.downcast::<gtk::Picture>() {
+                    grid.remove(&picture);
                     stock.add_card(&picture);
                     renderer::flip_card_full(&picture, &renderer);
                     runtime::connect_double_click(&picture);
@@ -149,12 +151,11 @@ impl super::Game for Klondike {
             let waste = runtime::get_child(&grid, "waste").unwrap().downcast::<CardStack>().unwrap();
 
             if slot.first_child().is_none() {
-                for i in 0..waste.observe_children().n_items() {
+                for _i in 0..waste.observe_children().n_items() {
                     let card = waste.last_child().unwrap().downcast::<gtk::Picture>().unwrap();
                     waste.remove_card(&card);
                     slot.add_card(&card);
                     renderer::flip_card(&card);
-                    runtime::remove_click(&card);
                 }
                 runtime::add_to_history("flip->waste", slot.first_child().unwrap().widget_name().as_str(), slot.widget_name().as_str());
             } else {
