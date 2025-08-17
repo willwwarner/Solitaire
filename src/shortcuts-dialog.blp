@@ -1,0 +1,34 @@
+using Gtk 4.0;
+using Adw 1;
+
+Adw.ShortcutsDialog shortcuts_dialog {
+  Adw.ShortcutsSection {
+    title: C_("shortcut window", "General");
+
+    Adw.ShortcutsItem {
+      title: C_("shortcut window", "Show Shortcuts");
+      action-name: "app.shortcuts";
+    }
+
+    Adw.ShortcutsItem {
+      title: C_("shortcut window", "Quit");
+      action-name: "app.quit";
+    }
+  }
+  Adw.ShortcutsSection {
+    title: C_("shortcut window", "Game");
+
+    Adw.ShortcutsItem {
+      title: C_("shortcut window", "Hint");
+      action-name: "win.hint";
+    }
+     Adw.ShortcutsItem {
+      title: C_("shortcut window", "Undo");
+      action-name: "win.undo";
+    }
+    Adw.ShortcutsItem {
+      title: C_("shortcut window", "Redo");
+      action-name: "win.redo";
+    }
+  }
+}
