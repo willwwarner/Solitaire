@@ -19,12 +19,13 @@
  */
 
 use std::sync::Mutex;
-use std::format;
-use gtk::{prelude::*};
+use adw::prelude::*;
 use gtk::{gio, glib};
 use gettextrs::gettext;
 use crate::{renderer, card::Card, card_stack::CardStack, runtime};
 
+#[cfg(debug_assertions)]
+mod test;
 mod klondike;
 
 pub const JOKERS: [&str; 2] = ["joker_red", "joker_black"];
@@ -33,7 +34,7 @@ pub const RANKS: [&str; 13] = ["ace", "2", "3", "4", "5", "6", "7", "8", "9", "1
 static CURRENT_GAME: Mutex<Option<Box<dyn Game>>> = Mutex::new(None);
 
 pub fn load_game(game_name: &str, grid: &gtk::Grid) {
-    let window = grid.root().unwrap().downcast::<gtk::Window>().unwrap().downcast::<crate::window::SolitaireWindow>().unwrap();
+    let window = crate::window::SolitaireWindow::get_window().unwrap();
     window.lookup_action("undo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
     window.lookup_action("redo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
     window.lookup_action("hint").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
@@ -62,7 +63,13 @@ pub fn load_game(game_name: &str, grid: &gtk::Grid) {
 
     // Store the current game type
     let mut game = CURRENT_GAME.lock().unwrap();
-    *game = Some(Box::new(klondike::Klondike::new_game(cards, &grid)));
+    match game_name {
+        #[cfg(debug_assertions)]
+        "Test" => *game = Some(Box::new(test::Test::new_game(cards, &grid))),
+        "Klondike" => *game = Some(Box::new(klondike::Klondike::new_game(cards, &grid))),
+        _ => panic!("Unknown game: {}", game_name),
+    }
+    
 
     // Log game loading
     println!("Loaded game: {}", game_name);
@@ -84,7 +91,19 @@ pub fn unload(grid: &gtk::Grid) {
 }
 
 pub fn get_games() -> Vec<String> {
-    vec![gettext("Klondike")] //, "Spider", "FreeCell", "Tri-Peaks", "Pyramid", "Yukon"]; not yet :)
+    vec![
+        #[cfg(debug_assertions)] gettext("Test"),
+        gettext("Klondike")
+    ] //, "Spider", "FreeCell", "Tri-Peaks", "Pyramid", "Yukon"] not yet :)
+}
+
+pub fn get_game_description(game_name: &str) -> String {
+    match game_name {
+        #[cfg(debug_assertions)]
+        "Test" => gettext("Test Game"),
+        "Klondike" => gettext("Classic Solitaire"),
+        _ => "".to_string()
+    }
 }
 
 pub fn on_double_click(card: &Card) {
@@ -133,25 +152,115 @@ pub fn verify_drop(bottom_card: &Card, to_stack: &CardStack) -> bool {
     }
 }
 
-pub fn get_best_next_move() -> Option<(String, String, String)> {
-    let mut game = CURRENT_GAME.lock().unwrap();
-    if let Some(game) = game.as_mut() {
-        game.get_best_next_move()
-    } else {
-        None
+pub mod solver;
+
+pub async fn try_game(game_name: &str, card_grid: &gtk::Grid) -> Option<Vec<runtime::Move>> {
+    solver::set_should_stop(false);
+    for _ in 0..3 {
+        if solver::get_should_stop() { return None; }
+        load_game(game_name, &card_grid);
+        let mut stack_names = Vec::new();
+        let stacks = card_grid.observe_children();
+        let mut game_state = Vec::new();
+        for i in 0..stacks.n_items() {
+            let stack = stacks.item(i).unwrap().downcast::<CardStack>().unwrap();
+            game_state.push(stack.get_solver_stack());
+            stack_names.push(stack.widget_name().to_string());
+        }
+        #[cfg(feature = "solver-debug")]
+        solver::solver_debug(&crate::window::SolitaireWindow::get_window().unwrap(), game_state.clone(), stack_names.clone());
+
+        let (sender, receiver) = async_channel::bounded(1);
+        std::thread::spawn(move || {
+            let mut game = CURRENT_GAME.lock().unwrap();
+            if let Some(game) = game.as_mut() {
+                let result = solver::solve(game_state, game.get_move_generator(), game.get_is_won_fn());
+                sender.send_blocking(result).unwrap();
+            }
+        });
+        while let Ok(result) = receiver.recv().await {
+            if let Some(solver_history) = result {
+                let mut history = Vec::new();
+                for move_option in &solver_history {
+                    history.push(runtime::Move {
+                        origin_stack: stack_names[move_option.origin_stack].clone(),
+                        card_name: solver::solver_card_to_name(move_option.card).to_string(),
+                        destination_stack: stack_names[move_option.destination_stack].clone(),
+                        instruction: move_option.instruction.clone(),
+                        flip_index: move_option.flip_index
+                    });
+                }
+                for move_option in &history {
+                    println!("{:?}", move_option);
+                }
+                return Some(history);
+            }
+        }
+        unload(&card_grid);
     }
+
+    // Couldn't find a solution
+    None
 }
 
-pub fn is_winnable() -> bool {
-    let mut game = CURRENT_GAME.lock().unwrap();
-    if let Some(game) = game.as_mut() {
-        game.is_winnable()
-    } else {
-        false
+pub fn re_solve(stack_names: Vec<String>, game_state: Vec<Vec<u8>>) -> Option<Vec<runtime::Move>> {
+    let (move_generator, is_won_fn);
+    {
+        let mut game = CURRENT_GAME.lock().unwrap();
+        let game = game.as_mut().unwrap();
+        move_generator = game.get_move_generator();
+        is_won_fn = game.get_is_won_fn();
     }
+    solver::set_should_stop(false);
+    let result = solver::solve(game_state, move_generator, is_won_fn);
+    let mut history = Vec::new();
+    for move_option in result? {
+        history.push(runtime::Move {
+            origin_stack: stack_names[move_option.origin_stack].clone(),
+            card_name: solver::solver_card_to_name(move_option.card).to_string(),
+            destination_stack: stack_names[move_option.destination_stack].clone(),
+            instruction: move_option.instruction.clone(),
+            flip_index: move_option.flip_index
+        });
+    }
+    Some(history)
 }
 
-pub trait Game: Send + Sync {
+pub fn test_solver_state() {
+    use runtime::MoveInstruction::{None, Flip};
+    let mut game_state = Vec::new();
+    let mut stack_a = Vec::new();
+    stack_a.push(solver::card_name_to_solver(&glib::GString::from("club_ace"), false));
+    for i in 2..7 { stack_a.push(solver::card_name_to_solver(&glib::GString::from(format!("club_{i}")), false)); }
+    for i in 7..9 {stack_a.push(solver::card_name_to_solver(&glib::GString::from(format!("club_{i}")), true)); }
+    game_state.insert(0, stack_a);
+    let stack_b = Vec::new();
+    game_state.insert(1, stack_b);
+
+    // SAMPLE MOVE UNDO CHECK
+    let moves = vec![solver::create_move(0, &solver::card_name_to_solver("club_6", false), 1, None),
+                     solver::create_move(0, &solver::card_name_to_solver("club_ace", false), 1, None),
+                     solver::create_move(0, &solver::card_name_to_solver("club_6", false), 1, Flip),
+                     solver::create_move(0, &solver::card_name_to_solver("club_ace", false), 1, Flip)];
+
+    for mut mv in moves {
+        let mv_copy = mv.clone();
+        let mut copy = game_state.clone();
+        solver::perform_state_move(&mut mv, &mut copy, false);
+        solver::perform_state_move(&mut mv, &mut copy, true);
+        assert_eq!(game_state, copy, "move/undo mismatch for {:?}", mv);
+        assert_eq!(mv, mv_copy, "move/undo mismatch for {:?}", mv);
+    }
+
+    assert_eq!(solver::card_name_to_solver("club_ace", false), solver::card_flipped(&solver::card_name_to_solver("club_ace", true)));
+
+    let card_name = "club_6";
+    let card_id = solver::card_name_to_solver(card_name, false);
+    assert_eq!(card_name, solver::solver_card_to_name(card_id), "Card name mismatch for {card_id}");
+    assert_eq!(solver::card_flipped(&card_id), solver::card_name_to_solver(card_name, true), "Card ID mismatch for {card_name}");
+}
+
+trait Game: Send + Sync {
     fn new_game(cards: Vec<Card>, grid: &gtk::Grid) -> Self where Self: Sized;
     fn verify_drag(&self, bottom_card: &Card, from_stack: &CardStack) -> bool;
     fn verify_drop(&self, bottom_card: &Card, to_stack: &CardStack) -> bool;
@@ -159,7 +268,6 @@ pub trait Game: Send + Sync {
     fn pre_undo_drag(&self, previous_origin_stack: &CardStack, previous_destination_stack: &CardStack, move_: &mut runtime::Move);
     fn on_double_click(&self, card: &Card);
     fn on_slot_click(&self, slot: &CardStack);
-    fn is_won(&self) -> bool;
-    fn get_best_next_move(&self) -> Option<(String, String, String)>;
-    fn is_winnable(&self) -> bool;
+    fn get_move_generator(&self) -> Box<dyn FnMut(&mut solver::State)>;
+    fn get_is_won_fn(&self) -> Box<dyn FnMut(&mut solver::State) -> bool>;
 }

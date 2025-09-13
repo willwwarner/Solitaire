@@ -226,6 +226,7 @@ impl CardStack {
         } else {
             this.set_widget_name(&*format!("{}_{}", stack_type, n_of_type));
         }
+
         runtime::add_stack(&*this.widget_name(), &this);
 
         this
@@ -295,6 +296,7 @@ impl CardStack {
             let card = child.downcast::<Card>().expect("Child is not a Card (split:1)");
             self.remove_card(&card);
             new_stack.add_card(&card);
+            card.remove_css_class("highlight");
         }
         self.imp().size_allocate(self.width(), self.height(), self.baseline());
         new_stack.set_height_request(self.height());
@@ -318,6 +320,7 @@ impl CardStack {
             let card = child.downcast::<Card>().expect("Child is not a Card (split:1)");
             self.remove_card(&card);
             new_stack.add_card(&card);
+            card.remove_css_class("highlight");
         }
         self.imp().size_allocate(self.width(), self.height(), self.baseline());
         new_stack.set_height_request(self.height());
@@ -353,6 +356,12 @@ impl CardStack {
         for _ in 0..items {
             let child = self.first_child().expect("Failed to get first child from CardStack");
             let card = child.downcast::<Card>().expect("Child is not a Card (dissolve)");
+            card.remove_css_class("highlight");
+            for controller in &card.observe_controllers() {
+                if let Ok(controller) = controller {
+                    card.remove_controller(&controller.downcast::<gtk::EventController>().unwrap());
+                }
+            }
             self.remove_card(&card);
             card.flip_to_face();
             cards.push(card);
@@ -426,7 +435,7 @@ impl CardStack {
             let value = provider.value(glib::Type::OBJECT).unwrap();
             if let Ok(obj) = value.get::<glib::Object>() {
                 let drag_stack = obj.downcast::<TransferCardStack>().unwrap();
-                let origin = runtime::get_stack(&*drag_stack.get_origin_name()).unwrap();
+                let origin = runtime::get_stack(&*drag_stack.get_origin_name()).expect("drag_recovery: Failed to get origin stack");
                 origin.merge_stack(&drag_stack);
             }
             true
@@ -435,20 +444,22 @@ impl CardStack {
         card.add_controller(drag_source);
     }
     
-    pub fn get_card_names(&self) -> Vec<String> {
-        let mut card_names = Vec::new();
+    pub fn get_solver_stack(&self) -> Vec<u8> {
+        let mut solver_cards = Vec::new();
         let children = self.observe_children();
         let total_children = children.n_items();
         for i in 0..total_children {
             let child = children.item(i).expect("Failed to get child from CardStack");
-            let card = child.downcast::<Card>().expect("Child is not a Card (get_card_names)");
-            card_names.push(card.widget_name().to_string());
+            let card = child.downcast::<Card>().expect("Child is not a Card (get_solver_stack)");
+            solver_cards.push(games::solver::card_name_to_solver(&card.widget_name(), !card.imp().is_face_up.get()));
         }
-        card_names
+        solver_cards
     }
     
-    pub fn focus_card(&self, card_name: String) {
-        runtime::get_child(self, &*card_name).expect("Couldn't get card").grab_focus();
+    pub fn hint_card(&self, card_name: String) {
+        let card = runtime::get_child(self, &*card_name).expect("highlight_card: Couldn't get card");
+        if card.has_css_class("highlight") { return; }
+        card.add_css_class("highlight");
     }
 
     pub fn remove_card(&self, card: &Card) {

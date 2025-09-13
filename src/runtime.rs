@@ -61,10 +61,17 @@ use std::cell::{Cell, RefCell};
 thread_local! {
     static STACK_NAMES: RefCell<Vec<String>> = RefCell::new(Vec::new());
     static STACKS: RefCell<Vec<CardStack>> = RefCell::new(Vec::new());
+    static SOLUTION_MOVES: RefCell<Vec<Move>> = RefCell::new(Vec::new());
     static HISTORY: RefCell<Vec<Move>> = RefCell::new(Vec::new());
     static UNDO_HISTORY: RefCell<Vec<Move>> = RefCell::new(Vec::new());
-    static CARDS: RefCell<Vec<Card>> = RefCell::new(Vec::new());
     static N_DEALS: Cell<u8> = Cell::new(0);
+    static CARDS: RefCell<Vec<Card>> = RefCell::new(Vec::new());
+    // Re-solve multithreading
+    static LATEST_SOLVING: Cell<usize> = Cell::new(0);
+    static FIRST_UNSOLVABLE: Cell<usize> = Cell::new(usize::MAX);
+    static FIRST_UNSOLVABLE_HISTORY: RefCell<Vec<Move>> = RefCell::new(Vec::new());
+    static SOLVER_ON: Cell<bool> = Cell::new(true);
+    static SOLVER_THREADS: RefCell<Vec<std::thread::JoinHandle<()>>> = RefCell::new(Vec::new());
 }
 
 pub fn remove_drag(widget: &impl IsA<gtk::Widget>) {
@@ -146,6 +153,8 @@ pub fn add_to_history(move_: Move) {
     // Remove invalidated undo entries
     let window = crate::window::SolitaireWindow::get_window().unwrap();
     UNDO_HISTORY.with(|undos| undos.borrow_mut().clear());
+    re_solve_if_needed(&move_, &window);
+    // TODO: Check if won
 
     update_redo_actions(&window);
     HISTORY.with(|h| h.borrow_mut().push(move_));
@@ -160,7 +169,25 @@ pub fn undo_last_move() {
         let origin_stack = get_stack(&last_entry.destination_stack).unwrap();
         games::pre_undo_drag(&destination_stack, &origin_stack, &mut last_entry);
         perform_move_with_stacks(&mut last_entry, &origin_stack, &destination_stack);
+        if SOLUTION_MOVES.with(|s| !s.borrow().is_empty()) { // Fixme: This will make won games be re-solved
+            SOLUTION_MOVES.with(|s| s.borrow_mut().insert(0, last_entry.clone()));
+        }
         UNDO_HISTORY.with(|undos| undos.borrow_mut().push(last_entry));
+    });
+}
+
+fn undo_many(last_index: usize) {
+    if HISTORY.with(|h| h.borrow().is_empty()) { return; }
+    HISTORY.with(|history| {
+        let mut history = history.borrow_mut();
+        for _ in last_index..history.len() {
+            let mut last_entry = history.pop().unwrap();
+            let destination_stack = get_stack(&last_entry.origin_stack).unwrap();
+            let origin_stack = get_stack(&last_entry.destination_stack).unwrap();
+            games::pre_undo_drag(&destination_stack, &origin_stack, &mut last_entry);
+            perform_move_with_stacks(&mut last_entry, &origin_stack, &destination_stack);
+            UNDO_HISTORY.with(|undos| undos.borrow_mut().push(last_entry));
+        }
     });
 }
 
@@ -172,6 +199,7 @@ pub fn redo_first_move() {
         let destination_stack = get_stack(&first_entry.destination_stack).unwrap();
         perform_move(&mut first_entry);
         games::on_drag_completed(&origin_stack, &destination_stack, &mut first_entry);
+        re_solve_if_needed(&first_entry, &crate::window::SolitaireWindow::get_window().unwrap());
         HISTORY.with(|history| history.borrow_mut().push(first_entry));
     });
 }
@@ -186,6 +214,7 @@ pub fn update_redo_actions(window: &crate::window::SolitaireWindow) {
 pub fn clear_history_and_moves() {
     HISTORY.with(|h| h.borrow_mut().clear());
     UNDO_HISTORY.with(|undos| undos.borrow_mut().clear());
+    SOLUTION_MOVES.with(|s| s.borrow_mut().clear());
 }
 
 pub fn get_stack(name: &str) -> Option<CardStack> {
@@ -203,6 +232,18 @@ pub fn clear_state() {
     STACKS.with(|stacks| stacks.borrow_mut().clear());
 }
 
+pub fn get_solver_state() -> (Vec<String>, Vec<Vec<u8>>) {
+    let names = STACK_NAMES.with(|names| names.borrow().to_owned());
+    let stacks = STACKS.with(|stacks| {
+        let mut solver_stacks = Vec::new();
+        for stack in stacks.borrow().iter() {
+            solver_stacks.push(stack.get_solver_stack())
+        }
+        solver_stacks
+    });
+    (names, stacks)
+}
+
 pub fn set_cards(cards: Vec<Card>) {
     CARDS.set(cards);
 }
@@ -217,4 +258,78 @@ pub fn get_deals() -> u8 {
 
 pub fn update_deals(n: u8) {
     N_DEALS.set(n);
+}
+
+pub fn get_hint() -> Option<Move> {
+    SOLUTION_MOVES.with(|moves| moves.borrow().first().cloned())
+}
+pub fn set_solution(moves: Vec<Move>) {
+    SOLUTION_MOVES.set(moves);
+}
+
+fn re_solve_threaded(window: &crate::window::SolitaireWindow) {
+    fn clear_and_abort_threads() {
+        games::solver::set_should_stop(true);
+        SOLVER_THREADS.with_borrow_mut(|t| t.clear());
+    }
+
+    window.lookup_action("hint").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
+    glib::spawn_future_local(glib::clone!(
+        #[weak]
+        window,
+        async move {
+            let (stack_names, game_state) = get_solver_state();
+            let discarded_solver_history = SOLUTION_MOVES.with(|s| s.borrow().clone());
+            let move_index = HISTORY.with(|h| h.borrow().len());
+            let (sender, receiver) = async_channel::bounded(1);
+            let t = std::thread::spawn(move || {
+                let result = games::re_solve(stack_names, game_state);
+                sender.send_blocking(result).unwrap();
+            });
+            SOLVER_THREADS.with_borrow_mut(|s| s.push(t));
+            while let Ok(result) = receiver.recv().await {
+                if let Some(history) = result {
+                    if move_index <= HISTORY.with_borrow(|h| h.len() - 1) { continue; }
+                    clear_and_abort_threads();
+                    set_solution(history);
+                    FIRST_UNSOLVABLE.set(usize::MAX);
+                    if SOLUTION_MOVES.with(|s| s.borrow().is_empty()) { continue; }
+                    window.lookup_action("hint").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(true);
+                } else {
+                    if move_index < FIRST_UNSOLVABLE.get() && !games::solver::get_should_stop() {
+                        FIRST_UNSOLVABLE.set(move_index);
+                        FIRST_UNSOLVABLE_HISTORY.set(discarded_solver_history.clone());
+                    }
+                    let first_unsolvable = FIRST_UNSOLVABLE.get();
+                    if move_index == HISTORY.with_borrow(|h| h.len()) {
+                        let window = window.clone();
+                        crate::window::SolitaireWindow::incompatible_move_dialog(move |_dialog, _response| { // Undo Button
+                            undo_many(first_unsolvable - 1);
+                            update_redo_actions(&window);
+                            clear_and_abort_threads();
+                            let first_unsolvable_h = FIRST_UNSOLVABLE_HISTORY.take();
+                            if !first_unsolvable_h.is_empty() { window.lookup_action("hint").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(true); }
+                            SOLUTION_MOVES.set(first_unsolvable_h);
+                        }, move |_dialog, _response| { // Keep Playing button
+                            SOLVER_ON.set(false);
+                            clear_and_abort_threads();
+                        });
+                        FIRST_UNSOLVABLE.set(usize::MAX);
+                    }
+                }
+            }
+        }
+    ));
+}
+
+fn re_solve_if_needed(move_: &Move, window: &crate::window::SolitaireWindow) {
+    if let Some(solution_move) = get_hint() {
+        if &solution_move == move_ {
+            SOLUTION_MOVES.with(|s| s.borrow_mut().remove(0));
+            return;
+        }
+    }
+    if SOLVER_ON.get() {
+        re_solve_threaded(&window);
+    }
 }

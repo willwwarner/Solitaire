@@ -1,0 +1,102 @@
+using Gtk 4.0;
+using Adw 1;
+
+Adw.Dialog solver-debug-dialog {
+  content-width: 800;
+  content-height: 600;
+
+  child: Adw.NavigationSplitView {
+    sidebar: Adw.NavigationPage {
+      width-request: 300;
+      title: "Solver Debug";
+
+      child: Adw.ToolbarView {
+        [top]
+        Adw.HeaderBar {}
+
+        Box {
+          orientation: vertical;
+
+          Adw.Clamp {
+            maximum-size: 500;
+            margin-start: 5;
+            margin-end: 5;
+            margin-bottom: 5;
+
+            ListBox {
+              selection-mode: none;
+
+              styles [
+                "boxed-list",
+              ]
+
+              Adw.SpinRow {
+                title: "Expand Nodes";
+                climb-rate: 0.2;
+
+                adjustment: Adjustment {
+                  lower: 0;
+                  upper: 100;
+                  step-increment: 1;
+                  value: 5;
+                };
+
+                [suffix]
+                Button expand_button {
+                  icon-name: "media-playback-start-symbolic";
+                  valign: center;
+                }
+              }
+            }
+          }
+
+          Adw.Clamp {
+            maximum-size: 500;
+            margin-start: 5;
+            margin-end: 5;
+            vexpand: true;
+
+            ScrolledWindow {
+              Box {
+                orientation: vertical;
+
+                ListBox node_list {
+                  selection-mode: none;
+
+                  styles [
+                    "boxed-list",
+                  ]
+                }
+              }
+            }
+          }
+        }
+      };
+    };
+
+    content: Adw.NavigationPage {
+      title: "Node State";
+
+      styles [
+        "view",
+      ]
+
+      child: Adw.ToolbarView {
+        [top]
+        Adw.HeaderBar {}
+
+        ScrolledWindow {
+          TextView node_view {
+            monospace: true;
+            editable: false;
+            wrap-mode: word;
+
+            buffer: TextBuffer {
+              text: "Click on a node to visualize its state";
+            };
+          }
+        }
+      };
+    };
+  };
+}

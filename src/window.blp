@@ -35,9 +35,7 @@ template $SolitaireWindow: Adw.ApplicationWindow {
         SearchBar search_bar {
           key-capture-widget: template;
           child: Adw.Clamp {
-            child: SearchEntry search_entry {
-              placeholder-text: _("Search games");
-            };
+            child: SearchEntry search_entry {};
           };
         }
 
@@ -117,15 +115,29 @@ template $SolitaireWindow: Adw.ApplicationWindow {
           }
         }
 
-        content: Grid card_grid {
-          halign: center;
-          row-homogeneous: false;
-          column-homogeneous: false;
-          row-spacing: 6;
-          column-spacing: 2;
-          margin-start: 6;
-          margin-end: 6;
-          margin-bottom: 12;
+        content: Stack game_stack {
+          StackPage {
+            name: "grid";
+            child: Grid card_grid {
+              halign: center;
+              row-homogeneous: false;
+              column-homogeneous: false;
+              row-spacing: 6;
+              column-spacing: 2;
+              margin-start: 6;
+              margin-end: 6;
+              margin-bottom: 12;
+            };
+          }
+          StackPage {
+            name: "spinner";
+            child: Adw.Spinner {
+              valign: center;
+              halign: center;
+              height-request: 48;
+              width-request: 48;
+            };
+          }
         };
       };
     }
