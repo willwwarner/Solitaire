@@ -224,24 +224,29 @@ fn get_stack_keyset(game_state: &HashMap<glib::GString, Vec<glib::GString>>, sta
 }
 
 fn card_id_to_name(id: u8) -> glib::GString {
-    if id > 54 { return glib::GString::default() }
-    match id {
+    let new_id = id & 0x7F;
+    let flipped = (id & 0x80) != 0;
+    if new_id > 54 { return glib::GString::default() }
+    match new_id {
         53 => return glib::GString::from("joker_red"),
         54 => return glib::GString::from("joker_black"),
         _ => (),
     }
-    let suite_index = (id / 13) as usize;
-    let rank_index = (id % 13) as usize;
-    glib::GString::from(format!("{}_{}", SUITES[suite_index], RANKS[rank_index]))
+    let suite_index = (new_id / 13) as usize;
+    let rank_index = (new_id % 13) as usize;
+    glib::GString::from(format!("{}_{}{}", SUITES[suite_index], RANKS[rank_index], if flipped {"_b"} else {""}))
 }
 
 fn card_name_to_id(name: &glib::GString) -> u8 {
     let mut name_parts = name.split("_");
     let suite_name =name_parts.next().unwrap();
     let rank_name = name_parts.next().unwrap();
+    let is_flipped = name_parts.next().is_some();
     let suite_index = SUITES.iter().position(|x| x == &suite_name).unwrap();
     let rank_index = RANKS.iter().position(|x| x == &rank_name).unwrap();
-    ((suite_index * 13) + rank_index) as u8
+    let base_id = ((suite_index * 13) + rank_index) as u8;
+    debug_assert!(base_id < 128);
+    if is_flipped { base_id | 0x80 } else { base_id & !0x80 }
 }
 
 pub fn solve_game() -> Option<Vec<String>> {
@@ -363,26 +368,26 @@ pub fn test_solver_state() {
     let mut game_state = HashMap::new();
     let stack_names = vec![glib::GString::from("A"), glib::GString::from("B")];
     let mut stack_a = Vec::new();
-    for i in 0..10 { stack_a.push(card_id_to_name(i)); }
+    stack_a.push(glib::GString::from("club_ace"));
+    for i in 2..7 { stack_a.push(glib::GString::from(format!("club_{i}"))); }
+    for i in 7..9 {stack_a.push(glib::GString::from(format!("club_{i}_b"))); }
     game_state.insert(stack_names[0].clone(), stack_a);
     let stack_b = Vec::new();
     game_state.insert(stack_names[1].clone(), stack_b);
     let mut stacks:HashMap<u32, Vec<u8>> = HashMap::new();
 
-    // ROUND TRIP CHECK
-    let keys = get_stack_keyset(&game_state, &stack_names, &mut stacks); // Vec<u32>
-    let mut rec = HashMap::new();
-    let mut it = stack_names.iter();
-    for k in &keys {
-        let compact = stacks.get(k).unwrap();
-        let mut v = Vec::new();
-        for &id in compact { v.push(card_id_to_name(id)); }
-        rec.insert(it.next().unwrap().to_owned(), v);
+    let keys = get_stack_keyset(&game_state, &stack_names, &mut stacks);
+    let mut new_state = HashMap::new();
+    let mut names_iter = stack_names.iter();
+    for key in &keys {
+        let compact_stack = stacks.get(key).unwrap();
+        let mut stack = Vec::new();
+        for &id in compact_stack { stack.push(card_id_to_name(id)); }
+        new_state.insert(names_iter.next().unwrap().to_owned(), stack);
     }
-    assert_eq!(game_state, rec, "Round-trip state mismatch!");
+    assert_eq!(game_state, new_state, "Round-trip state mismatch!");
 
-    // SAMPLE MOVE UNDO CHECK
-    let moves = vec!["A&>club_6&>B".to_string(), "flip->A&>club_6&>B".to_string(), "flip->A&>club_ace&>B".to_string()];
+    let moves = vec!["A&>club_2&>B".to_string(), "flip->A&>club_6&>B".to_string(), "flip->A&>club_ace&>B".to_string()];
     for mut mv in moves {
         let mv_copy = mv.clone();
         let mut copy = game_state.clone();
