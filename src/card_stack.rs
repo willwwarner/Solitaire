@@ -419,14 +419,14 @@ impl CardStack {
         card.add_controller(drag_source);
     }
     
-    pub fn get_card_names(&self) -> Vec<String> {
+    pub fn get_card_names(&self) -> Vec<glib::GString> {
         let mut card_names = Vec::new();
         let children = self.observe_children();
         let total_children = children.n_items();
         for i in 0..total_children {
             let child = children.item(i).expect("Failed to get child from CardStack");
             let picture = child.downcast::<gtk::Picture>().expect("Child is not a gtk::Picture (get_card_names)");
-            card_names.push(picture.widget_name().to_string());
+            card_names.push(picture.widget_name());
         }
         card_names
     }

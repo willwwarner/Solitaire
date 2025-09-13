@@ -18,13 +18,13 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+use std::collections::{HashMap};
 use crate::{renderer, runtime, card_stack::CardStack};
 use gtk::prelude::{Cast, GridExt, WidgetExt, ListModelExt};
 use gtk::glib;
 
 pub struct Klondike {}
 
-impl Klondike {}
 impl super::Game for Klondike {
     fn new_game(cards: gtk::gio::ListModel, grid: &gtk::Grid, renderer: &rsvg::CairoRenderer) -> Self {
         let mut n_cards = cards.n_items() as i32;
@@ -171,25 +171,122 @@ impl super::Game for Klondike {
         }
     }
 
-    fn is_won(&self) -> bool {
-        let grid = runtime::get_grid().unwrap();
-        for i in 0..4 {
-            let stack = runtime::get_child(&grid, format!("foundation_{i}").as_str()).unwrap().downcast::<CardStack>().unwrap();
-            if let Some(last_child) = stack.last_child() {
-                if !last_child.widget_name().ends_with("king") {
-                    return false;
+    fn get_automoves_ranked(&self, state: &HashMap<glib::GString, Vec<glib::GString>>) -> Vec<String> {
+        let mut moves = Vec::new();
+        // Check if inner-tableau moves are possible
+        for i in 0..7 {
+            let stack = state.get(format!("tableau_{i}").as_str()).unwrap();
+            for card in stack {
+                if !card.ends_with("_b") {
+                    for j in 0..7 {
+                        if j != i {
+                            if let Some(last_child) = state.get(format!("tableau_{j}").as_str()).unwrap().last() {
+                                if runtime::is_one_rank_above(&last_child, &card) && runtime::is_similar_suit(&card, &last_child) {
+                                    moves.push(format!("tableau_{i}&>{card}&>tableau_{j}"));
+                                }
+                            } else if card.ends_with("king") {
+                                moves.push(format!("tableau_{i}&>{card}&>tableau_{j}"));
+                            }
+                        }
+                    }
                 }
             }
         }
+        // Check if tableau to foundation moves are possible
+        for i in 0..7 {
+            if let Some(tableau_child) = state.get(format!("tableau_{i}").as_str()).unwrap().last() {
+                for j in 0..4 {
+                    let stack = state.get(format!("foundation_{j}").as_str()).unwrap();
+                    if let Some(foundation_child) = stack.last() {
+                        if runtime::is_same_suit(&foundation_child, &tableau_child) && runtime::is_one_rank_above(&foundation_child, &tableau_child) {
+                            moves.push(format!("tableau_{i}&>{tableau_child}&>foundation_{j}"));
+                        }
+                    } else {
+                        if tableau_child.ends_with("ace") {
+                            moves.push(format!("tableau_{i}&>{tableau_child}&>foundation_{j}"));
+                        }
+                    }
+                }
+            }
+        }
+        //if moves.len() > 3 { return moves }
+        // Check if the waste is empty, and handle it
+        let waste = state.get("waste").unwrap();
+        let stock = state.get("stock").unwrap();
+        if waste.is_empty() {
+            if stock.is_empty() { return moves }
+            else {
+                moves.push(format!("flip->stock&>{}&>waste", stock.last().unwrap()));
+                return moves;
+            }
+        }
+        // Check if a waste to tableau move is possible
+        let card = waste.last().unwrap();
+        for i in 0..7 {
+            if let Some(tableau_child) = state.get(format!("tableau_{i}").as_str()).unwrap().last() {
+                if runtime::is_similar_suit(card, tableau_child) && runtime::is_one_rank_above(tableau_child, card) {
+                    moves.push(format!("waste&>{card}&>tableau_{i}"));
+                }
+            }
+        }
+        // Check if a waste to foundation move is possible
+        let card = waste.last().unwrap();
+        for i in 0..4 {
+            if let Some(foundation_child) = state.get(format!("foundation_{i}").as_str()).unwrap().last() {
+                if runtime::is_same_suit(card, foundation_child) && runtime::is_one_rank_above(foundation_child, card) {
+                    moves.push(format!("waste&>{card}&>foundation_{i}"));
+                }
+            }
+        }
+
+        if stock.is_empty() {
+            moves.push(format!("flip->waste&>{}&>stock", waste.first().unwrap()));
+        } else {
+            moves.push(format!("flip->stock&>{}&>waste", stock.last().unwrap()));
+        }
+
+        // Check if a foundation to tableau move is possible
+        for i in 0..4 {
+            let foundation = state.get(format!("foundation_{i}").as_str()).unwrap();
+            if let Some(card) = foundation.last() {
+                for j in 0..7 {
+                    if let Some(tableau_child) = state.get(format!("tableau_{j}").as_str()).unwrap().last() {
+                        if runtime::is_similar_suit(card, tableau_child) && runtime::is_one_rank_above(tableau_child, card) {
+                            moves.push(format!("foundation_{i}&>{card}&>tableau_{j}"));
+                        }
+                    }
+                }
+            }
+        }
+        moves
+    }
+
+    fn get_priority(&self, state: &HashMap<glib::GString, Vec<glib::GString>>) -> u32 {
+        let mut outs = 0;
+        for i in 0..4 {
+            let outpile = state.get(format!("foundation_{i}").as_str()).unwrap();
+            outs += outpile.len() as u32;
+        }
+        for i in 0..7 {
+            let tableau = state.get(format!("tableau_{i}").as_str()).unwrap();
+            if let Some(last_child) = tableau.last() { if !last_child.ends_with("_b") { outs += 1; } }
+        }
+        outs
+    }
+
+    fn is_won(&self, state: &HashMap<glib::GString, Vec<glib::GString>>) -> bool {
+        for i in 0..4 {
+            let stack = state.get(format!("foundation_{i}").as_str()).unwrap();
+            if let Some(last_child) = stack.last() {
+                if !last_child.ends_with("king") {
+                    return false;
+                }
+            } else {
+                // If one of the foundations is empty, the game is not won
+                return false;
+            }
+        }
         true
-    }
-
-    fn get_best_next_move(&self) -> Option<(String, String, String)> {
-        todo!()
-    }
-
-    fn is_winnable(&self) -> bool {
-        todo!()
     }
 }
 
