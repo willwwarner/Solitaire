@@ -18,16 +18,6 @@ variables:
 flatpak@x86_64:
   extends: [".flatpak@x86_64"]
 
-# Build Flatpak for aarch64
-flatpak@aarch64:
-  extends: [".flatpak@aarch64"]
-  allow_failure: true
-
 nightly@x86_64:
   extends: ".publish_nightly"
   needs: ["flatpak@x86_64"]
-
-nightly@aarch64:
-  extends: ".publish_nightly"
-  needs: ["flatpak@aarch64"]
-  allow_failure: true
