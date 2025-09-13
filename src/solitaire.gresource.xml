@@ -4,6 +4,7 @@
     <file preprocess="xml-stripblanks">window.ui</file>
     <file>style.css</file>
     <file preprocess="xml-stripblanks">shortcuts-dialog.ui</file>
+    <file preprocess="xml-stripblanks">solver-debug.ui</file>
     <file preprocess="xml-stripblanks">assets/minimum.svg</file>
     <file preprocess="xml-stripblanks">assets/minimum_dark.svg</file>
     <file preprocess="xml-stripblanks">assets/anglo_poker.svg</file>

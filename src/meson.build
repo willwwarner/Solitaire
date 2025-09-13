@@ -1,6 +1,7 @@
 blueprints = custom_target('blueprints',
   input: files(
     'shortcuts-dialog.blp',
+    'solver-debug.blp',
     'window.blp',
   ),
   output: '.',
