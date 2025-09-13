@@ -30,8 +30,30 @@ pub struct Move {
     pub instruction: Option<String>,
 }
 
+pub fn create_move(origin_stack: &str, card_name: &str, destination_stack: &str, instruction: Option<&str>) -> Move {
+    let new_instruction;
+    if instruction.is_some() { new_instruction = Some(instruction.unwrap().to_string()) }
+    else { new_instruction = None}
+    Move {
+        origin_stack: origin_stack.to_string(),
+        card_name: card_name.to_string(),
+        destination_stack: destination_stack.to_string(),
+        instruction: new_instruction,
+    }
+}
+
+pub fn move_from_strings(origin_stack: String, card_name: String, destination_stack: String, instruction: Option<String>) -> Move {
+    Move {
+        origin_stack,
+        card_name,
+        destination_stack,
+        instruction,
+    }
+}
+
 thread_local! {
     static GRID: std::cell::RefCell<Option<gtk::Grid>> = std::cell::RefCell::new(None);
+    static SOLUTION_MOVES: std::cell::RefCell<Vec<Move>> = std::cell::RefCell::new(Vec::new());
     static ACTION_HISTORY: std::cell::RefCell<Vec<Move>> = std::cell::RefCell::new(Vec::new());
     static HISTORY_INDEX: std::cell::RefCell<usize> = std::cell::RefCell::new(0);
     static N_DEALS: std::cell::RefCell<u8> = std::cell::RefCell::new(0);
@@ -124,10 +146,10 @@ pub fn add_to_history(move_: Move) {
     let move_index = HISTORY_INDEX.with(|index| index.borrow().clone());
     // Remove invalidated entries
     if ACTION_HISTORY.with(|history| history.borrow().len() > move_index) {
+        let window = get_grid().unwrap().root().unwrap().downcast::<gtk::Window>().unwrap().downcast::<crate::window::SolitaireWindow>().unwrap();
+        window.lookup_action("redo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
         for _ in move_index..ACTION_HISTORY.with(|history| history.borrow().len()) {
             ACTION_HISTORY.with(|history| history.borrow_mut().pop());
-            let window = get_grid().unwrap().root().unwrap().downcast::<gtk::Window>().unwrap().downcast::<crate::window::SolitaireWindow>().unwrap();
-            window.lookup_action("redo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
         }
     }
     if move_index == 0 {
@@ -201,4 +223,12 @@ pub fn get_deals() -> u8 {
 
 pub fn update_deals(n: u8) {
     N_DEALS.set(n);
+}
+
+pub fn get_hint() -> Option<Move> {
+    let move_index = HISTORY_INDEX.with(|index| index.borrow().clone());
+    Some(SOLUTION_MOVES.with(|moves| moves.borrow().get(move_index + 1).cloned())?)
+}
+pub fn set_solution(moves: Vec<Move>) {
+    SOLUTION_MOVES.set(moves);
 }

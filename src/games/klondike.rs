@@ -18,6 +18,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+use std::collections::{HashMap};
 use crate::{runtime, card::Card, card_stack::CardStack};
 use gtk::{prelude::*, subclass::prelude::*};
 use gtk::glib;
@@ -174,24 +175,124 @@ impl super::Game for Klondike {
         }
     }
 
-    fn is_won(&self) -> bool {
-        for i in 0..4 {
-            let stack = runtime::get_stack(format!("foundation_{i}").as_str()).unwrap();
-            if let Some(last_card) = stack.last_card() {
-                if !last_card.widget_name().ends_with("king") {
-                    return false;
+    fn get_automoves_ranked(&self, state: &HashMap<String, Vec<glib::GString>>) -> Vec<runtime::Move> {
+        let mut moves = Vec::new();
+        // Check if inner-tableau moves are possible
+        for i in 0..7 {
+            let stack = state.get(&format!("tableau_{i}")).unwrap();
+            for card in stack {
+                if !card.ends_with("_b") {
+                    for j in 0..7 {
+                        if j != i {
+                            if let Some(last_child) = state.get(&format!("tableau_{j}")).unwrap().last() {
+                                if super::is_one_rank_above(&last_child, &card) && super::is_similar_suit(&card, &last_child) {
+                                    moves.push(runtime::move_from_strings(format!("tableau_{i}"), card.to_string(),format!("tableau_{j}"), None));
+                                }
+                            } else if card.ends_with("king") {
+                                moves.push(runtime::move_from_strings(format!("tableau_{i}"), card.to_string(),format!("tableau_{j}"), None));
+                            }
+                        }
+                    }
                 }
             }
         }
+        // Check if tableau to foundation moves are possible
+        for i in 0..7 {
+            if let Some(tableau_child) = state.get(&format!("tableau_{i}")).unwrap().last() {
+                for j in 0..4 {
+                    let stack = state.get(&format!("foundation_{j}")).unwrap();
+                    if let Some(foundation_child) = stack.last() {
+                        if super::is_same_suit(&foundation_child, &tableau_child) && super::is_one_rank_above(&foundation_child, &tableau_child) {
+                            moves.push(runtime::move_from_strings(format!("tableau_{i}"), tableau_child.to_string(),format!("tableau_{j}"), None));
+
+                        }
+                    } else {
+                        if tableau_child.ends_with("ace") {
+                            moves.push(runtime::move_from_strings(format!("tableau_{i}"), tableau_child.to_string(),format!("tableau_{j}"), None));
+
+                        }
+                    }
+                }
+            }
+        }
+        // Check if the waste is empty, and handle it
+        let waste = state.get("waste").unwrap();
+        let stock = state.get("stock").unwrap();
+        if waste.is_empty() {
+            if stock.is_empty() { return moves }
+            else {
+                moves.push(runtime::create_move("stock", stock.last().unwrap(),"waste", Some("flip")));
+                return moves;
+            }
+        }
+        // Check if a waste to tableau move is possible
+        let card = waste.last().unwrap();
+        for i in 0..7 {
+            if let Some(tableau_child) = state.get(&format!("tableau_{i}")).unwrap().last() {
+                if super::is_similar_suit(card, tableau_child) && super::is_one_rank_above(tableau_child, card) {
+                    moves.push(runtime::create_move("waste", card, format!("tableau_{i}").as_str(), None));
+
+                }
+            }
+        }
+        // Check if a waste to foundation move is possible
+        let card = waste.last().unwrap();
+        for i in 0..4 {
+            if let Some(foundation_child) = state.get(&format!("foundation_{i}")).unwrap().last() {
+                if super::is_same_suit(card, foundation_child) && super::is_one_rank_above(foundation_child, card) {
+                    moves.push(runtime::create_move("waste", card, format!("foundation_{i}").as_str(), None));
+                }
+            }
+        }
+
+        if stock.is_empty() {
+            moves.push(runtime::create_move("waste", waste.first().unwrap(),"stock", Some("flip")));
+        } else {
+            moves.push(runtime::create_move("stock", stock.last().unwrap(),"waste", Some("flip")));
+        }
+
+        // Check if a foundation to tableau move is possible
+        for i in 0..4 {
+            let foundation = state.get(&format!("foundation_{i}")).unwrap();
+            if let Some(card) = foundation.last() {
+                for j in 0..7 {
+                    if let Some(tableau_child) = state.get(&format!("tableau_{j}")).unwrap().last() {
+                        if super::is_similar_suit(card, tableau_child) && super::is_one_rank_above(tableau_child, card) {
+                            moves.push(runtime::move_from_strings(format!("foundation_{i}"), card.to_string(),format!("tableau_{j}"), None));
+                        }
+                    }
+                }
+            }
+        }
+        moves
+    }
+
+    fn get_priority(&self, state: &HashMap<String, Vec<glib::GString>>) -> u32 {
+        let mut outs = 0;
+        for i in 0..4 {
+            let outpile = state.get(&format!("foundation_{i}")).unwrap();
+            outs += outpile.len() as u32;
+        }
+        for i in 0..7 {
+            let tableau = state.get(&format!("tableau_{i}")).unwrap();
+            if let Some(last_child) = tableau.last() { if !last_child.ends_with("_b") { outs += 1; } }
+        }
+        outs
+    }
+
+    fn is_won(&self, state: &HashMap<String, Vec<glib::GString>>) -> bool {
+        for i in 0..4 {
+            let stack = state.get(&format!("foundation_{i}")).unwrap();
+            if let Some(last_child) = stack.last() {
+                if !last_child.ends_with("king") {
+                    return false;
+                }
+            } else {
+                // If one of the foundations is empty, the game is not won
+                return false;
+            }
+        }
         true
-    }
-
-    fn get_best_next_move(&self) -> Option<(String, String, String)> {
-        todo!()
-    }
-
-    fn is_winnable(&self) -> bool {
-        todo!()
     }
 }
 
@@ -205,20 +306,14 @@ fn try_distribute(card: &Card, parent: &CardStack) {
             if last_card.is_same_suit(card) && card.is_one_rank_above(&last_card) {
                 parent.remove_card(card);
                 stack.add_card(card);
-                runtime::add_to_history(runtime::Move { origin_stack: parent.widget_name().to_string(),
-                                                               card_name: card.widget_name().to_string(),
-                                                               destination_stack: stack.widget_name().to_string(),
-                                                               instruction: None });
+                runtime::add_to_history(runtime::create_move(&parent.widget_name(), &card.widget_name(), &stack.widget_name(), None));
                 return
             }
         } else {
             if card.get_rank() == "ace" {
                 parent.remove_card(card);
                 stack.add_card(card);
-                runtime::add_to_history(runtime::Move { origin_stack: parent.widget_name().to_string(),
-                                                               card_name: card.widget_name().to_string(),
-                                                               destination_stack: stack.widget_name().to_string(),
-                                                               instruction: None });
+                runtime::add_to_history(runtime::create_move(&parent.widget_name(), &card.widget_name(), &stack.widget_name(), None));
                 return
             }
         }
