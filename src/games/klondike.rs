@@ -18,16 +18,16 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use crate::{renderer, runtime, card_stack::CardStack};
-use gtk::prelude::{Cast, GridExt, WidgetExt, ListModelExt};
+use crate::{runtime, card::Card, card_stack::CardStack};
+use gtk::{prelude::*, subclass::prelude::*};
 use gtk::glib;
 
 pub struct Klondike {}
 
 impl Klondike {}
 impl super::Game for Klondike {
-    fn new_game(cards: gtk::gio::ListModel, grid: &gtk::Grid, renderer: &rsvg::CairoRenderer) -> Self {
-        let mut n_cards = cards.n_items() as i32;
+    fn new_game(mut cards: Vec<Card>, grid: &gtk::Grid) -> Self {
+        let mut n_cards = cards.len() as i32;
 
         for i in 0..7 {
             let card_stack = CardStack::new();
@@ -35,16 +35,15 @@ impl super::Game for Klondike {
             card_stack.set_aspect(2.8); // 2 card heights
 
             for j in 0..(i + 1) {
-                if let Some(obj) = cards.item(glib::random_int_range(0, n_cards) as u32) {
-                    if let Ok(picture) = obj.downcast::<gtk::Picture>() {
-                        grid.remove(&picture);
-                        card_stack.add_card(&picture);
-                        if j < i { renderer::flip_card_full(&picture, &renderer) }
-                        card_stack.add_drag_to_card(&picture);
-                        runtime::connect_double_click(&picture);
-                    }
+                let random_card = glib::random_int_range(0, n_cards) as usize;
+                if let Some(card) = cards.get(random_card) {
+                    card_stack.add_card(&card);
+                    if j < i { card.flip() }
+                    card_stack.add_drag_to_card(&card);
+                    runtime::connect_double_click(&card);
+                    cards.remove(random_card);
                 } else {
-                    glib::g_error!("solitaire", "Failed to get child from grid");
+                    glib::g_error!("solitaire", "Failed to get card");
                 }
                 n_cards -= 1;
             }
@@ -69,15 +68,14 @@ impl super::Game for Klondike {
         stock.add_click_to_slot();
         stock.set_widget_name("stock");
         while n_cards > 0 {
-            if let Some(obj) = cards.item(glib::random_int_range(0, n_cards) as u32) {
-                if let Ok(picture) = obj.downcast::<gtk::Picture>() {
-                    grid.remove(&picture);
-                    stock.add_card(&picture);
-                    renderer::flip_card_full(&picture, &renderer);
-                    runtime::connect_double_click(&picture);
-                }
+            let random_card = glib::random_int_range(0, n_cards) as usize;
+            if let Some(card) = cards.get(random_card) {
+                stock.add_card(&card);
+                card.flip();
+                runtime::connect_double_click(&card);
+                cards.remove(random_card);
             } else {
-                glib::g_error!("solitaire", "Failed to get child from grid");
+                glib::g_error!("solitaire", "Failed to get card from grid");
             }
             n_cards -= 1;
         }
@@ -85,27 +83,25 @@ impl super::Game for Klondike {
 
         Self {}
     }
-    fn verify_drag(&self, bottom_card: &gtk::Widget, _from_stack: &CardStack) -> bool {
-        if bottom_card.widget_name().ends_with("_b") { false }
+    fn verify_drag(&self, bottom_card: &Card, _from_stack: &CardStack) -> bool {
+        if !bottom_card.imp().is_face_up.get() { false }
         else { true }
     }
 
-    fn verify_drop(&self, bottom_card: &gtk::Widget, to_stack: &CardStack) -> bool {
+    fn verify_drop(&self, bottom_card: &Card, to_stack: &CardStack) -> bool {
         let stack_name = to_stack.widget_name();
-        let bottom_card_name = bottom_card.widget_name();
-
         if stack_name.starts_with("tableau") {
-            if to_stack.first_child().is_none() && bottom_card_name.ends_with("king") { return true }
-            else if to_stack.first_child().is_none() { return false }
-            let top_card_name = to_stack.last_child().unwrap().widget_name();
-            if (!runtime::is_similar_suit(&bottom_card_name, &top_card_name)) && runtime::is_one_rank_above(&bottom_card_name, &top_card_name) { return true }
-            else { false }
+            if to_stack.is_empty() && bottom_card.get_rank() == "king" { return true }
+            else if to_stack.is_empty() { return false }
+            let top_card = to_stack.last_card().unwrap();
+            if (!bottom_card.is_similar_suit(&top_card)) && top_card.is_one_rank_above(&bottom_card) { return true }
+            else { return false }
         }
         else if stack_name.starts_with("foundation") {
-            if to_stack.first_child().is_none() && bottom_card_name.ends_with("ace") { return true }
-            else if to_stack.first_child().is_none() { return false }
-            let top_card_name = to_stack.last_child().unwrap().widget_name();
-            if runtime::is_same_suit (&bottom_card_name, &top_card_name) && runtime::is_one_rank_above(&top_card_name, &bottom_card_name) { return true }
+            if to_stack.is_empty() && bottom_card.get_rank() == "ace" { return true }
+            else if to_stack.is_empty() { return false }
+            let top_card = to_stack.last_card().unwrap();
+            if bottom_card.is_same_suit(&top_card) && bottom_card.is_one_rank_above(&top_card) { return true }
             else { false }
         }
         else { false }
@@ -131,8 +127,8 @@ impl super::Game for Klondike {
         }
     }
 
-    fn on_double_click(&self, card: &gtk::Picture) {
-        let card_stack = card.parent().unwrap().downcast::<CardStack>().unwrap();
+    fn on_double_click(&self, card: &Card) {
+        let card_stack = card.get_stack().unwrap();
         if card_stack.widget_name().starts_with("foundation") {
             return
         } else {
@@ -147,25 +143,31 @@ impl super::Game for Klondike {
 
     fn on_slot_click(&self, slot: &CardStack) {
         if slot.widget_name() == "stock" {
-            let grid = slot.parent().unwrap().downcast::<gtk::Grid>().unwrap();
-            let waste = runtime::get_child(&grid, "waste").unwrap().downcast::<CardStack>().unwrap();
+            let grid = runtime::get_grid().unwrap();
+            let waste = runtime::get_stack("waste").unwrap();
 
-            if slot.first_child().is_none() {
+            if slot.is_empty() {
                 for _i in 0..waste.observe_children().n_items() {
-                    let card = waste.last_child().unwrap().downcast::<gtk::Picture>().unwrap();
+                    let card = waste.last_card().unwrap();
                     waste.remove_card(&card);
                     slot.add_card(&card);
-                    renderer::flip_card(&card);
+                    card.flip();
                 }
-                runtime::add_to_history("flip->waste", slot.first_child().unwrap().widget_name().as_str(), slot.widget_name().as_str());
+                runtime::add_to_history(runtime::Move { origin_stack: "waste".to_string(), 
+                                                               card_name: slot.first_card().unwrap().widget_name().to_string(),
+                                                               destination_stack: slot.widget_name().to_string(),
+                                                               instruction: Some("flip".to_string()) });
             } else {
-                let waste = runtime::get_child(&grid, "waste").unwrap().downcast::<CardStack>().unwrap();
-                let card = slot.last_child().unwrap().downcast::<gtk::Picture>().unwrap();
+                let waste = runtime::get_stack("waste").unwrap();
+                let card = slot.last_card().unwrap();
                 slot.remove_card(&card);
-                renderer::flip_card(&card);
+                card.flip();
                 waste.add_card(&card);
                 waste.add_drag_to_card(&card);
-                runtime::add_to_history(slot.widget_name().as_str(), card.widget_name().as_str(), "waste");
+                runtime::add_to_history(runtime::Move { origin_stack: slot.widget_name().to_string(), 
+                                                               card_name: card.widget_name().to_string(), 
+                                                               destination_stack: "waste".to_string(),
+                                                               instruction: None });
             }
         }
     }
@@ -173,9 +175,9 @@ impl super::Game for Klondike {
     fn is_won(&self) -> bool {
         let grid = runtime::get_grid().unwrap();
         for i in 0..4 {
-            let stack = runtime::get_child(&grid, format!("foundation_{i}").as_str()).unwrap().downcast::<CardStack>().unwrap();
-            if let Some(last_child) = stack.last_child() {
-                if !last_child.widget_name().ends_with("king") {
+            let stack = runtime::get_stack(format!("foundation_{i}").as_str()).unwrap();
+            if let Some(last_card) = stack.last_card() {
+                if !last_card.widget_name().ends_with("king") {
                     return false;
                 }
             }
@@ -192,27 +194,31 @@ impl super::Game for Klondike {
     }
 }
 
-fn try_distribute(card: &gtk::Picture, parent: &CardStack) {
-    let card_name = card.widget_name();
-    if card_name.ends_with("_b") { return }
-    if &parent.last_child().unwrap() != card { return }
+fn try_distribute(card: &Card, parent: &CardStack) {
+    if !card.imp().is_face_up.get() { return }
+    if &parent.last_card().unwrap() != card { return }
 
     let grid = runtime::get_grid().unwrap();
-    let card_suit = card_name.split("_").nth(0).unwrap();
     for i in 0..4 {
-        let stack = runtime::get_child(&grid, format!("foundation_{i}").as_str()).unwrap().downcast::<CardStack>().unwrap();
-        if let Some(last_child) = stack.last_child() {
-            if last_child.widget_name().starts_with(card_suit) && runtime::is_one_rank_above(&last_child.widget_name(), &card_name) {
+        let stack = runtime::get_stack(format!("foundation_{i}").as_str()).unwrap();
+        if let Some(last_card) = stack.last_card() {
+            if last_card.is_same_suit(card) && card.is_one_rank_above(&last_card) {
                 parent.remove_card(card);
                 stack.add_card(card);
-                runtime::add_to_history(parent.widget_name().as_str(), card.widget_name().as_str(), stack.widget_name().as_str());
+                runtime::add_to_history(runtime::Move { origin_stack: parent.widget_name().to_string(),
+                                                               card_name: card.widget_name().to_string(), 
+                                                               destination_stack: stack.widget_name().to_string(), 
+                                                               instruction: None });
                 return
             }
         } else {
-            if card_name.ends_with("ace") {
+            if card.get_rank() == "ace" {
                 parent.remove_card(card);
                 stack.add_card(card);
-                runtime::add_to_history(parent.widget_name().as_str(), card.widget_name().as_str(), stack.widget_name().as_str());
+                runtime::add_to_history(runtime::Move { origin_stack: parent.widget_name().to_string(),
+                                                               card_name: card.widget_name().to_string(),
+                                                               destination_stack: stack.widget_name().to_string(),
+                                                               instruction: None });
                 return
             }
         }

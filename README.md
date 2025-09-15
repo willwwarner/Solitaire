@@ -10,7 +10,7 @@ To test: compile with meson or Flatpak, using GNOME Builder is best.
 TODO (Not really in any order):
  * Make game look nice
  * Make solver work
- * Improve the Game Builder Interface
+ * Code cleanup
  * Implement more games
  * Add sounds
  * Add animations

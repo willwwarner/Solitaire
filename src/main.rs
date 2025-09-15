@@ -23,6 +23,7 @@ mod config;
 mod window;
 mod renderer;
 mod games;
+mod card;
 mod card_stack;
 mod runtime;
 
