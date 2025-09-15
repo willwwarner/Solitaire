@@ -74,7 +74,6 @@ mod imp {
             self.parent_constructed();
             let obj = self.obj();
             obj.setup_gactions();
-            obj.add_cards();
             obj.populate_game_list(&obj.imp().list.get());
             obj.imp().search_bar.connect_entry(&obj.imp().search_entry.get());
             runtime::set_grid(self.card_grid.get());
@@ -102,26 +101,6 @@ impl SolitaireWindow {
             .build()
     }
 
-    pub fn add_cards(&self) {
-        let game_board = &self.imp().card_grid.get();
-        
-        let mut cards_to_add:u8 = 52; // The number of gtk Pictures (cards) to add to the grid, a standard deck has 52 cards
-
-        while cards_to_add > 0 {
-            let picture = gtk::Picture::new();
-
-            let suite_index = ((cards_to_add - 1) / 13) as usize;
-            let rank_index = ((cards_to_add - 1) % 13) as usize;
-            let card_name = format!("{}_{}", games::SUITES[suite_index], games::RANKS[rank_index]);
-
-            picture.set_widget_name(card_name.as_str());
-            picture.set_property("sensitive", true);
-            game_board.attach(&picture, rank_index as i32, suite_index as i32 + 100, 1, 1);
-
-            cards_to_add -= 1;
-        }
-    }
-    
     fn hint(&self) {
         if let Some((from, card, to)) = games::get_best_next_move() {
             println!("Hint: Move {} from {} to {}", card, from, to);
@@ -129,9 +108,9 @@ impl SolitaireWindow {
             let grid = self.imp().card_grid.get();
 
             // Focus the source stack
-            if let Ok(source_stack) = runtime::get_child(&grid, &from) {
+            if let Ok(source_stack) = runtime::get_child(&grid, &*from) {
                 let source_stack = source_stack.downcast::<crate::card_stack::CardStack>().unwrap();
-                source_stack.focus_card(&card);
+                source_stack.focus_card(card);
             }
         } else {
             println!("No hints available!");

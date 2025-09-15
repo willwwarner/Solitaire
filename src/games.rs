@@ -20,15 +20,15 @@
 
 use std::sync::Mutex;
 use std::format;
-use gtk::prelude::*;
+use gtk::{prelude::*};
 use gtk::{gio, glib};
 use gettextrs::gettext;
-use crate::{renderer, card_stack::CardStack, runtime};
+use crate::{renderer, card::Card, card_stack::CardStack, runtime};
 
 mod klondike;
 
 pub const JOKERS: [&str; 2] = ["joker_red", "joker_black"];
-pub const SUITES: [&str; 4] = ["club", "diamond", "heart", "spade"];
+pub const SUITES: [&str; 4] = ["club", "heart", "spade", "diamond"];
 pub const RANKS: [&str; 13] = ["ace", "2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king"];
 static CURRENT_GAME: Mutex<Option<Box<dyn Game>>> = Mutex::new(None);
 
@@ -38,38 +38,31 @@ pub fn load_game(game_name: &str, grid: &gtk::Grid) {
     window.lookup_action("redo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
     window.lookup_action("hint").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
 
-    let cards = grid.observe_children();
+    let mut cards = runtime::get_cards();
+    if cards.is_empty() {
+        // Create the renderer
+        glib::g_message!("solitaire", "Loading SVG");
+        let resource = gio::resources_lookup_data("/org/gnome/gitlab/wwarner/Solitaire/assets/anglo_poker.svg", gio::ResourceLookupFlags::NONE)
+            .expect("Failed to load resource data");
+        glib::g_message!("solitaire", "loaded resource data");
+        let handle = rsvg::Loader::new()
+            .read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>)
+            .expect("Failed to load SVG");
+        let renderer = rsvg::CairoRenderer::new(&handle);
+        glib::g_message!("solitaire", "Done Loading SVG");
 
-    // Create the renderer for the game
-    glib::g_message!("solitaire", "Loading SVG");
-    let resource = gio::resources_lookup_data("/org/gnome/gitlab/wwarner/Solitaire/assets/anglo_poker.svg", gio::ResourceLookupFlags::NONE)
-        .expect("Failed to load resource data");
-    glib::g_message!("solitaire", "loaded resource data");
-    let handle = rsvg::Loader::new()
-        .read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>)
-        .expect("Failed to load SVG");
-    let renderer = rsvg::CairoRenderer::new(&handle);
-    glib::g_message!("solitaire", "Done Loading SVG");
-
-    for i in 0..grid.observe_children().n_items() {
-        let picture = cards.item(i).unwrap().downcast::<gtk::Picture>().unwrap();
-
-        let suite_index = (i / 13) as usize;
-        let rank_index = (i % 13) as usize;
-        let card_name = format!("{}_{}", SUITES[suite_index], RANKS[rank_index]);
-
-        picture.set_widget_name(card_name.as_str());
-        picture.set_property("sensitive", true);
-        let texture = renderer::set_and_return_texture(&card_name, &renderer);
-        picture.set_paintable(Some(&texture));
+        for i in 0..52 {
+            let card_name = format!("{}_{}", SUITES[i / 13], RANKS[i % 13]);
+            let card = Card::new(&*card_name, i as u8, &renderer);
+            cards.push(card);
+        }
+        renderer::set_back_texture(&renderer);
+        glib::g_message!("solitaire", "Done setting textures");
     }
-
-    renderer::set_back_texture(&renderer);
-    glib::g_message!("solitaire", "Done setting textures");
 
     // Store the current game type
     let mut game = CURRENT_GAME.lock().unwrap();
-    *game = Some(Box::new(klondike::Klondike::new_game(cards, &grid, &renderer)));
+    *game = Some(Box::new(klondike::Klondike::new_game(cards, &grid)));
 
     // Log game loading
     println!("Loaded game: {}", game_name);
@@ -80,19 +73,19 @@ pub fn unload(grid: &gtk::Grid) {
     *game = None;
     runtime::clear_history_and_moves();
     let items = grid.observe_children().n_items();
-    for i in 0..items {
+    let mut cards = Vec::new();
+    for _ in 0..items {
         let child = grid.first_child().expect("Couldn't get child");
-        let stack = child.downcast::<CardStack>().expect("Couldn't downcast child");
-        stack.remove_child_controllers();
-        stack.dissolve_to_row(&grid, i as i32 + 100);
+        child.downcast::<CardStack>().unwrap().destroy_and_return_cards(&mut cards);
     }
+    runtime::set_cards(cards);
 }
 
 pub fn get_games() -> Vec<String> {
     vec![gettext("Klondike")] //, "Spider", "FreeCell", "Tri-Peaks", "Pyramid", "Yukon"]; not yet :)
 }
 
-pub fn on_double_click(card: &gtk::Picture) {
+pub fn on_double_click(card: &Card) {
     let mut game = CURRENT_GAME.lock().unwrap();
     if let Some(game) = game.as_mut() {
         game.on_double_click(card);
@@ -127,7 +120,7 @@ pub fn pre_undo_drag(origin_stack: &CardStack, dropped_stack: &CardStack) {
     }
 }
 
-pub fn verify_drag(bottom_card: &gtk::Widget, from_stack: &CardStack) -> bool {
+pub fn verify_drag(bottom_card: &Card, from_stack: &CardStack) -> bool {
     let mut game = CURRENT_GAME.lock().unwrap();
     if let Some(game) = game.as_mut() {
         game.verify_drag(bottom_card, from_stack)
@@ -136,7 +129,7 @@ pub fn verify_drag(bottom_card: &gtk::Widget, from_stack: &CardStack) -> bool {
     }
 }
 
-pub fn verify_drop(bottom_card: &gtk::Widget, to_stack: &CardStack) -> bool {
+pub fn verify_drop(bottom_card: &Card, to_stack: &CardStack) -> bool {
     let mut game = CURRENT_GAME.lock().unwrap();
     if let Some(game) = game.as_mut() {
         game.verify_drop(bottom_card, to_stack)
@@ -164,13 +157,13 @@ pub fn is_winnable() -> bool {
 }
 
 pub trait Game: Send + Sync {
-    fn new_game(cards: gio::ListModel, grid: &gtk::Grid, renderer: &rsvg::CairoRenderer) -> Self where Self: Sized;
-    fn verify_drag(&self, bottom_card: &gtk::Widget, from_stack: &CardStack) -> bool;
-    fn verify_drop(&self, bottom_card: &gtk::Widget, to_stack: &CardStack) -> bool;
+    fn new_game(cards: Vec<Card>, grid: &gtk::Grid) -> Self where Self: Sized;
+    fn verify_drag(&self, bottom_card: &Card, from_stack: &CardStack) -> bool;
+    fn verify_drop(&self, bottom_card: &Card, to_stack: &CardStack) -> bool;
     fn on_drag_completed(&self, origin_stack: &CardStack);
     fn on_drop_completed(&self, recipient_stack: &CardStack);
-    fn pre_undo_drag(&self, origin_stack: &CardStack, dropped_stack: &CardStack);
-    fn on_double_click(&self, card: &gtk::Picture);
+    fn pre_undo_drag(&self, previous_origin_stack: &CardStack, previous_destination_stack: &CardStack);
+    fn on_double_click(&self, card: &Card);
     fn undo_deal(&self, stock: &CardStack);
     fn on_slot_click(&self, slot: &CardStack);
     fn is_won(&self) -> bool;
