@@ -43,9 +43,8 @@ pub fn get_index(card_name: &str, children: &ListModel) -> Result<u32, glib::Err
 
     // Loop through all the children widgets to find the matching card
     for i in 0..total_children {
-        let child = children.item(i).expect("Failed to get child from CardStack");
-        let card = child.downcast::<Card>().expect("Child is not a Card (find)");
-        if card.widget_name() == card_name {
+        let child = children.item(i).expect("Failed to get child from CardStack").downcast::<gtk::Widget>().unwrap();
+        if child.widget_name() == card_name {
             return Ok(i);
         }
     }
@@ -71,6 +70,9 @@ mod imp {
 
     impl ObjectImpl for CardStack {
         fn constructed(&self) {
+            let placeholder = gtk::Picture::new();
+            placeholder.add_css_class("stack-placeholder");
+            placeholder.insert_before(&self.obj().to_owned(), None::<&gtk::Widget>);
             self.obj().add_css_class("card-stack");
             self.aspect.set(1.4);
         }
@@ -134,8 +136,9 @@ mod imp {
                 }
 
                 // Position each card with proper spacing
+                children.item(0).unwrap().downcast::<gtk::Widget>().unwrap().allocate(allocation_width, allocation_height, -1, None);
                 for i in 0..child_count {
-                    if let Some(child) = children.item(i) {
+                    if let Some(child) = children.item(i + 1) {
                         if let Ok(card) = child.downcast::<gtk::Widget>() {
                             let y_pos = (i * vertical_offset) as f32;
                             card.allocate(allocation_width, allocation_height, -1, Some(gsk::Transform::new().translate(&gtk::graphene::Point::new(0.0, y_pos))));
@@ -330,10 +333,9 @@ impl CardStack {
     }
     
     pub fn destroy_and_return_cards(self, cards: &mut Vec<Card>) {
-        let items = self.observe_children().n_items();
+        let items = self.observe_children().n_items() - 1;
         for _ in 0..items {
-            let child = self.first_child().expect("Failed to get first child from CardStack");
-            let card = child.downcast::<Card>().expect("Child is not a Card (dissolve)");
+            let card = self.first_card().expect("Failed to get first card from CardStack");
             self.remove_card(&card);
             card.flip_to_face();
             cards.push(card);
@@ -352,7 +354,7 @@ impl CardStack {
     }
 
     pub fn face_up_top_card(&self) -> bool {
-        if let Some(widget) = self.last_child() {
+        if let Some(widget) = self.last_card() {
             let card = widget.downcast::<Card>().expect("Child is not a Card (flip)");
             card.flip_to_face();
             return false; // The stack is not empty
@@ -361,7 +363,7 @@ impl CardStack {
     }
 
     pub fn face_down_top_card(&self) -> bool {
-        if let Some(widget) = self.last_child() {
+        if let Some(widget) = self.last_card() {
             let card = widget.downcast::<Card>().expect("Child is not a Card (flip)");
             card.flip_to_back();
             return false; // The stack is not empty
@@ -444,7 +446,7 @@ impl CardStack {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.first_child().is_none()
+        self.observe_children().n_items() == 1
     }
 
     pub fn last_card(&self) -> Option<Card> {
@@ -452,7 +454,7 @@ impl CardStack {
     }
 
     pub fn first_card(&self) -> Option<Card> {
-        self.first_child()?.downcast::<Card>().ok()
+        self.observe_children().item(1)?.downcast::<Card>().ok()
     }
 }
 

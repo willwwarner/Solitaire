@@ -1,11 +1,15 @@
 :root {
-    --bg: lightgreen;
+    --bg: #57E389;
 }
 
 .card-stack {
     box-shadow: none;
-    background-color: green;
-    border-radius: 6px;
+}
+
+.stack-placeholder {
+    background-color: #26A269;
+    border-radius: 6%;
+    box-shadow: 0 0 8px #25835c;
 }
 
 window {
@@ -14,6 +18,6 @@ window {
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --bg: darkgreen;
+        --bg: #207351;
     }
 }
