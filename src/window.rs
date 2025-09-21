@@ -17,14 +17,20 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-
+use std::thread;
 use gettextrs::gettext;
 use gtk::prelude::*;
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gio, glib};
 use glib::subclass::InitializingObject;
+use indexmap::IndexMap;
 use crate::{games, runtime};
+use crate::card_stack::CardStack;
+
+thread_local! {
+    static SELF: std::cell::RefCell<Option<SolitaireWindow>> = std::cell::RefCell::new(None);
+}
 
 mod imp {
     use super::*;
@@ -41,6 +47,8 @@ mod imp {
         pub recent_row: TemplateChild<adw::ActionRow>,
         #[template_child]
         pub nav_page: TemplateChild<adw::NavigationPage>,
+        #[template_child]
+        pub game_stack: TemplateChild<gtk::Stack>,
         #[template_child]
         pub card_grid: TemplateChild<gtk::Grid>,
         #[template_child]
@@ -77,6 +85,7 @@ mod imp {
             obj.populate_game_list(&obj.imp().list.get());
             obj.imp().search_bar.connect_entry(&obj.imp().search_entry.get());
             runtime::set_grid(self.card_grid.get());
+            SELF.replace(Some(obj.clone()));
         }
     }
     impl WidgetImpl for SolitaireWindow {}
@@ -150,52 +159,85 @@ impl SolitaireWindow {
 
     #[template_callback]
     fn populate_game_list(&self, list: &gtk::ListBox) {
-        for game in &games::get_games() {
+        for game in games::get_games() {
             let action_row = adw::ActionRow::new();
             let icon = gtk::Image::new();
             icon.set_icon_name(Some("go-next-symbolic"));
             icon.set_valign(gtk::Align::Center);
             action_row.set_activatable(true);
-            action_row.set_property("title", game);
-            action_row.set_property("subtitle", games::get_game_description(game));
+            action_row.set_property("title", &game);
+            action_row.set_property("subtitle", games::get_game_description(&game));
             action_row.add_suffix(&icon);
-            let nav_view = self.imp().nav_view.get();
-            let card_grid = self.imp().card_grid.get();
-            let game_name = game.clone();
             action_row.connect_activated(move |action_row| {
-                glib::g_message!("solitaire", "Starting {game_name}!");
-                nav_view.push_by_tag("game");
+                let game_name = game.to_owned();
+                glib::g_message!("solitaire", "Starting {game_name}");
+                let window = Self::get_window().unwrap();
+                window.imp().nav_view.get().push_by_tag("game");
+                window.imp().game_stack.set_visible_child_name("spinner");
+                let card_grid = window.imp().card_grid.get();
+                let (sender, receiver) = async_channel::bounded(1);
                 games::test_solver_state();
-                for i in 0..3 {
-                    games::load_game(&*game_name, &card_grid);
-                    if let Some(solution) = games::solve_game() {
-                        runtime::set_solution(solution);
-                        glib::g_message!("solitaire", "pushed to game");
-                        return;
-                    } else {
-                        games::unload(&card_grid);
-                        println!("Failed to solve game {i}!");
+                let game_name = game_name.as_str();
+                games::load_game(&*game_name, &card_grid);
+                // Get the game state
+                let mut game_state = IndexMap::new();
+                let mut stack_names = Vec::new();
+                let grid = runtime::get_grid().unwrap();
+                let stacks = grid.observe_children();
+                for i in 0..stacks.n_items() {
+                    let stack = stacks.item(i).unwrap().downcast::<CardStack>().unwrap();
+                    if game_state.contains_key(&stack.widget_name().to_string()) {
+                        glib::g_warning!("solitaire", "Duplicate stack key collected");
                     }
+                    game_state.insert(stack.widget_name().to_string(), stack.get_solver_stack());
+                    stack_names.push(stack.widget_name().to_string());
                 }
-                let dialog = adw::AlertDialog::builder()
-                    .heading(gettext("Failed to make a winnable game"))
-                    .body(gettext("Would you like to try to create a new game?"))
-                    .default_response("accept")
-                    .build();
-                dialog.add_responses(&[
-                    ("accept",          gettext("Try Again").as_str()),
-                    ("delete_event",    gettext("Go Back").as_str())
-                ]);
-                dialog.set_response_appearance("accept", adw::ResponseAppearance::Suggested);
-                let owned_row = action_row.to_owned();
-                dialog.connect_response(Some("accept"), move |_dialog, _response| {
-                    owned_row.emit_activate();
-                });
 
-                dialog.connect_response(Some("delete_event"), move |dialog, _response| {
-                    dialog.root().unwrap().downcast::<SolitaireWindow>().unwrap().imp().nav_view.pop_to_tag("chooser");
+                // Run the solver in a thread to avoid blocking the UI
+                thread::spawn(move || {
+                    let sender = sender.clone();
+                    sender.send_blocking(games::solve_game(game_state, stack_names)).unwrap();
                 });
-                dialog.present(Some(&card_grid.root().unwrap().downcast::<Self>().unwrap()));
+                glib::spawn_future_local(glib::clone!(
+                    #[weak]
+                    card_grid,
+                    #[weak]
+                    window,
+                    #[weak]
+                    action_row,
+                    async move {
+                        while let Ok(rec) = receiver.recv().await {
+                            if let Some(solution) = rec {
+                                runtime::set_solution(solution);
+                                window.imp().game_stack.set_visible_child_name("grid");
+                            } else {
+                                games::unload(&card_grid);
+
+                                let dialog = adw::AlertDialog::builder()
+                                    .heading(gettext("Failed to make a winnable game"))
+                                    .body(gettext("Would you like to try to create a new game?"))
+                                    .default_response("accept")
+                                    .close_response("delete_event")
+                                    .build();
+                                dialog.add_responses(&[
+                                    ("accept",          gettext("Try Again").as_str()),
+                                    ("delete_event",    gettext("Go Back").as_str())
+                                ]);
+                                dialog.set_response_appearance("accept", adw::ResponseAppearance::Suggested);
+                                let owned_row = action_row.clone();
+                                dialog.connect_response(Some("accept"), move |_dialog, _response| {
+                                    owned_row.emit_activate();
+                                });
+
+                                dialog.connect_response(Some("delete_event"), move |dialog, _response| {
+                                    dialog.root().unwrap().downcast::<SolitaireWindow>().unwrap().imp().nav_view.pop_to_tag("chooser");
+                                });
+
+                                dialog.present(Some(&window));
+                            }
+                        }
+                    }
+                ));
             });
             list.append(&action_row);
         }
@@ -220,5 +262,9 @@ impl SolitaireWindow {
         });
         dialog.set_response_appearance("accept", adw::ResponseAppearance::Destructive);
         dialog.present(Some(self));
+    }
+
+    fn get_window() -> Option<SolitaireWindow> {
+        SELF.with(|window| window.borrow().to_owned())
     }
 }

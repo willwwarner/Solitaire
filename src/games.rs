@@ -18,14 +18,15 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use indexmap::IndexSet;
+use indexmap::{IndexSet, IndexMap};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Mutex;
 use std::format;
+use std::ops::Index;
 use gtk::prelude::*;
 use gtk::{gio, glib};
 use gettextrs::gettext;
-use crate::{renderer, card::Card, card_stack::CardStack, runtime};
+use crate::{renderer, card::Card, card_stack::CardStack, runtime, games};
 
 mod klondike;
 
@@ -74,6 +75,7 @@ pub fn unload(grid: &gtk::Grid) {
     let mut game = CURRENT_GAME.lock().unwrap();
     *game = None;
     runtime::clear_history_and_moves();
+    runtime::update_deals(0);
     let items = grid.observe_children().n_items();
     let mut cards = Vec::new();
     for _ in 0..items {
@@ -147,7 +149,16 @@ pub fn verify_drop(bottom_card: &Card, to_stack: &CardStack) -> bool {
     }
 }
 
-fn perform_state_move(move_option: &mut runtime::Move, game_state: &mut HashMap<String, Vec<glib::GString>>, undo: bool) {
+#[derive(Debug, Clone, PartialEq)]
+struct SolverMove {
+    pub origin_stack: String,
+    pub card: u8,
+    pub destination_stack: String,
+    pub instruction: Option<String>,
+}
+
+// NOTE: IndexMap will panic if origin_stack and destination_stack are the same.
+fn perform_state_move(move_option: &mut SolverMove, game_state: &mut IndexMap<String, Vec<u8>>, undo: bool) {
     let (destination_stack, origin_stack);
     if !undo {
         let [Some(tmp_destination), Some(tmp_origin)] =
@@ -160,17 +171,13 @@ fn perform_state_move(move_option: &mut runtime::Move, game_state: &mut HashMap<
         else { panic!("Couldn't get stacks from {move_option:?}") };
         (destination_stack, origin_stack) = (tmp_origin, tmp_destination);
     }
-    let card_index = origin_stack.iter().position(|x| *x == move_option.card_name).expect(format!("Couldn't find card {} in {origin_stack:?} undo: {undo}", move_option.card_name).as_str());
+    let card_index = origin_stack.iter().position(|x| *x == move_option.card).expect(format!("Couldn't find card {} in {origin_stack:?} undo: {undo}", move_option.card).as_str());
     if move_option.instruction == Some("flip".to_string()) {
-        let new_card = origin_stack.last().unwrap().to_string();
-        move_option.card_name = new_card;
+        let new_card = origin_stack.last().unwrap();
+        move_option.card = *new_card;
         for i in (card_index..origin_stack.len()).rev() {
             let card = origin_stack.remove(i);
-            if card.ends_with("_b") {
-                destination_stack.push(glib::GString::from(card.replace("_b", "")));
-            } else {
-                destination_stack.push(glib::GString::from(card.to_string() + "_b"));
-            }
+            destination_stack.push(card);
         }
     } else {
         for _ in card_index..origin_stack.len() {
@@ -183,32 +190,12 @@ fn perform_state_move(move_option: &mut runtime::Move, game_state: &mut HashMap<
 #[derive(PartialEq)]
 struct SolverNode {
     parent: Option<usize>,
-    move_option: runtime::Move,
+    move_option: SolverMove,
     state_key: usize,
 }
 
-fn get_stack_keyset(game_state: &HashMap<String, Vec<glib::GString>>, stack_names: &Vec<String>, stacks: &mut HashMap<u32, Vec<u8>>) -> Vec<u32> {
-    let mut stack_keys = Vec::new();
-    for name in stack_names.iter() {
-        let stack = game_state.get(name).unwrap();
-        let stack_shortened = stack.iter().map(|x| card_name_to_id(x)).collect::<Vec<u8>>();
-        let mut stack_key:u32 = 0x811C9DC5;
-        let stack_iter = stack_shortened.iter().rev();
-        for card in stack_iter {
-            stack_key ^= *card as u32;
-            stack_key = stack_key.wrapping_mul(0x01000193);
-        }
-        let stack_key = stack_key;
-        stacks.entry(stack_key).or_insert(stack_shortened);
-        stack_keys.push(stack_key);
-    }
-
-    stack_keys
-}
-
-fn card_id_to_name(id: u8) -> glib::GString {
-    let new_id = id & 0x7F;
-    let flipped = (id & 0x80) != 0;
+fn solver_card_to_name(card: u8) -> glib::GString {
+    let new_id = card & 0x7F;
     if new_id > 54 { return glib::GString::default() }
     match new_id {
         53 => return glib::GString::from("joker_red"),
@@ -217,14 +204,20 @@ fn card_id_to_name(id: u8) -> glib::GString {
     }
     let suite_index = (new_id / 13) as usize;
     let rank_index = (new_id % 13) as usize;
-    glib::GString::from(format!("{}_{}{}", SUITES[suite_index], RANKS[rank_index], if flipped {"_b"} else {""}))
+    glib::GString::from(format!("{}_{}", SUITES[suite_index], RANKS[rank_index]))
 }
 
-pub fn card_name_to_id(name: &glib::GString) -> u8 {
+fn solver_card_to_id(card: &u8) -> u8 {
+    card & 0x7F
+}
+fn mut_solver_card_to_id(card: &mut u8) {
+    *card &= 0x7F
+}
+
+pub fn card_name_to_solver(name: &str, is_flipped: bool) -> u8 {
     let mut name_parts = name.split("_");
     let suite_name =name_parts.next().unwrap();
     let rank_name = name_parts.next().unwrap();
-    let is_flipped = name_parts.next().is_some();
     let suite_index = SUITES.iter().position(|x| x == &suite_name).unwrap();
     let rank_index = RANKS.iter().position(|x| x == &rank_name).unwrap();
     let base_id = ((suite_index * 13) + rank_index) as u8;
@@ -232,49 +225,59 @@ pub fn card_name_to_id(name: &glib::GString) -> u8 {
     if is_flipped { base_id | 0x80 } else { base_id & !0x80 }
 }
 
-pub fn is_one_rank_above(card_lower: &glib::GString, card_higher: &glib::GString) -> bool {
-    let lower_rank = card_lower.split("_").nth(1).unwrap();
-    let higher_rank = card_higher.split("_").nth(1).unwrap();
-    let lower_index = RANKS.iter().position(|x| x == &lower_rank).unwrap();
-    let higher_index = RANKS.iter().position(|x| x == &higher_rank).unwrap();
+fn is_flipped(card: &u8) -> bool {
+    (card & 0x80) != 0
+}
 
-    if lower_index + 1 == higher_index {
-        true
-    } else {
-        false
+fn is_one_rank_above(card_lower: &u8, card_higher: &u8) -> bool {
+    let lower_rank = solver_card_to_id(card_lower) % 13;
+    let higher_rank = solver_card_to_id(card_higher) % 13;
+    (lower_rank + 1) == higher_rank
+}
+
+fn is_same_suit(card_1: &u8, card_2: &u8) -> bool {
+    (solver_card_to_id(card_1) / 13) == (solver_card_to_id(card_2) / 13)
+}
+
+fn is_similar_suit(card_1: &u8, card_2: &u8) -> bool {
+    let self_suit = (solver_card_to_id(card_1) / 13) as usize;
+    let other_suit = (solver_card_to_id(card_2) / 13) as usize;
+    (self_suit == 0 || self_suit == 2) == (other_suit == 0 || other_suit == 2)
+}
+
+fn get_rank(card: &u8) -> &str {
+    let rank = solver_card_to_id(card) % 13;
+    RANKS[rank as usize]
+}
+
+fn create_move(origin_stack: &str, card: &u8, destination_stack: &str, instruction: Option<&str>) -> SolverMove {
+    let new_instruction;
+    if instruction.is_some() { new_instruction = Some(instruction.unwrap().to_string()) }
+    else { new_instruction = None}
+    SolverMove {
+        origin_stack: origin_stack.to_string(),
+        card: card.to_owned(),
+        destination_stack: destination_stack.to_string(),
+        instruction: new_instruction,
     }
 }
 
-pub fn is_same_suit(card_1: &glib::GString, card_2: &glib::GString) -> bool {
-    (card_1.starts_with("heart")   && card_2.starts_with("heart")   ) ||
-        (card_1.starts_with("diamond") && card_2.starts_with("diamond") ) ||
-        (card_1.starts_with("club")    && card_2.starts_with("club")    ) ||
-        (card_1.starts_with("spade")   && card_2.starts_with("spade")   )
-}
-
-pub fn is_similar_suit(card_1: &glib::GString, card_2: &glib::GString) -> bool {
-    (card_1.starts_with("heart") || card_1.starts_with("diamond")) ==
-        (card_2.starts_with("heart") || card_2.starts_with("diamond"))
+fn move_from_strings(origin_stack: String, card: &u8, destination_stack: String, instruction: Option<String>) -> SolverMove {
+    SolverMove {
+        origin_stack,
+        card: card.to_owned(),
+        destination_stack,
+        instruction,
+    }
 }
 
 
-pub fn solve_game() -> Option<Vec<runtime::Move>> {
+pub fn solve_game(mut game_state: IndexMap<String, Vec<u8>>, stack_names: Vec<String>) -> Option<Vec<runtime::Move>> {
     let mut game = CURRENT_GAME.lock().unwrap();
     if let Some(game) = game.as_mut() {
         glib::g_message!("solitaire", "solver: starting");
-        // Get the game state
-        let mut game_state = HashMap::new();
-        let mut stack_names = Vec::new();
-        let grid = runtime::get_grid().unwrap();
-        let stacks = grid.observe_children();
-        for i in 0..stacks.n_items() {
-            let stack = stacks.item(i).unwrap().downcast::<CardStack>().unwrap();
-            game_state.insert(stack.widget_name().to_string(), stack.get_solver_stack());
-            stack_names.push(stack.widget_name().to_string());
-        }
-        let stack_names = stack_names;
-        let mut states:IndexSet<Vec<u32>> = IndexSet::new();
-        let mut stacks:HashMap<u32, Vec<u8>> = HashMap::new();
+        let mut states:IndexSet<Vec<usize>> = IndexSet::new();
+        let mut stacks:IndexSet<Vec<u8>> = IndexSet::new();
         let mut nodes:Vec<SolverNode> = Vec::new();
         let mut queues:Vec<VecDeque<usize>> = vec![VecDeque::new(); 50];
         let mut n_q_expand = 0;
@@ -284,11 +287,18 @@ pub fn solve_game() -> Option<Vec<runtime::Move>> {
         let moves = game.get_automoves_ranked(&game_state);
         for mut move_option in moves {
             perform_state_move(&mut move_option, &mut game_state, false);
-            let stack_keys = get_stack_keyset(&game_state, &stack_names, &mut stacks);
+            let mut new_stack_keys = Vec::new();
+            for stack in game_state.values() {
+                if let Some(stack_index) = stacks.get_index_of(stack) {
+                    new_stack_keys.push(stack_index);
+                } else {
+                    new_stack_keys.push(stacks.len());
+                    stacks.insert(stack.to_owned());
+                }
+            }
             let outs = game.get_priority(&game_state) as usize;
             perform_state_move(&mut move_option, &mut game_state, true);
-            if !states.contains(&stack_keys) {
-                states.insert(stack_keys);
+            if states.insert(new_stack_keys) {
                 let new_node = SolverNode { parent: None, move_option, state_key: states.len() - 1 };
                 let new_node_index = nodes.len();
                 nodes.push(new_node);
@@ -317,13 +327,12 @@ pub fn solve_game() -> Option<Vec<runtime::Move>> {
             let node = nodes.get(node_index).unwrap();
             game_state.clear();
             let mut names_iter = stack_names.iter();
-            let stack_keys = &states[node.state_key];
+            let stack_keys = states.index(node.state_key);
             for stack_key in stack_keys {
-                let stack = stacks.get(stack_key).unwrap();
+                let stack = stacks.index(*stack_key);
                 let mut new_stack = Vec::new();
                 for card_id in stack {
-                    let card_name = card_id_to_name(*card_id);
-                    new_stack.push(card_name);
+                    new_stack.push(*card_id);
                 }
                 game_state.insert(names_iter.next().unwrap().to_owned(), new_stack);
             }
@@ -331,11 +340,10 @@ pub fn solve_game() -> Option<Vec<runtime::Move>> {
                 glib::g_message!("solitaire", "solver: found solution");
                 let mut history = Vec::new();
                 let mut node = node;
-                history.push(node.move_option.to_owned());
                 while let Some(node_index) = node.parent {
-                    node = nodes.get(node_index).unwrap();
                     let move_option = node.move_option.to_owned();
-                    history.push(move_option);
+                    history.push(runtime::move_from_strings(move_option.origin_stack, solver_card_to_name(move_option.card).to_string(), move_option.destination_stack, move_option.instruction));
+                    node = nodes.get(node_index).unwrap();
                 }
                 history.reverse();
                 return Some(history);
@@ -343,11 +351,18 @@ pub fn solve_game() -> Option<Vec<runtime::Move>> {
             let moves = game.get_automoves_ranked(&game_state);
             for mut move_option in moves {
                 perform_state_move(&mut move_option, &mut game_state, false);
-                let stack_keys = get_stack_keyset(&game_state, &stack_names, &mut stacks);
+                let mut new_stack_keys = Vec::new();
+                for stack in game_state.values() {
+                    if let Some(stack_index) = stacks.get_index_of(stack) {
+                        new_stack_keys.push(stack_index);
+                    } else {
+                        new_stack_keys.push(stacks.len());
+                        stacks.insert(stack.to_owned());
+                    }
+                }
                 let outs = game.get_priority(&game_state) as usize;
                 perform_state_move(&mut move_option, &mut game_state, true);
-                if !states.contains(&stack_keys) {
-                    states.insert(stack_keys);
+                if states.insert(new_stack_keys) {
                     let new_node = SolverNode { parent: Some(node_index), move_option, state_key: states.len() - 1 };
                     let new_node_index = nodes.len();
                     nodes.push(new_node);
@@ -374,34 +389,40 @@ pub fn solve_game() -> Option<Vec<runtime::Move>> {
 }
 
 pub fn test_solver_state() {
-    let mut game_state = HashMap::new();
+    let mut game_state = IndexMap::new();
     let stack_names = vec![String::from("A"), String::from("B")];
     let mut stack_a = Vec::new();
-    stack_a.push(glib::GString::from("club_ace"));
-    for i in 2..7 { stack_a.push(glib::GString::from(format!("club_{i}"))); }
-    for i in 7..9 {stack_a.push(glib::GString::from(format!("club_{i}_b"))); }
+    stack_a.push(card_name_to_solver(&glib::GString::from("club_ace"), false));
+    for i in 2..7 { stack_a.push(card_name_to_solver(&glib::GString::from(format!("club_{i}")), false)); }
+    for i in 7..9 {stack_a.push(card_name_to_solver(&glib::GString::from(format!("club_{i}")), true)); }
     game_state.insert(stack_names[0].clone(), stack_a);
     let stack_b = Vec::new();
     game_state.insert(stack_names[1].clone(), stack_b);
-    let mut stacks:HashMap<u32, Vec<u8>> = HashMap::new();
+    let mut stacks:IndexSet<Vec<u8>> = IndexSet::new();
 
-    let keys = get_stack_keyset(&game_state, &stack_names, &mut stacks);
-    let mut new_state = HashMap::new();
+    let mut keys = Vec::new();
+    for stack in game_state.values() {
+        if let Some(stack_index) = stacks.get_index_of(stack) {
+            keys.push(stack_index);
+        } else {
+            keys.push(stacks.len());
+            stacks.insert(stack.to_owned());
+        }
+    }
+    let mut new_state = IndexMap::new();
     let mut names_iter = stack_names.iter();
     for key in &keys {
-        let compact_stack = stacks.get(key).unwrap();
-        let mut stack = Vec::new();
-        for &id in compact_stack { stack.push(card_id_to_name(id)); }
-        new_state.insert(names_iter.next().unwrap().to_owned(), stack);
+        let stack = stacks.index(*key);
+        new_state.insert(names_iter.next().unwrap().to_owned(), stack.to_owned());
     }
     assert_eq!(game_state, new_state, "Round-trip state mismatch!");
 
     // SAMPLE MOVE UNDO CHECK
-    let moves = vec![runtime::create_move("A", "club_6", "B", None),
-                     runtime::create_move("A", "club_ace", "B", None),
-                     runtime::create_move("A", "club_6", "B", Some("flip")),
-                     runtime::create_move("A", "club_ace", "B", Some("flip"))];
-    
+    let moves = vec![create_move("A", &card_name_to_solver("club_6", false), "B", None),
+                     create_move("A", &card_name_to_solver("club_ace", false), "B", None),
+                     create_move("A", &card_name_to_solver("club_6", false), "B", Some("flip")),
+                     create_move("A", &card_name_to_solver("club_ace", false), "B", Some("flip"))];
+
     for mut mv in moves {
         let mv_copy = mv.clone();
         let mut copy = game_state.clone();
@@ -420,9 +441,8 @@ pub trait Game: Send + Sync {
     fn on_drop_completed(&self, recipient_stack: &CardStack);
     fn pre_undo_drag(&self, previous_origin_stack: &CardStack, previous_destination_stack: &CardStack);
     fn on_double_click(&self, card: &Card);
-    fn undo_deal(&self, stock: &CardStack);
     fn on_slot_click(&self, slot: &CardStack);
-    fn get_automoves_ranked(&self, state: &HashMap<String, Vec<glib::GString>>) -> Vec<runtime::Move>;
-    fn get_priority(&self, state: &HashMap<String, Vec<glib::GString>>) -> u32;
-    fn is_won(&self, state: &HashMap<String, Vec<glib::GString>>) -> bool;
+    fn get_automoves_ranked(&self, state: &IndexMap<String, Vec<u8>>) -> Vec<SolverMove>;
+    fn get_priority(&self, state: &IndexMap<String, Vec<u8>>) -> u32;
+    fn is_won(&self, state: &IndexMap<String, Vec<u8>>) -> bool;
 }

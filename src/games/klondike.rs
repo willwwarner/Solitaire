@@ -19,14 +19,14 @@
  */
 
 use std::collections::{HashMap};
-use crate::{runtime, card::Card, card_stack::CardStack};
-use gtk::{prelude::*, subclass::prelude::*};
+use crate::{games::*, runtime, card::Card, card_stack::CardStack};
+use gtk::{subclass::prelude::*};
 use gtk::glib;
 
 pub struct Klondike {}
 
 impl Klondike {}
-impl super::Game for Klondike {
+impl Game for Klondike {
     fn new_game(mut cards: Vec<Card>, grid: &gtk::Grid) -> Self {
         let mut n_cards = cards.len() as i32;
 
@@ -138,10 +138,6 @@ impl super::Game for Klondike {
         }
     }
 
-    fn undo_deal(&self, stock: &CardStack) {
-        todo!()
-    }
-
     fn on_slot_click(&self, slot: &CardStack) {
         if slot.widget_name() == "stock" {
             let waste = runtime::get_stack("waste").unwrap();
@@ -175,21 +171,21 @@ impl super::Game for Klondike {
         }
     }
 
-    fn get_automoves_ranked(&self, state: &HashMap<String, Vec<glib::GString>>) -> Vec<runtime::Move> {
+    fn get_automoves_ranked(&self, state: &IndexMap<String, Vec<u8>>) -> Vec<SolverMove> {
         let mut moves = Vec::new();
         // Check if inner-tableau moves are possible
         for i in 0..7 {
             let stack = state.get(&format!("tableau_{i}")).unwrap();
             for card in stack {
-                if !card.ends_with("_b") {
+                if !is_flipped(card) {
                     for j in 0..7 {
                         if j != i {
                             if let Some(last_child) = state.get(&format!("tableau_{j}")).unwrap().last() {
-                                if super::is_one_rank_above(&last_child, &card) && super::is_similar_suit(&card, &last_child) {
-                                    moves.push(runtime::move_from_strings(format!("tableau_{i}"), card.to_string(),format!("tableau_{j}"), None));
+                                if is_one_rank_above(&last_child, &card) && is_similar_suit(&card, &last_child) {
+                                    moves.push(move_from_strings(format!("tableau_{i}"), card,format!("tableau_{j}"), None));
                                 }
-                            } else if card.ends_with("king") {
-                                moves.push(runtime::move_from_strings(format!("tableau_{i}"), card.to_string(),format!("tableau_{j}"), None));
+                            } else if get_rank(card) == "king" {
+                                moves.push(move_from_strings(format!("tableau_{i}"), card,format!("tableau_{j}"), None));
                             }
                         }
                     }
@@ -199,16 +195,17 @@ impl super::Game for Klondike {
         // Check if tableau to foundation moves are possible
         for i in 0..7 {
             if let Some(tableau_child) = state.get(&format!("tableau_{i}")).unwrap().last() {
+                if is_flipped(&tableau_child) { continue }
                 for j in 0..4 {
                     let stack = state.get(&format!("foundation_{j}")).unwrap();
                     if let Some(foundation_child) = stack.last() {
-                        if super::is_same_suit(&foundation_child, &tableau_child) && super::is_one_rank_above(&foundation_child, &tableau_child) {
-                            moves.push(runtime::move_from_strings(format!("tableau_{i}"), tableau_child.to_string(),format!("tableau_{j}"), None));
+                        if is_same_suit(&foundation_child, &tableau_child) && is_one_rank_above(&foundation_child, &tableau_child) {
+                            moves.push(move_from_strings(format!("tableau_{i}"), tableau_child,format!("tableau_{j}"), None));
 
                         }
                     } else {
-                        if tableau_child.ends_with("ace") {
-                            moves.push(runtime::move_from_strings(format!("tableau_{i}"), tableau_child.to_string(),format!("tableau_{j}"), None));
+                        if get_rank(tableau_child) == "ace" {
+                            moves.push(move_from_strings(format!("tableau_{i}"), tableau_child,format!("tableau_{j}"), None));
 
                         }
                     }
@@ -221,7 +218,7 @@ impl super::Game for Klondike {
         if waste.is_empty() {
             if stock.is_empty() { return moves }
             else {
-                moves.push(runtime::create_move("stock", stock.last().unwrap(),"waste", Some("flip")));
+                moves.push(create_move("stock", stock.last().unwrap(),"waste", Some("flip")));
                 return moves;
             }
         }
@@ -229,8 +226,8 @@ impl super::Game for Klondike {
         let card = waste.last().unwrap();
         for i in 0..7 {
             if let Some(tableau_child) = state.get(&format!("tableau_{i}")).unwrap().last() {
-                if super::is_similar_suit(card, tableau_child) && super::is_one_rank_above(tableau_child, card) {
-                    moves.push(runtime::create_move("waste", card, format!("tableau_{i}").as_str(), None));
+                if is_similar_suit(card, tableau_child) && is_one_rank_above(tableau_child, card) {
+                    moves.push(create_move("waste", card, format!("tableau_{i}").as_str(), None));
 
                 }
             }
@@ -239,16 +236,16 @@ impl super::Game for Klondike {
         let card = waste.last().unwrap();
         for i in 0..4 {
             if let Some(foundation_child) = state.get(&format!("foundation_{i}")).unwrap().last() {
-                if super::is_same_suit(card, foundation_child) && super::is_one_rank_above(foundation_child, card) {
-                    moves.push(runtime::create_move("waste", card, format!("foundation_{i}").as_str(), None));
+                if is_same_suit(card, foundation_child) && is_one_rank_above(foundation_child, card) {
+                    moves.push(create_move("waste", card, format!("foundation_{i}").as_str(), None));
                 }
             }
         }
 
         if stock.is_empty() {
-            moves.push(runtime::create_move("waste", waste.first().unwrap(),"stock", Some("flip")));
+            moves.push(create_move("waste", waste.first().unwrap(),"stock", Some("flip")));
         } else {
-            moves.push(runtime::create_move("stock", stock.last().unwrap(),"waste", Some("flip")));
+            moves.push(create_move("stock", stock.last().unwrap(),"waste", Some("flip")));
         }
 
         // Check if a foundation to tableau move is possible
@@ -257,8 +254,8 @@ impl super::Game for Klondike {
             if let Some(card) = foundation.last() {
                 for j in 0..7 {
                     if let Some(tableau_child) = state.get(&format!("tableau_{j}")).unwrap().last() {
-                        if super::is_similar_suit(card, tableau_child) && super::is_one_rank_above(tableau_child, card) {
-                            moves.push(runtime::move_from_strings(format!("foundation_{i}"), card.to_string(),format!("tableau_{j}"), None));
+                        if is_similar_suit(card, tableau_child) && is_one_rank_above(tableau_child, card) && !is_flipped(tableau_child) {
+                            moves.push(move_from_strings(format!("foundation_{i}"), card,format!("tableau_{j}"), None));
                         }
                     }
                 }
@@ -267,7 +264,7 @@ impl super::Game for Klondike {
         moves
     }
 
-    fn get_priority(&self, state: &HashMap<String, Vec<glib::GString>>) -> u32 {
+    fn get_priority(&self, state: &IndexMap<String, Vec<u8>>) -> u32 {
         let mut outs = 0;
         for i in 0..4 {
             let outpile = state.get(&format!("foundation_{i}")).unwrap();
@@ -275,16 +272,16 @@ impl super::Game for Klondike {
         }
         for i in 0..7 {
             let tableau = state.get(&format!("tableau_{i}")).unwrap();
-            if let Some(last_child) = tableau.last() { if !last_child.ends_with("_b") { outs += 1; } }
+            if let Some(last_child) = tableau.last() { if !is_flipped(last_child) { outs += 1; } }
         }
         outs
     }
 
-    fn is_won(&self, state: &HashMap<String, Vec<glib::GString>>) -> bool {
+    fn is_won(&self, state: &IndexMap<String, Vec<u8>>) -> bool {
         for i in 0..4 {
             let stack = state.get(&format!("foundation_{i}")).unwrap();
             if let Some(last_child) = stack.last() {
-                if !last_child.ends_with("king") {
+                if !(get_rank(last_child) == "king") {
                     return false;
                 }
             } else {

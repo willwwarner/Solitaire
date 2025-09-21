@@ -4,10 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-indexmap = "2.11"
+async-channel = "2.5.0"
+indexmap = "2.11.4"
 gettext-rs = { version = "0.7.2", features = ["gettext-system"] }
 gtk = { version = "0.10", package = "gtk4", features = ["gnome_48"] }
-librsvg = "2.61"
+librsvg = "2.61.1"
 cairo = { version = "0.21", package = "cairo-rs" }
 
 [dependencies.adw]

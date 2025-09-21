@@ -423,16 +423,16 @@ impl CardStack {
         card.add_controller(drag_source);
     }
     
-    pub fn get_solver_stack(&self) -> Vec<glib::GString> {
-        let mut card_names = Vec::new();
+    pub fn get_solver_stack(&self) -> Vec<u8> {
+        let mut solver_cards = Vec::new();
         let children = self.observe_children();
         let total_children = children.n_items();
         for i in 0..total_children {
             let child = children.item(i).expect("Failed to get child from CardStack");
             let card = child.downcast::<Card>().expect("Child is not a Card (get_solver_stack)");
-            card_names.push(card.widget_name());
+            solver_cards.push(games::card_name_to_solver(&card.widget_name(), !card.imp().is_face_up.get()));
         }
-        card_names
+        solver_cards
     }
     
     pub fn focus_card(&self, card_name: String) {
