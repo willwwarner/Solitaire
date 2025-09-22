@@ -19,14 +19,13 @@
  */
 
 use indexmap::{IndexSet, IndexMap};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{VecDeque};
 use std::sync::Mutex;
 use std::format;
-use std::ops::Index;
 use gtk::prelude::*;
 use gtk::{gio, glib};
 use gettextrs::gettext;
-use crate::{renderer, card::Card, card_stack::CardStack, runtime, games};
+use crate::{renderer, card::Card, card_stack::CardStack, runtime};
 
 mod klondike;
 
@@ -159,6 +158,7 @@ struct SolverMove {
 
 // NOTE: IndexMap will panic if origin_stack and destination_stack are the same.
 fn perform_state_move(move_option: &mut SolverMove, game_state: &mut IndexMap<String, Vec<u8>>, undo: bool) {
+    debug_assert!(move_option.origin_stack != move_option.destination_stack, "Origin and destination stacks are the same: {move_option:?}");
     let (destination_stack, origin_stack);
     if !undo {
         let [Some(tmp_destination), Some(tmp_origin)] =
@@ -174,9 +174,10 @@ fn perform_state_move(move_option: &mut SolverMove, game_state: &mut IndexMap<St
     let card_index = origin_stack.iter().position(|x| *x == move_option.card).expect(format!("Couldn't find card {} in {origin_stack:?} undo: {undo}", move_option.card).as_str());
     if move_option.instruction == Some("flip".to_string()) {
         let new_card = origin_stack.last().unwrap();
-        move_option.card = *new_card;
+        move_option.card = card_flipped(new_card);
         for i in (card_index..origin_stack.len()).rev() {
-            let card = origin_stack.remove(i);
+            let mut card = origin_stack.remove(i);
+            flip(&mut card);
             destination_stack.push(card);
         }
     } else {
@@ -227,6 +228,14 @@ pub fn card_name_to_solver(name: &str, is_flipped: bool) -> u8 {
 
 fn is_flipped(card: &u8) -> bool {
     (card & 0x80) != 0
+}
+
+fn flip(card: &mut u8) {
+    *card ^= 0x80;
+}
+
+fn card_flipped(card: &u8) -> u8 {
+    card ^ 0x80
 }
 
 fn is_one_rank_above(card_lower: &u8, card_higher: &u8) -> bool {
@@ -285,8 +294,10 @@ pub fn solve_game(mut game_state: IndexMap<String, Vec<u8>>, stack_names: Vec<St
         let mut expanded = 0;
 
         let moves = game.get_automoves_ranked(&game_state);
+        println!("Initial Moves: {:?}", moves);
         for mut move_option in moves {
             perform_state_move(&mut move_option, &mut game_state, false);
+            game.solver_on_move(&move_option, &mut game_state, false);
             let mut new_stack_keys = Vec::new();
             for stack in game_state.values() {
                 if let Some(stack_index) = stacks.get_index_of(stack) {
@@ -297,6 +308,7 @@ pub fn solve_game(mut game_state: IndexMap<String, Vec<u8>>, stack_names: Vec<St
                 }
             }
             let outs = game.get_priority(&game_state) as usize;
+            game.solver_on_move(&move_option, &mut game_state, true);
             perform_state_move(&mut move_option, &mut game_state, true);
             if states.insert(new_stack_keys) {
                 let new_node = SolverNode { parent: None, move_option, state_key: states.len() - 1 };
@@ -309,9 +321,8 @@ pub fn solve_game(mut game_state: IndexMap<String, Vec<u8>>, stack_names: Vec<St
                 }
             }
         }
-        println!("Initial Nodes: {}", nodes.len());
 
-        while expanded < 200_000 {
+        while expanded < 20_000 {
             let mut q_index = usize::MAX; // Use MAX instead of -1, because usize
             let mut highest_q = true;
             for i in (0..50).rev() {
@@ -327,9 +338,9 @@ pub fn solve_game(mut game_state: IndexMap<String, Vec<u8>>, stack_names: Vec<St
             let node = nodes.get(node_index).unwrap();
             game_state.clear();
             let mut names_iter = stack_names.iter();
-            let stack_keys = states.index(node.state_key);
+            let stack_keys = states.get_index(node.state_key).unwrap();
             for stack_key in stack_keys {
-                let stack = stacks.index(*stack_key);
+                let stack = stacks.get_index(*stack_key).unwrap();
                 let mut new_stack = Vec::new();
                 for card_id in stack {
                     new_stack.push(*card_id);
@@ -351,6 +362,7 @@ pub fn solve_game(mut game_state: IndexMap<String, Vec<u8>>, stack_names: Vec<St
             let moves = game.get_automoves_ranked(&game_state);
             for mut move_option in moves {
                 perform_state_move(&mut move_option, &mut game_state, false);
+                game.solver_on_move(&move_option, &mut game_state, false);
                 let mut new_stack_keys = Vec::new();
                 for stack in game_state.values() {
                     if let Some(stack_index) = stacks.get_index_of(stack) {
@@ -361,6 +373,7 @@ pub fn solve_game(mut game_state: IndexMap<String, Vec<u8>>, stack_names: Vec<St
                     }
                 }
                 let outs = game.get_priority(&game_state) as usize;
+                game.solver_on_move(&move_option, &mut game_state, true);
                 perform_state_move(&mut move_option, &mut game_state, true);
                 if states.insert(new_stack_keys) {
                     let new_node = SolverNode { parent: Some(node_index), move_option, state_key: states.len() - 1 };
@@ -412,7 +425,7 @@ pub fn test_solver_state() {
     let mut new_state = IndexMap::new();
     let mut names_iter = stack_names.iter();
     for key in &keys {
-        let stack = stacks.index(*key);
+        let stack = stacks.get_index(*key).unwrap();
         new_state.insert(names_iter.next().unwrap().to_owned(), stack.to_owned());
     }
     assert_eq!(game_state, new_state, "Round-trip state mismatch!");
@@ -433,7 +446,7 @@ pub fn test_solver_state() {
     }
 }
 
-pub trait Game: Send + Sync {
+trait Game: Send + Sync {
     fn new_game(cards: Vec<Card>, grid: &gtk::Grid) -> Self where Self: Sized;
     fn verify_drag(&self, bottom_card: &Card, from_stack: &CardStack) -> bool;
     fn verify_drop(&self, bottom_card: &Card, to_stack: &CardStack) -> bool;
@@ -443,6 +456,7 @@ pub trait Game: Send + Sync {
     fn on_double_click(&self, card: &Card);
     fn on_slot_click(&self, slot: &CardStack);
     fn get_automoves_ranked(&self, state: &IndexMap<String, Vec<u8>>) -> Vec<SolverMove>;
+    fn solver_on_move(&self, move_option: &SolverMove, state: &mut IndexMap<String, Vec<u8>>, undo: bool);
     fn get_priority(&self, state: &IndexMap<String, Vec<u8>>) -> u32;
     fn is_won(&self, state: &IndexMap<String, Vec<u8>>) -> bool;
 }

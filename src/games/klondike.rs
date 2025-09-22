@@ -18,10 +18,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use std::collections::{HashMap};
 use crate::{games::*, runtime, card::Card, card_stack::CardStack};
-use gtk::{subclass::prelude::*};
-use gtk::glib;
+use gtk::{glib, subclass::prelude::*};
 
 pub struct Klondike {}
 
@@ -200,12 +198,11 @@ impl Game for Klondike {
                     let stack = state.get(&format!("foundation_{j}")).unwrap();
                     if let Some(foundation_child) = stack.last() {
                         if is_same_suit(&foundation_child, &tableau_child) && is_one_rank_above(&foundation_child, &tableau_child) {
-                            moves.push(move_from_strings(format!("tableau_{i}"), tableau_child,format!("tableau_{j}"), None));
-
+                            moves.push(move_from_strings(format!("tableau_{i}"), tableau_child,format!("foundation_{j}"), None));
                         }
                     } else {
                         if get_rank(tableau_child) == "ace" {
-                            moves.push(move_from_strings(format!("tableau_{i}"), tableau_child,format!("tableau_{j}"), None));
+                            moves.push(move_from_strings(format!("tableau_{i}"), tableau_child,format!("foundation_{j}"), None));
 
                         }
                     }
@@ -264,16 +261,25 @@ impl Game for Klondike {
         moves
     }
 
+    fn solver_on_move(&self, move_option: &SolverMove, state: &mut IndexMap<String, Vec<u8>>, undo: bool) {
+        if move_option.origin_stack.starts_with("tableau") {
+            let origin_stack = state.get_mut(&move_option.origin_stack).unwrap();
+            if let Some(card_index) = origin_stack.iter().position(|x| *x == move_option.card) {
+                flip(origin_stack.get_mut(card_index).unwrap());
+            }
+        }
+    }
+
     fn get_priority(&self, state: &IndexMap<String, Vec<u8>>) -> u32 {
         let mut outs = 0;
         for i in 0..4 {
             let outpile = state.get(&format!("foundation_{i}")).unwrap();
             outs += outpile.len() as u32;
         }
-        for i in 0..7 {
-            let tableau = state.get(&format!("tableau_{i}")).unwrap();
-            if let Some(last_child) = tableau.last() { if !is_flipped(last_child) { outs += 1; } }
-        }
+        // for i in 0..7 {
+        //     let tableau = state.get(&format!("tableau_{i}")).unwrap();
+        //     if let Some(last_child) = tableau.last() { if !is_flipped(last_child) { outs += 1; } }
+        // }
         outs
     }
 
