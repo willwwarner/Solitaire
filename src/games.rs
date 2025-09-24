@@ -285,62 +285,55 @@ pub fn solve_game(mut game_state: IndexMap<String, Vec<u8>>, stack_names: Vec<St
     let mut game = CURRENT_GAME.lock().unwrap();
     if let Some(game) = game.as_mut() {
         glib::g_message!("solitaire", "solver: starting");
-        let mut states:IndexSet<Vec<usize>> = IndexSet::new();
-        let mut stacks:IndexSet<Vec<u8>> = IndexSet::new();
+        let mut states:IndexSet<Vec<Vec<u8>>> = IndexSet::new();
         let mut nodes:Vec<SolverNode> = Vec::new();
-        let mut queues:Vec<VecDeque<usize>> = vec![VecDeque::new(); 50];
+        let mut queues:Vec<VecDeque<usize>> = vec![VecDeque::new(); 53];
         let mut n_q_expand = 0;
         let mut last_q_idx = 0;
         let mut expanded = 0;
 
-        let moves = game.get_automoves_ranked(&game_state);
+        let moves = game.get_solver_moves_ranked(&game_state);
         println!("Initial Moves: {:?}", moves);
-        for mut move_option in moves {
+        for (mut move_option, _rank) in moves {
             perform_state_move(&mut move_option, &mut game_state, false);
             game.solver_on_move(&move_option, &mut game_state, false);
-            let mut new_stack_keys = Vec::new();
-            for stack in game_state.values() {
-                if let Some(stack_index) = stacks.get_index_of(stack) {
-                    new_stack_keys.push(stack_index);
-                } else {
-                    new_stack_keys.push(stacks.len());
-                    stacks.insert(stack.to_owned());
-                }
+            let mut new_stacks = Vec::new();
+            for name in &stack_names {
+                let stack = game_state.get(name).unwrap();
+                new_stacks.push(stack.to_owned());
             }
             let outs = game.get_priority(&game_state) as usize;
             game.solver_on_move(&move_option, &mut game_state, true);
             perform_state_move(&mut move_option, &mut game_state, true);
-            if states.insert(new_stack_keys) {
+            if states.insert(new_stacks) {
                 let new_node = SolverNode { parent: None, move_option, state_key: states.len() - 1 };
                 let new_node_index = nodes.len();
                 nodes.push(new_node);
-                if let Some(queue) = queues.get_mut(outs) {
-                    queue.push_back(new_node_index);
-                } else {
-                    queues[49].push_back(new_node_index);
-                }
+                let queue = queues.get_mut(outs).unwrap();
+                queue.push_back(new_node_index);
             }
         }
 
-        while expanded < 20_000 {
-            let mut q_index = usize::MAX; // Use MAX instead of -1, because usize
+        while expanded < 100_000 {
+            let mut q_index = None;
             let mut highest_q = true;
-            for i in (0..50).rev() {
-                if queues[i].is_empty() { continue }
-                q_index = i;
-                if (highest_q && n_q_expand < i) ||
-                   (i < last_q_idx || last_q_idx == 0) { break }
-                highest_q = false;
+            for i in (0..53).rev() {
+                if !queues[i].is_empty() {
+                    q_index = Some(i);
+                    if (highest_q && n_q_expand < i) ||
+                       (i < last_q_idx || last_q_idx == 0) { break }
+                    highest_q = false;
+                }
             }
-            if q_index == usize::MAX { println!("expanded: {expanded}"); return None }
+            if q_index == None { println!("expanded: {expanded}"); return None }
+            let q_index = q_index.unwrap();
             let queue = queues.get_mut(q_index).unwrap();
             let node_index = queue.pop_front().unwrap();
             let node = nodes.get(node_index).unwrap();
             game_state.clear();
             let mut names_iter = stack_names.iter();
-            let stack_keys = states.get_index(node.state_key).unwrap();
-            for stack_key in stack_keys {
-                let stack = stacks.get_index(*stack_key).unwrap();
+            let stacks = states.get_index(node.state_key).unwrap();
+            for stack in stacks {
                 let mut new_stack = Vec::new();
                 for card_id in stack {
                     new_stack.push(*card_id);
@@ -359,32 +352,25 @@ pub fn solve_game(mut game_state: IndexMap<String, Vec<u8>>, stack_names: Vec<St
                 history.reverse();
                 return Some(history);
             }
-            let moves = game.get_automoves_ranked(&game_state);
-            for mut move_option in moves {
+            let moves = game.get_solver_moves_ranked(&game_state);
+            for (mut move_option, rank) in moves {
                 perform_state_move(&mut move_option, &mut game_state, false);
                 game.solver_on_move(&move_option, &mut game_state, false);
-                let mut new_stack_keys = Vec::new();
-                for stack in game_state.values() {
-                    if let Some(stack_index) = stacks.get_index_of(stack) {
-                        new_stack_keys.push(stack_index);
-                    } else {
-                        new_stack_keys.push(stacks.len());
-                        stacks.insert(stack.to_owned());
-                    }
+                let mut new_stacks = Vec::new();
+                for name in &stack_names {
+                    let stack = game_state.get(name).unwrap();
+                    new_stacks.push(stack.to_owned());
                 }
                 let outs = game.get_priority(&game_state) as usize;
                 game.solver_on_move(&move_option, &mut game_state, true);
                 perform_state_move(&mut move_option, &mut game_state, true);
-                if states.insert(new_stack_keys) {
+                if states.insert(new_stacks) {
                     let new_node = SolverNode { parent: Some(node_index), move_option, state_key: states.len() - 1 };
                     let new_node_index = nodes.len();
                     nodes.push(new_node);
-                    if let Some(queue) = queues.get_mut(outs) {
-                        if outs > q_index { queue.push_front(new_node_index); }
-                        else {queue.push_back(new_node_index); }
-                    } else {
-                        queues[49].push_back(new_node_index);
-                    }
+                    let queue = queues.get_mut(outs).unwrap();
+                    if outs > q_index { queue.push_front(new_node_index); }
+                    else {queue.insert(queue.len() / rank, new_node_index); }
                 }
             }
             expanded += 1;
@@ -392,6 +378,7 @@ pub fn solve_game(mut game_state: IndexMap<String, Vec<u8>>, stack_names: Vec<St
             else { last_q_idx = q_index; n_q_expand = 0; }
         }
         glib::g_message!("solitaire", "solver: finished, n_nodes: {expanded}, n_q_expand: {n_q_expand}");
+
         for i in 0..50 {
             println!("Queue-{i}: {}", queues[i].len());
         }
@@ -444,6 +431,8 @@ pub fn test_solver_state() {
         assert_eq!(game_state, copy, "move/undo mismatch for {:?}", mv);
         assert_eq!(mv, mv_copy, "move/undo mismatch for {:?}", mv);
     }
+
+    assert_eq!(card_name_to_solver("club_ace", false), card_flipped(&card_name_to_solver("club_ace", true)));
 }
 
 trait Game: Send + Sync {
@@ -455,7 +444,7 @@ trait Game: Send + Sync {
     fn pre_undo_drag(&self, previous_origin_stack: &CardStack, previous_destination_stack: &CardStack);
     fn on_double_click(&self, card: &Card);
     fn on_slot_click(&self, slot: &CardStack);
-    fn get_automoves_ranked(&self, state: &IndexMap<String, Vec<u8>>) -> Vec<SolverMove>;
+    fn get_solver_moves_ranked(&self, state: &IndexMap<String, Vec<u8>>) -> Vec<(SolverMove, usize)>;
     fn solver_on_move(&self, move_option: &SolverMove, state: &mut IndexMap<String, Vec<u8>>, undo: bool);
     fn get_priority(&self, state: &IndexMap<String, Vec<u8>>) -> u32;
     fn is_won(&self, state: &IndexMap<String, Vec<u8>>) -> bool;

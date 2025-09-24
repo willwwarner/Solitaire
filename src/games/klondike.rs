@@ -169,7 +169,7 @@ impl Game for Klondike {
         }
     }
 
-    fn get_automoves_ranked(&self, state: &IndexMap<String, Vec<u8>>) -> Vec<SolverMove> {
+    fn get_solver_moves_ranked(&self, state: &IndexMap<String, Vec<u8>>) -> Vec<(SolverMove, usize)> {
         let mut moves = Vec::new();
         // Check if inner-tableau moves are possible
         for i in 0..7 {
@@ -180,10 +180,10 @@ impl Game for Klondike {
                         if j != i {
                             if let Some(last_child) = state.get(&format!("tableau_{j}")).unwrap().last() {
                                 if is_one_rank_above(&last_child, &card) && is_similar_suit(&card, &last_child) {
-                                    moves.push(move_from_strings(format!("tableau_{i}"), card,format!("tableau_{j}"), None));
+                                    moves.push((move_from_strings(format!("tableau_{i}"), card,format!("tableau_{j}"), None), 4));
                                 }
                             } else if get_rank(card) == "king" {
-                                moves.push(move_from_strings(format!("tableau_{i}"), card,format!("tableau_{j}"), None));
+                                moves.push((move_from_strings(format!("tableau_{i}"), card,format!("tableau_{j}"), None), 4));
                             }
                         }
                     }
@@ -198,12 +198,24 @@ impl Game for Klondike {
                     let stack = state.get(&format!("foundation_{j}")).unwrap();
                     if let Some(foundation_child) = stack.last() {
                         if is_same_suit(&foundation_child, &tableau_child) && is_one_rank_above(&foundation_child, &tableau_child) {
-                            moves.push(move_from_strings(format!("tableau_{i}"), tableau_child,format!("foundation_{j}"), None));
+                            moves.push((move_from_strings(format!("tableau_{i}"), tableau_child,format!("foundation_{j}"), None), 3));
                         }
                     } else {
                         if get_rank(tableau_child) == "ace" {
-                            moves.push(move_from_strings(format!("tableau_{i}"), tableau_child,format!("foundation_{j}"), None));
-
+                            moves.push((move_from_strings(format!("tableau_{i}"), tableau_child,format!("foundation_{j}"), None), 3));
+                        }
+                    }
+                }
+            }
+        }
+        // Check if a foundation to tableau move is possible
+        for i in 0..4 {
+            let foundation = state.get(&format!("foundation_{i}")).unwrap();
+            if let Some(card) = foundation.last() {
+                for j in 0..7 {
+                    if let Some(tableau_child) = state.get(&format!("tableau_{j}")).unwrap().last() {
+                        if is_similar_suit(card, tableau_child) && is_one_rank_above(tableau_child, card) && !is_flipped(tableau_child) {
+                            moves.push((move_from_strings(format!("foundation_{i}"), card,format!("tableau_{j}"), None), 2));
                         }
                     }
                 }
@@ -215,7 +227,7 @@ impl Game for Klondike {
         if waste.is_empty() {
             if stock.is_empty() { return moves }
             else {
-                moves.push(create_move("stock", stock.last().unwrap(),"waste", Some("flip")));
+                moves.push((create_move("stock", stock.last().unwrap(), "waste", Some("flip")), 2));
                 return moves;
             }
         }
@@ -224,9 +236,11 @@ impl Game for Klondike {
         for i in 0..7 {
             if let Some(tableau_child) = state.get(&format!("tableau_{i}")).unwrap().last() {
                 if is_similar_suit(card, tableau_child) && is_one_rank_above(tableau_child, card) {
-                    moves.push(create_move("waste", card, format!("tableau_{i}").as_str(), None));
+                    moves.push((create_move("waste", card, format!("tableau_{i}").as_str(), None), 2));
 
                 }
+            } else if get_rank(card) == "king" {
+                moves.push((create_move("waste", card,format!("tableau_{i}").as_str(), None), 4));
             }
         }
         // Check if a waste to foundation move is possible
@@ -234,29 +248,19 @@ impl Game for Klondike {
         for i in 0..4 {
             if let Some(foundation_child) = state.get(&format!("foundation_{i}")).unwrap().last() {
                 if is_same_suit(card, foundation_child) && is_one_rank_above(foundation_child, card) {
-                    moves.push(create_move("waste", card, format!("foundation_{i}").as_str(), None));
+                    moves.push((create_move("waste", card, format!("foundation_{i}").as_str(), None), 2));
+                }
+            } else {
+                if get_rank(card) == "ace" {
+                    moves.push((create_move("waste", card,format!("foundation_{i}").as_str(), None), 2));
                 }
             }
         }
 
         if stock.is_empty() {
-            moves.push(create_move("waste", waste.first().unwrap(),"stock", Some("flip")));
+            moves.push((create_move("waste", waste.first().unwrap(),"stock", Some("flip")), 1));
         } else {
-            moves.push(create_move("stock", stock.last().unwrap(),"waste", Some("flip")));
-        }
-
-        // Check if a foundation to tableau move is possible
-        for i in 0..4 {
-            let foundation = state.get(&format!("foundation_{i}")).unwrap();
-            if let Some(card) = foundation.last() {
-                for j in 0..7 {
-                    if let Some(tableau_child) = state.get(&format!("tableau_{j}")).unwrap().last() {
-                        if is_similar_suit(card, tableau_child) && is_one_rank_above(tableau_child, card) && !is_flipped(tableau_child) {
-                            moves.push(move_from_strings(format!("foundation_{i}"), card,format!("tableau_{j}"), None));
-                        }
-                    }
-                }
-            }
+            moves.push((create_move("stock", stock.last().unwrap(), "waste", Some("flip")), 1));
         }
         moves
     }
@@ -276,10 +280,6 @@ impl Game for Klondike {
             let outpile = state.get(&format!("foundation_{i}")).unwrap();
             outs += outpile.len() as u32;
         }
-        // for i in 0..7 {
-        //     let tableau = state.get(&format!("tableau_{i}")).unwrap();
-        //     if let Some(last_child) = tableau.last() { if !is_flipped(last_child) { outs += 1; } }
-        // }
         outs
     }
 

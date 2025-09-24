@@ -35,9 +35,7 @@ template $SolitaireWindow: Adw.ApplicationWindow {
         SearchBar search_bar {
           key-capture-widget: template;
           child: Adw.Clamp {
-            child: SearchEntry search_entry {
-              placeholder-text: _("Search games");
-            };
+            child: SearchEntry search_entry {};
           };
         }
 
