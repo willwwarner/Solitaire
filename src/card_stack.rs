@@ -60,6 +60,7 @@ mod imp {
     pub struct CardStack {
         pub aspect: Cell<f32>,
         pub v_offset: Cell<u32>,
+        pub stack_type: Cell<String>,
     }
 
     #[glib::object_subclass]
@@ -72,7 +73,6 @@ mod imp {
     impl ObjectImpl for CardStack {
         fn constructed(&self) {
             self.obj().add_css_class("card-stack");
-            self.aspect.set(1.4);
         }
     }
 
@@ -216,13 +216,29 @@ mod imp {
 }
 
 impl CardStack {
-    pub fn new() -> Self {
-        glib::Object::new()
+    pub fn new(aspect: f32, stack_type: &str, n_of_type: i32) -> Self {
+        let this:CardStack = glib::Object::new();
+        if aspect < 1.4 { panic!("solitaire: set_aspect() called with aspect < 1.4 \nRTL stacks are not currently supported."); }
+        this.imp().aspect.set(aspect);
+        this.imp().stack_type.set(stack_type.to_string());
+        if n_of_type < 0 {
+            this.set_widget_name(stack_type);
+        } else {
+            this.set_widget_name(&*format!("{}_{}", stack_type, n_of_type));
+        }
+
+        this
     }
 
     pub fn set_aspect(&self, aspect: f32) {
-        if aspect < 1.4 { panic!("solitaire: set_aspect() called with aspect < 1.4"); }
+        if aspect < 1.4 { panic!("solitaire: set_aspect() called with aspect < 1.4 \nRTL stacks are not currently supported."); }
         self.imp().aspect.set(aspect);
+    }
+
+    pub fn get_type(&self) -> String {
+        let value = self.imp().stack_type.take();
+        self.imp().stack_type.set(value.clone());
+        value
     }
 
     pub fn enable_drop(&self) {
@@ -392,7 +408,7 @@ impl CardStack {
             let icon = gtk::DragIcon::for_drag(drag);
             let provider = src.content().unwrap();
             let value = provider.value(glib::Type::OBJECT).unwrap();
-            // I'd rather have no DnD icon instead of a crash
+
             if let Ok(obj) = value.get::<glib::Object>() {
                 if let Ok(original_stack) = obj.downcast::<TransferCardStack>() {
                     let stack_clone = original_stack.clone();
@@ -453,6 +469,14 @@ impl CardStack {
 
     pub fn first_card(&self) -> Option<Card> {
         self.first_child()?.downcast::<Card>().ok()
+    }
+
+    pub fn n_cards(&self) -> usize {
+        self.observe_children().n_items() as usize
+    }
+
+    pub fn get_card(&self, index: usize) -> Option<Card> {
+        self.observe_children().item(index as u32)?.downcast::<Card>().ok()
     }
 }
 
