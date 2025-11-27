@@ -30,9 +30,7 @@ impl super::Game for Klondike {
         let mut n_cards = cards.len() as i32;
 
         for i in 0..7 {
-            let card_stack = CardStack::new();
-            card_stack.set_widget_name(format!("tableau_{i}").as_str());
-            card_stack.set_aspect(2.8); // 2 card heights
+            let card_stack = CardStack::new(2.8 /* 2 card heights */, "tableau", i);
 
             for j in 0..(i + 1) {
                 let random_card = glib::random_int_range(0, n_cards) as usize;
@@ -54,19 +52,16 @@ impl super::Game for Klondike {
         }
 
         for i in 0..4 {
-            let card_stack = CardStack::new();
-            card_stack.set_widget_name(format!("foundation_{i}").as_str());
+            let card_stack = CardStack::new(1.4, "foundation", i);
             grid.attach(&card_stack, i + 3, 0, 1, 1);
             card_stack.enable_drop();
         }
 
-        let waste = CardStack::new();
-        waste.set_widget_name("waste");
+        let waste = CardStack::new(1.4, "waste", -1);
         grid.attach(&waste, 1, 0, 1, 1);
 
-        let stock = CardStack::new();
+        let stock = CardStack::new(1.4, "stock", -1);
         stock.add_click_to_slot();
-        stock.set_widget_name("stock");
         while n_cards > 0 {
             let random_card = glib::random_int_range(0, n_cards) as usize;
             if let Some(card) = cards.get(random_card) {
@@ -89,47 +84,45 @@ impl super::Game for Klondike {
     }
 
     fn verify_drop(&self, bottom_card: &Card, to_stack: &CardStack) -> bool {
-        let stack_name = to_stack.widget_name();
-        if stack_name.starts_with("tableau") {
+        let stack_type = to_stack.get_type();
+        if stack_type == "tableau" {
             if to_stack.is_empty() && bottom_card.get_rank() == "king" { return true }
             else if to_stack.is_empty() { return false }
             let top_card = to_stack.last_card().unwrap();
             if (!bottom_card.is_similar_suit(&top_card)) && top_card.is_one_rank_above(&bottom_card) { return true }
             else { return false }
-        }
-        else if stack_name.starts_with("foundation") {
+        } else if stack_type == "foundation" {
             if to_stack.is_empty() && bottom_card.get_rank() == "ace" { return true }
             else if to_stack.is_empty() { return false }
             let top_card = to_stack.last_card().unwrap();
             if bottom_card.is_same_suit(&top_card) && bottom_card.is_one_rank_above(&top_card) { return true }
             else { false }
-        }
-        else { false }
+        } else { false }
     }
 
     fn on_drag_completed(&self, origin_stack: &CardStack) {
-        if origin_stack.widget_name().starts_with("tableau") {
+        if origin_stack.get_type() == "tableau" {
             origin_stack.face_up_top_card(); // This returns if the stack is empty or not
         }
     }
 
     fn on_drop_completed(&self, recipient_stack: &CardStack) {
-        if recipient_stack.widget_name() == "waste" {
+        if recipient_stack.get_type() == "waste" {
             recipient_stack.face_up_top_card();
         }
     }
 
     fn pre_undo_drag(&self, origin_stack: &CardStack, dropped_stack: &CardStack) {
-        if origin_stack.widget_name().starts_with("tableau") {
+        if origin_stack.get_type() == "tableau" {
             origin_stack.face_down_top_card(); // This returns if the stack is empty or not
-        } else if origin_stack.widget_name() == "stock" {
+        } else if origin_stack.get_type() == "stock" {
             dropped_stack.face_down_top_card();
         }
     }
 
     fn on_double_click(&self, card: &Card) {
         let card_stack = card.get_stack().unwrap();
-        if card_stack.widget_name().starts_with("foundation") {
+        if card_stack.get_type() == "foundation" {
             return
         } else {
             try_distribute(card, &card_stack);
@@ -142,8 +135,7 @@ impl super::Game for Klondike {
     }
 
     fn on_slot_click(&self, slot: &CardStack) {
-        if slot.widget_name() == "stock" {
-            let grid = runtime::get_grid().unwrap();
+        if slot.get_type() == "stock" {
             let waste = runtime::get_stack("waste").unwrap();
 
             if slot.is_empty() {
@@ -177,7 +169,7 @@ impl super::Game for Klondike {
         for i in 0..4 {
             let stack = runtime::get_stack(format!("foundation_{i}").as_str()).unwrap();
             if let Some(last_card) = stack.last_card() {
-                if !last_card.widget_name().ends_with("king") {
+                if !(last_card.get_rank() == "king") {
                     return false;
                 }
             }
