@@ -18,14 +18,15 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use crate::{runtime, card::Card, card_stack::CardStack};
+use crate::{runtime, runtime::MoveInstruction, card::Card, card_stack::CardStack};
 use gtk::{prelude::*, subclass::prelude::*};
 use gtk::glib;
+use super::*;
 
 pub struct Klondike {}
 
 impl Klondike {}
-impl super::Game for Klondike {
+impl Game for Klondike {
     fn new_game(mut cards: Vec<Card>, grid: &gtk::Grid) -> Self {
         let mut n_cards = cards.len() as i32;
 
@@ -100,23 +101,24 @@ impl super::Game for Klondike {
         } else { false }
     }
 
-    fn on_drag_completed(&self, origin_stack: &CardStack) {
+    fn on_drag_completed(&self, origin_stack: &CardStack, destination_stack: &CardStack, move_: &mut runtime::Move) {
         if origin_stack.get_type() == "tableau" {
-            origin_stack.face_up_top_card(); // This returns if the stack is empty or not
+            if let Some(last_card) = origin_stack.last_card() {
+                if !last_card.is_face_up() {
+                    move_.flip_index = Some(origin_stack.n_cards() - 1);
+                    last_card.flip();
+                }
+            }
         }
     }
 
-    fn on_drop_completed(&self, recipient_stack: &CardStack) {
-        if recipient_stack.get_type() == "waste" {
-            recipient_stack.face_up_top_card();
-        }
-    }
-
-    fn pre_undo_drag(&self, origin_stack: &CardStack, dropped_stack: &CardStack) {
+    fn pre_undo_drag(&self, origin_stack: &CardStack, dropped_stack: &CardStack, move_: &mut runtime::Move) {
         if origin_stack.get_type() == "tableau" {
-            origin_stack.face_down_top_card(); // This returns if the stack is empty or not
+            if let Some(flip_index) = move_.flip_index {
+                origin_stack.get_card(flip_index).unwrap().flip();
+            }
         } else if origin_stack.get_type() == "stock" {
-            dropped_stack.face_down_top_card();
+            origin_stack.face_down_top_card();
         }
     }
 
@@ -125,13 +127,8 @@ impl super::Game for Klondike {
         if card_stack.get_type() == "foundation" {
             return
         } else {
-            try_distribute(card, &card_stack);
-            self.on_drag_completed(&card_stack);
+            try_distribute(card, &card_stack, self);
         }
-    }
-
-    fn undo_deal(&self, stock: &CardStack) {
-        todo!()
     }
 
     fn on_slot_click(&self, slot: &CardStack) {
@@ -139,33 +136,28 @@ impl super::Game for Klondike {
             let waste = runtime::get_stack("waste").unwrap();
 
             if slot.is_empty() {
-                for _i in 0..waste.observe_children().n_items() {
-                    let card = waste.last_card().unwrap();
-                    waste.remove_card(&card);
-                    slot.add_card(&card);
-                    card.flip();
-                }
-                runtime::add_to_history(runtime::Move { origin_stack: "waste".to_string(), 
-                                                               card_name: slot.first_card().unwrap().widget_name().to_string(),
-                                                               destination_stack: slot.widget_name().to_string(),
-                                                               instruction: Some("flip".to_string()) });
+                //Fixme: Don't use widget_name
+                let mut move_ = runtime::create_move("waste",
+                                                     &waste.first_card().unwrap().widget_name(),
+                                                     "stock",
+                                                     MoveInstruction::Flip);
+                runtime::perform_move(&mut move_);
+                runtime::add_to_history(move_);
             } else {
-                let waste = runtime::get_stack("waste").unwrap();
                 let card = slot.last_card().unwrap();
                 slot.remove_card(&card);
                 card.flip();
                 waste.add_card(&card);
                 waste.add_drag_to_card(&card);
-                runtime::add_to_history(runtime::Move { origin_stack: slot.widget_name().to_string(), 
-                                                               card_name: card.widget_name().to_string(), 
-                                                               destination_stack: "waste".to_string(),
-                                                               instruction: None });
+                runtime::add_to_history(runtime::create_move(&slot.widget_name(),
+                                                             &card.widget_name(),
+                                                             "waste",
+                                                             MoveInstruction::Flip));
             }
         }
     }
 
     fn is_won(&self) -> bool {
-        let grid = runtime::get_grid().unwrap();
         for i in 0..4 {
             let stack = runtime::get_stack(format!("foundation_{i}").as_str()).unwrap();
             if let Some(last_card) = stack.last_card() {
@@ -186,31 +178,32 @@ impl super::Game for Klondike {
     }
 }
 
-fn try_distribute(card: &Card, parent: &CardStack) {
+fn try_distribute(card: &Card, parent: &CardStack, game: &Klondike) {
     if !card.imp().is_face_up.get() { return }
     if &parent.last_card().unwrap() != card { return }
 
-    let grid = runtime::get_grid().unwrap();
     for i in 0..4 {
         let stack = runtime::get_stack(format!("foundation_{i}").as_str()).unwrap();
         if let Some(last_card) = stack.last_card() {
             if last_card.is_same_suit(card) && card.is_one_rank_above(&last_card) {
-                parent.remove_card(card);
-                stack.add_card(card);
-                runtime::add_to_history(runtime::Move { origin_stack: parent.widget_name().to_string(),
-                                                               card_name: card.widget_name().to_string(), 
-                                                               destination_stack: stack.widget_name().to_string(), 
-                                                               instruction: None });
+                let mut move_ = runtime::create_move(&parent.widget_name(),
+                                                     &card.widget_name(),
+                                                     &stack.widget_name(),
+                                                     MoveInstruction::None);
+                runtime::perform_move_with_stacks(&mut move_, parent, &stack);
+                game.on_drag_completed(parent, &stack, &mut move_);
+                runtime::add_to_history(move_);
                 return
             }
         } else {
             if card.get_rank() == "ace" {
-                parent.remove_card(card);
-                stack.add_card(card);
-                runtime::add_to_history(runtime::Move { origin_stack: parent.widget_name().to_string(),
-                                                               card_name: card.widget_name().to_string(),
-                                                               destination_stack: stack.widget_name().to_string(),
-                                                               instruction: None });
+                let mut move_ = runtime::create_move(&parent.widget_name(),
+                                                     &card.widget_name(),
+                                                     &stack.widget_name(),
+                                                     MoveInstruction::None);
+                runtime::perform_move_with_stacks(&mut move_, parent, &stack);
+                game.on_drag_completed(parent, &stack, &mut move_);
+                runtime::add_to_history(move_);
                 return
             }
         }

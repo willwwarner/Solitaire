@@ -132,4 +132,8 @@ impl Card {
     pub fn get_stack(&self) -> Option<CardStack> {
         self.parent()?.downcast::<CardStack>().ok()
     }
+
+    pub fn is_face_up(&self) -> bool {
+        self.imp().is_face_up.get()
+    }
 }
