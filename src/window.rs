@@ -26,6 +26,10 @@ use gtk::{gio, glib};
 use glib::subclass::InitializingObject;
 use crate::{games, runtime};
 
+thread_local! {
+    static SELF: std::cell::RefCell<Option<SolitaireWindow>> = std::cell::RefCell::new(None);
+}
+
 mod imp {
     use super::*;
 
@@ -76,7 +80,7 @@ mod imp {
             obj.setup_gactions();
             obj.populate_game_list(&obj.imp().list.get());
             obj.imp().search_bar.connect_entry(&obj.imp().search_entry.get());
-            runtime::set_grid(self.card_grid.get());
+            SELF.set(Some(obj.clone()));
         }
     }
     impl WidgetImpl for SolitaireWindow {}
@@ -193,5 +197,9 @@ impl SolitaireWindow {
         });
         dialog.set_response_appearance("accept", adw::ResponseAppearance::Destructive);
         dialog.present(Some(self));
+    }
+
+    pub fn get_window() -> Option<SolitaireWindow> {
+        SELF.with(|window| window.borrow().to_owned())
     }
 }
