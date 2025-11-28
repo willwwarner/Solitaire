@@ -57,11 +57,13 @@ pub fn move_from_strings(origin_stack: String, card_name: String, destination_st
     }
 }
 
+use std::cell::RefCell;
 thread_local! {
-    static GRID: std::cell::RefCell<Option<gtk::Grid>> = std::cell::RefCell::new(None);
-    static ACTION_HISTORY: std::cell::RefCell<Vec<Move>> = std::cell::RefCell::new(Vec::new());
-    static HISTORY_INDEX: std::cell::RefCell<usize> = std::cell::RefCell::new(0);
-    static CARDS: std::cell::RefCell<Vec<Card>> = std::cell::RefCell::new(Vec::new());
+    static STACK_NAMES: RefCell<Vec<String>> = RefCell::new(Vec::new());
+    static STACKS: RefCell<Vec<CardStack>> = RefCell::new(Vec::new());
+    static HISTORY: RefCell<Vec<Move>> = RefCell::new(Vec::new());
+    static UNDO_HISTORY: RefCell<Vec<Move>> = RefCell::new(Vec::new());
+    static CARDS: RefCell<Vec<Card>> = RefCell::new(Vec::new());
 }
 
 pub fn remove_drag(widget: &impl IsA<gtk::Widget>) {
@@ -112,14 +114,6 @@ pub fn remove_click(widget: &impl IsA<gtk::Widget>) {
     }
 }
 
-pub fn get_grid() -> Option<gtk::Grid> {
-    GRID.with(|grid| grid.borrow().clone())
-}
-
-pub fn set_grid(grid: gtk::Grid) {
-    GRID.set(Some(grid));
-}
-
 pub fn perform_move(move_: &mut Move) {
     let origin_stack = get_stack(&move_.origin_stack).unwrap();
     let destination_stack = get_stack(&move_.destination_stack).unwrap();
@@ -148,69 +142,64 @@ pub fn perform_move_with_stacks(move_: &mut Move, origin_stack: &CardStack, dest
 }
 
 pub fn add_to_history(move_: Move) {
-    let move_index = HISTORY_INDEX.with(|index| index.borrow().clone());
-    // Remove invalidated entries
-    if ACTION_HISTORY.with(|history| history.borrow().len() > move_index) {
-        for _ in move_index..ACTION_HISTORY.with(|history| history.borrow().len()) {
-            ACTION_HISTORY.with(|history| history.borrow_mut().pop());
-            let window = get_grid().unwrap().root().unwrap().downcast::<gtk::Window>().unwrap().downcast::<crate::window::SolitaireWindow>().unwrap();
-            window.lookup_action("redo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
-        }
-    }
-    if move_index == 0 {
-        let window = get_grid().unwrap().root().unwrap().downcast::<gtk::Window>().unwrap().downcast::<crate::window::SolitaireWindow>().unwrap();
-        window.lookup_action("undo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(true);
-    }
-    ACTION_HISTORY.with(|history| history.borrow_mut().push(move_));
-    HISTORY_INDEX.set(move_index + 1);
+    // Remove invalidated undo entries
+    let window = crate::window::SolitaireWindow::get_window().unwrap();
+    UNDO_HISTORY.with(|undos| undos.borrow_mut().clear());
+
+    update_redo_actions(&window);
+    HISTORY.with(|h| h.borrow_mut().push(move_));
 }
 
 pub fn undo_last_move() {
-    let move_index = HISTORY_INDEX.with(|index| index.borrow().clone());
-    if !(move_index == 0) {
-        let mut last_entry = ACTION_HISTORY.with(|history| history.borrow().get(move_index - 1).cloned()).unwrap();
-        let grid = get_grid().unwrap();
-        let destination_stack = get_child(&grid, &last_entry.origin_stack).unwrap().downcast::<CardStack>().unwrap();
-        let origin_stack = get_child(&grid, &last_entry.destination_stack).unwrap().downcast::<CardStack>().unwrap();
+    if HISTORY.with(|h| h.borrow().is_empty()) { return; }
+    HISTORY.with(|history| {
+        let mut history = history.borrow_mut();
+        let mut last_entry = history.pop().unwrap();
+        let destination_stack = get_stack(&last_entry.origin_stack).unwrap();
+        let origin_stack = get_stack(&last_entry.destination_stack).unwrap();
         games::pre_undo_drag(&destination_stack, &origin_stack, &mut last_entry);
         perform_move_with_stacks(&mut last_entry, &origin_stack, &destination_stack);
-        HISTORY_INDEX.set(move_index - 1);
-    }
+        UNDO_HISTORY.with(|undos| undos.borrow_mut().push(last_entry));
+    });
 }
 
 pub fn redo_first_move() {
-    let move_index = HISTORY_INDEX.with(|index| index.borrow().clone());
-    if let Some(mut first_entry) = ACTION_HISTORY.with(|history| history.borrow().get(move_index).cloned()) {
-        let grid = get_grid().unwrap();
-        let origin_stack = get_child(&grid, &first_entry.origin_stack).unwrap().downcast::<CardStack>().unwrap();
-        let destination_stack = get_child(&grid, &first_entry.destination_stack).unwrap().downcast::<CardStack>().unwrap();
+    if UNDO_HISTORY.with(|undos| undos.borrow().is_empty()) { return; }
+    UNDO_HISTORY.with(|undos| {
+        let mut first_entry = undos.borrow_mut().pop().unwrap();
+        let origin_stack = get_stack(&first_entry.origin_stack).unwrap();
+        let destination_stack = get_stack(&first_entry.destination_stack).unwrap();
         perform_move(&mut first_entry);
         games::on_drag_completed(&origin_stack, &destination_stack, &mut first_entry);
-        HISTORY_INDEX.set(move_index + 1);
-    }
+        HISTORY.with(|history| history.borrow_mut().push(first_entry));
+    });
 }
 
 pub fn update_redo_actions(window: &crate::window::SolitaireWindow) {
-    let move_index = HISTORY_INDEX.with(|index| index.borrow().clone());
     let undo_action = window.lookup_action("undo").unwrap().downcast::<gio::SimpleAction>().unwrap();
     let redo_action = window.lookup_action("redo").unwrap().downcast::<gio::SimpleAction>().unwrap();
-    undo_action.set_enabled(move_index > 0);
-    redo_action.set_enabled(move_index < ACTION_HISTORY.with(|history| history.borrow().len()));
+    HISTORY.with(|h| undo_action.set_enabled(!h.borrow().is_empty()));
+    UNDO_HISTORY.with(|undos| redo_action.set_enabled(!undos.borrow().is_empty()));
 }
 
 pub fn clear_history_and_moves() {
-    ACTION_HISTORY.set(Vec::new());
-    HISTORY_INDEX.set(0);
+    HISTORY.with(|h| h.borrow_mut().clear());
+    UNDO_HISTORY.with(|undos| undos.borrow_mut().clear());
 }
 
 pub fn get_stack(name: &str) -> Option<CardStack> {
-    let grid = get_grid().unwrap();
-    if let Ok(widget) = get_child(&grid, name) {
-        if let Ok(stack) = widget.downcast::<CardStack>() {
-            return Some(stack);
-        }
-    }
-    None
+    let position = STACK_NAMES.with(|names| names.borrow().iter().position(|n| n == name))?;
+    STACKS.with(|stacks| stacks.borrow().get(position).cloned())
+}
+
+pub fn add_stack(name: &str, stack: &CardStack) {
+    STACK_NAMES.with(|names| names.borrow_mut().push(name.to_string()));
+    STACKS.with(|stacks| stacks.borrow_mut().push(stack.clone()));
+}
+
+pub fn clear_state() {
+    STACK_NAMES.with(|names| names.borrow_mut().clear());
+    STACKS.with(|stacks| stacks.borrow_mut().clear());
 }
 
 pub fn set_cards(cards: Vec<Card>) {

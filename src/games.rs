@@ -72,6 +72,7 @@ pub fn unload(grid: &gtk::Grid) {
     let mut game = CURRENT_GAME.lock().unwrap();
     *game = None;
     runtime::clear_history_and_moves();
+    runtime::clear_state();
     let items = grid.observe_children().n_items();
     let mut cards = Vec::new();
     for _ in 0..items {

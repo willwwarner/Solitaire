@@ -226,6 +226,7 @@ impl CardStack {
         } else {
             this.set_widget_name(&*format!("{}_{}", stack_type, n_of_type));
         }
+        runtime::add_stack(&*this.widget_name(), &this);
 
         this
     }
@@ -425,7 +426,7 @@ impl CardStack {
             let value = provider.value(glib::Type::OBJECT).unwrap();
             if let Ok(obj) = value.get::<glib::Object>() {
                 let drag_stack = obj.downcast::<TransferCardStack>().unwrap();
-                let origin = runtime::get_child(&runtime::get_grid().unwrap(), &*drag_stack.get_origin_name()).unwrap().downcast::<CardStack>().unwrap();
+                let origin = runtime::get_stack(&*drag_stack.get_origin_name()).unwrap();
                 origin.merge_stack(&drag_stack);
             }
             true
