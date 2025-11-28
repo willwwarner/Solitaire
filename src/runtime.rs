@@ -27,7 +27,34 @@ pub struct Move {
     pub origin_stack: String,
     pub card_name: String,
     pub destination_stack: String,
-    pub instruction: Option<String>,
+    pub instruction: MoveInstruction,
+    pub flip_index: Option<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum MoveInstruction {
+    Flip,
+    None,
+}
+
+pub fn create_move(origin_stack: &str, card_name: &str, destination_stack: &str, instruction: MoveInstruction) -> Move {
+    Move {
+        origin_stack: origin_stack.to_string(),
+        card_name: card_name.to_string(),
+        destination_stack: destination_stack.to_string(),
+        instruction,
+        flip_index: None,
+    }
+}
+
+pub fn move_from_strings(origin_stack: String, card_name: String, destination_stack: String, instruction: MoveInstruction) -> Move {
+    Move {
+        origin_stack,
+        card_name,
+        destination_stack,
+        instruction,
+        flip_index: None,
+    }
 }
 
 thread_local! {
@@ -93,27 +120,28 @@ pub fn set_grid(grid: gtk::Grid) {
     GRID.set(Some(grid));
 }
 
-pub fn perform_move(move_: &Move) {
+pub fn perform_move(move_: &mut Move) {
     let origin_stack = get_stack(&move_.origin_stack).unwrap();
     let destination_stack = get_stack(&move_.destination_stack).unwrap();
     perform_move_with_stacks(move_, &origin_stack, &destination_stack);
 }
 
-pub fn perform_move_with_stacks(move_: &Move, origin_stack: &CardStack, destination_stack: &CardStack) {
-    if let Some(instruction) = &move_.instruction {
-        match instruction.as_str() {
-            "flip" => { //Fixme
-                let origin_children = origin_stack.observe_children();
-                for _ in 0..origin_children.n_items() {
-                    let card = origin_stack.last_child().unwrap().downcast::<Card>().unwrap();
-                    card.flip();
-                    card.unparent();
-                    destination_stack.add_card(&card);
-                }
-                return
-            },
-            _ => println!("Unknown instruction: {}", instruction),
-        }
+pub fn perform_move_with_stacks(move_: &mut Move, origin_stack: &CardStack, destination_stack: &CardStack) {
+    match move_.instruction {
+        MoveInstruction::Flip => { //Fixme
+            let origin_children = origin_stack.observe_children();
+            let split_index = crate::card_stack::get_index(&*move_.card_name, &origin_children).unwrap();
+            move_.card_name = origin_stack.last_child().unwrap().widget_name().to_string();
+            for _ in split_index..origin_children.n_items() {
+                let card = origin_stack.last_child().unwrap().downcast::<Card>().unwrap();
+                card.flip();
+                card.unparent();
+                destination_stack.add_card(&card);
+                card.remove_css_class("highlight");
+            }
+            return
+        },
+        MoveInstruction::None => {},
     }
     let transfer_stack = origin_stack.split_to_new_on(&*move_.card_name);
     destination_stack.merge_stack(&transfer_stack);
@@ -140,25 +168,24 @@ pub fn add_to_history(move_: Move) {
 pub fn undo_last_move() {
     let move_index = HISTORY_INDEX.with(|index| index.borrow().clone());
     if !(move_index == 0) {
-        let last_entry = ACTION_HISTORY.with(|history| history.borrow().get(move_index - 1).cloned()).unwrap();
+        let mut last_entry = ACTION_HISTORY.with(|history| history.borrow().get(move_index - 1).cloned()).unwrap();
         let grid = get_grid().unwrap();
         let destination_stack = get_child(&grid, &last_entry.origin_stack).unwrap().downcast::<CardStack>().unwrap();
         let origin_stack = get_child(&grid, &last_entry.destination_stack).unwrap().downcast::<CardStack>().unwrap();
-        games::pre_undo_drag(&destination_stack, &origin_stack);
-        perform_move_with_stacks(&last_entry, &origin_stack, &destination_stack);
+        games::pre_undo_drag(&destination_stack, &origin_stack, &mut last_entry);
+        perform_move_with_stacks(&mut last_entry, &origin_stack, &destination_stack);
         HISTORY_INDEX.set(move_index - 1);
     }
 }
 
 pub fn redo_first_move() {
     let move_index = HISTORY_INDEX.with(|index| index.borrow().clone());
-    if let Some(first_entry) = ACTION_HISTORY.with(|history| history.borrow().get(move_index).cloned()) {
+    if let Some(mut first_entry) = ACTION_HISTORY.with(|history| history.borrow().get(move_index).cloned()) {
         let grid = get_grid().unwrap();
         let origin_stack = get_child(&grid, &first_entry.origin_stack).unwrap().downcast::<CardStack>().unwrap();
         let destination_stack = get_child(&grid, &first_entry.destination_stack).unwrap().downcast::<CardStack>().unwrap();
-        perform_move(&first_entry);
-        games::on_drag_completed(&origin_stack);
-        games::on_drop_completed(&destination_stack);
+        perform_move(&mut first_entry);
+        games::on_drag_completed(&origin_stack, &destination_stack, &mut first_entry);
         HISTORY_INDEX.set(move_index + 1);
     }
 }

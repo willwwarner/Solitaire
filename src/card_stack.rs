@@ -249,11 +249,13 @@ impl CardStack {
                 let first_card = transfer_stack.first_child().unwrap().downcast::<Card>().unwrap();
                 if games::verify_drop(&first_card, &to_stack) {
                     to_stack.merge_stack(&transfer_stack);
-                    games::on_drop_completed(&to_stack);
-                    runtime::add_to_history(runtime::Move { origin_stack: transfer_stack.get_origin_name(),
-                                                                   card_name: first_card.widget_name().to_string(),
-                                                                   destination_stack: to_stack.widget_name().to_string(),
-                                                                   instruction: None });
+                    let mut move_ = runtime::create_move(&transfer_stack.get_origin_name(),
+                                                         &first_card.widget_name(),
+                                                         &to_stack.widget_name(),
+                                                         runtime::MoveInstruction::None);
+                    games::on_drag_completed(&runtime::get_stack(&*transfer_stack.get_origin_name()).unwrap(), &to_stack, &mut move_);
+                    //FIXME: do not use widget_name
+                    runtime::add_to_history(move_);
                     return true;
                 }
                 else { return false; }
@@ -427,13 +429,6 @@ impl CardStack {
                 origin.merge_stack(&drag_stack);
             }
             true
-        });
-
-        drag_source.connect_drag_end(|src, _drag, _result| {
-            let value = src.content().unwrap().value(glib::Type::OBJECT).unwrap();
-            let stack = value.get::<TransferCardStack>().unwrap();
-            let origin = runtime::get_child(&runtime::get_grid().unwrap(), &*stack.get_origin_name()).unwrap();
-            games::on_drag_completed(&origin.downcast::<CardStack>().unwrap());
         });
 
         card.add_controller(drag_source);

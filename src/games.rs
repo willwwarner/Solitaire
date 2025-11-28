@@ -99,24 +99,17 @@ pub fn on_slot_click(slot: &CardStack) {
     }
 }
 
-pub fn on_drag_completed(origin_stack: &CardStack) {
+pub fn on_drag_completed(origin_stack: &CardStack, destination_stack: &CardStack, move_: &mut runtime::Move) {
     let mut game = CURRENT_GAME.lock().unwrap();
     if let Some(game) = game.as_mut() {
-        game.on_drag_completed(origin_stack);
+        game.on_drag_completed(origin_stack, destination_stack, move_);
     }
 }
 
-pub fn on_drop_completed(recipient_stack: &CardStack) {
+pub fn pre_undo_drag(origin_stack: &CardStack, dropped_stack: &CardStack, move_: &mut runtime::Move) {
     let mut game = CURRENT_GAME.lock().unwrap();
     if let Some(game) = game.as_mut() {
-        game.on_drop_completed(recipient_stack);
-    }
-}
-
-pub fn pre_undo_drag(origin_stack: &CardStack, dropped_stack: &CardStack) {
-    let mut game = CURRENT_GAME.lock().unwrap();
-    if let Some(game) = game.as_mut() {
-        game.pre_undo_drag(origin_stack, dropped_stack);
+        game.pre_undo_drag(origin_stack, dropped_stack, move_);
     }
 }
 
@@ -160,11 +153,9 @@ pub trait Game: Send + Sync {
     fn new_game(cards: Vec<Card>, grid: &gtk::Grid) -> Self where Self: Sized;
     fn verify_drag(&self, bottom_card: &Card, from_stack: &CardStack) -> bool;
     fn verify_drop(&self, bottom_card: &Card, to_stack: &CardStack) -> bool;
-    fn on_drag_completed(&self, origin_stack: &CardStack);
-    fn on_drop_completed(&self, recipient_stack: &CardStack);
-    fn pre_undo_drag(&self, previous_origin_stack: &CardStack, previous_destination_stack: &CardStack);
+    fn on_drag_completed(&self, origin_stack: &CardStack, destination_stack: &CardStack, move_: &mut runtime::Move);
+    fn pre_undo_drag(&self, previous_origin_stack: &CardStack, previous_destination_stack: &CardStack, move_: &mut runtime::Move);
     fn on_double_click(&self, card: &Card);
-    fn undo_deal(&self, stock: &CardStack);
     fn on_slot_click(&self, slot: &CardStack);
     fn is_won(&self) -> bool;
     fn get_best_next_move(&self) -> Option<(String, String, String)>;
