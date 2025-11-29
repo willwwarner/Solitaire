@@ -152,6 +152,11 @@ pub fn verify_drop(bottom_card: &Card, to_stack: &CardStack) -> bool {
     }
 }
 
+pub fn get_is_won_fn() -> Box<dyn FnMut(&mut solver::State) -> bool> {
+    let mut game = CURRENT_GAME.lock().unwrap();
+    game.as_mut().unwrap().get_is_won_fn()
+}
+
 pub mod solver;
 
 pub async fn try_game(game_name: &str, card_grid: &gtk::Grid) -> Option<Vec<runtime::Move>> {

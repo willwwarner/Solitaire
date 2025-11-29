@@ -218,6 +218,10 @@ impl State {
 
 pub fn no_onmove(_move: &mut Move, _state: &mut State, _undo: bool) {}
 
+pub fn new_ghost_state(game_state: Vec<Vec<u8>>) -> State {
+    State {game_state, states: IndexSet::new(), nodes: Vec::new(), queues: Vec::new(), q_index: 0, parent_node: None}
+}
+
 static SHOULD_STOP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 pub fn set_should_stop(should_stop: bool) {
