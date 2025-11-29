@@ -60,6 +60,7 @@ mod imp {
         pub undo: TemplateChild<gtk::Button>,
         #[template_child]
         pub redo: TemplateChild<gtk::Button>,
+        pub new_game_is_safe: std::cell::Cell<bool>,
     }
 
     #[glib::object_subclass]
@@ -172,6 +173,7 @@ impl SolitaireWindow {
                 let game_name = game.to_owned();
                 glib::g_message!("solitaire", "Starting {game_name}");
                 let window = Self::get_window().unwrap();
+                window.imp().new_game_is_safe.set(false);
                 window.imp().nav_view.get().push_by_tag("game");
                 window.imp().game_stack.set_visible_child_name("spinner");
                 let card_grid = window.imp().card_grid.get();
@@ -193,6 +195,8 @@ impl SolitaireWindow {
                                 window.lookup_action("hint").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(true);
                             }
                             runtime::set_solution(solution);
+                            let won_fn = games::get_is_won_fn();
+                            runtime::set_won_fn(won_fn);
                         } else {
                             if games::solver::get_should_stop() { return; }
                             let dialog = adw::AlertDialog::builder()
@@ -226,6 +230,14 @@ impl SolitaireWindow {
     
     #[template_callback]
     fn new_game_clicked(&self, _button: &gtk::Button) {
+        let nav_view = self.imp().nav_view.get();
+        let grid = self.imp().card_grid.get();
+        if self.imp().new_game_is_safe.get() {
+            games::unload(&grid);
+            games::solver::set_should_stop(true);
+            nav_view.pop_to_tag("chooser");
+            return;
+        }
         let dialog = adw::AlertDialog::builder()
             .heading(gettext("Do you want to start a new game?"))
             .body(gettext("If you start a new game, your current progress will be lost."))
@@ -235,8 +247,7 @@ impl SolitaireWindow {
             ("accept",          gettext("Start New Game").as_str()),
             ("delete_event",    gettext("Keep Current Game").as_str())
         ]);
-        let nav_view = self.imp().nav_view.get();
-        let grid = self.imp().card_grid.get();
+
         dialog.connect_response(Some("accept"), move |_dialog, _response| {
             games::unload(&grid);
             games::solver::set_should_stop(true);
@@ -268,5 +279,27 @@ impl SolitaireWindow {
         dialog.connect_response(Some("undo"), undo_move);
         dialog.connect_response(Some("delete_event"), keep_playing);
         dialog.present(Some(&window));
+    }
+
+    pub fn won_dialog(&self) {
+        self.imp().new_game_is_safe.set(true);
+        let dialog = adw::AlertDialog::builder()
+            .heading(gettext("You have won"))
+            .body(gettext("Congratulations, you have solved the game"))
+            .default_response("new_game")
+            .build();
+        dialog.add_responses(&[
+            ("new_game",        &*gettext("New Game")),
+            ("delete_event",    &*gettext("Keep Playing"))
+        ]);
+        dialog.set_response_appearance("new_game", adw::ResponseAppearance::Suggested);
+        let nav_view = self.imp().nav_view.get();
+        let grid = self.imp().card_grid.get();
+        dialog.connect_response(Some("new_game"), move |_dialog, _response| {
+            games::unload(&grid);
+            games::solver::set_should_stop(true);
+            nav_view.pop_to_tag("chooser");
+        });
+        dialog.present(Some(self));
     }
 }

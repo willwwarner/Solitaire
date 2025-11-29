@@ -66,6 +66,7 @@ thread_local! {
     static UNDO_HISTORY: RefCell<Vec<Move>> = RefCell::new(Vec::new());
     static N_DEALS: Cell<u8> = Cell::new(0);
     static CARDS: RefCell<Vec<Card>> = RefCell::new(Vec::new());
+    static IS_WON_FN: RefCell<Option<Box<dyn FnMut(&mut games::solver::State) -> bool>>> = RefCell::new(None);
     // Re-solve multithreading
     static LATEST_SOLVING: Cell<usize> = Cell::new(0);
     static FIRST_UNSOLVABLE: Cell<usize> = Cell::new(usize::MAX);
@@ -153,11 +154,23 @@ pub fn add_to_history(move_: Move) {
     // Remove invalidated undo entries
     let window = crate::window::SolitaireWindow::get_window().unwrap();
     UNDO_HISTORY.with(|undos| undos.borrow_mut().clear());
-    re_solve_if_needed(&move_, &window);
-    // TODO: Check if won
-
     update_redo_actions(&window);
-    HISTORY.with(|h| h.borrow_mut().push(move_));
+    HISTORY.with(|h| h.borrow_mut().push(move_.clone()));
+    let (stack_names, game_state) = get_solver_state();
+    let mut ghost_solver_state = games::solver::new_ghost_state(game_state.to_owned());
+    if IS_WON_FN.with_borrow_mut(|f| f.as_mut().unwrap()(&mut ghost_solver_state)) {
+        window.won_dialog();
+        return;
+    }
+    if let Some(solution_move) = get_hint() {
+        if solution_move == move_ {
+            SOLUTION_MOVES.with(|s| s.borrow_mut().remove(0));
+            return;
+        }
+    }
+    if SOLVER_ON.get() {
+        re_solve_threaded(&window, stack_names, game_state);
+    }
 }
 
 pub fn undo_last_move() {
@@ -199,8 +212,17 @@ pub fn redo_first_move() {
         let destination_stack = get_stack(&first_entry.destination_stack).unwrap();
         perform_move(&mut first_entry);
         games::on_drag_completed(&origin_stack, &destination_stack, &mut first_entry);
-        re_solve_if_needed(&first_entry, &crate::window::SolitaireWindow::get_window().unwrap());
-        HISTORY.with(|history| history.borrow_mut().push(first_entry));
+        HISTORY.with(|history| history.borrow_mut().push(first_entry.clone()));
+        if let Some(solution_move) = get_hint() {
+            if solution_move == first_entry {
+                SOLUTION_MOVES.with(|s| s.borrow_mut().remove(0));
+                return;
+            }
+        }
+        if SOLVER_ON.get() {
+            let (stack_names, game_state) = get_solver_state();
+            re_solve_threaded(&crate::window::SolitaireWindow::get_window().unwrap(), stack_names, game_state);
+        }
     });
 }
 
@@ -244,6 +266,10 @@ pub fn get_solver_state() -> (Vec<String>, Vec<Vec<u8>>) {
     (names, stacks)
 }
 
+pub fn set_won_fn<F: FnMut(&mut games::solver::State) -> bool + 'static>(f: F) {
+    IS_WON_FN.set(Some(Box::new(f)));
+}
+
 pub fn set_cards(cards: Vec<Card>) {
     CARDS.set(cards);
 }
@@ -265,9 +291,10 @@ pub fn get_hint() -> Option<Move> {
 }
 pub fn set_solution(moves: Vec<Move>) {
     SOLUTION_MOVES.set(moves);
+    SOLVER_ON.set(true);
 }
 
-fn re_solve_threaded(window: &crate::window::SolitaireWindow) {
+fn re_solve_threaded(window: &crate::window::SolitaireWindow, stack_names: Vec<String>, game_state: Vec<Vec<u8>>) {
     fn clear_and_abort_threads() {
         games::solver::set_should_stop(true);
         SOLVER_THREADS.with_borrow_mut(|t| t.clear());
@@ -278,7 +305,6 @@ fn re_solve_threaded(window: &crate::window::SolitaireWindow) {
         #[weak]
         window,
         async move {
-            let (stack_names, game_state) = get_solver_state();
             let discarded_solver_history = SOLUTION_MOVES.with(|s| s.borrow().clone());
             let move_index = HISTORY.with(|h| h.borrow().len());
             let (sender, receiver) = async_channel::bounded(1);
@@ -289,7 +315,7 @@ fn re_solve_threaded(window: &crate::window::SolitaireWindow) {
             SOLVER_THREADS.with_borrow_mut(|s| s.push(t));
             while let Ok(result) = receiver.recv().await {
                 if let Some(history) = result {
-                    if move_index <= HISTORY.with_borrow(|h| h.len() - 1) { continue; }
+                    if move_index < HISTORY.with_borrow(|h| h.len()) { continue; }
                     clear_and_abort_threads();
                     set_solution(history);
                     FIRST_UNSOLVABLE.set(usize::MAX);
@@ -320,16 +346,4 @@ fn re_solve_threaded(window: &crate::window::SolitaireWindow) {
             }
         }
     ));
-}
-
-fn re_solve_if_needed(move_: &Move, window: &crate::window::SolitaireWindow) {
-    if let Some(solution_move) = get_hint() {
-        if &solution_move == move_ {
-            SOLUTION_MOVES.with(|s| s.borrow_mut().remove(0));
-            return;
-        }
-    }
-    if SOLVER_ON.get() {
-        re_solve_threaded(&window);
-    }
 }
