@@ -112,6 +112,12 @@ impl Game for Klondike {
                 }
             }
         }
+        if origin_stack.get_type() == "waste" {
+            let stock = runtime::get_stack("stock").unwrap();
+            if stock.is_empty() && origin_stack.is_empty() {
+                runtime::set_can_drop(true);
+            }
+        }
     }
 
     fn pre_undo_drag(&self, origin_stack: &CardStack, dropped_stack: &CardStack, move_: &mut runtime::Move) {
@@ -121,6 +127,11 @@ impl Game for Klondike {
             }
         } else if origin_stack.get_type() == "stock" {
             origin_stack.face_down_top_card();
+        } else if origin_stack.get_type() == "waste" {
+            let stock = runtime::get_stack("stock").unwrap();
+            if stock.is_empty() && origin_stack.is_empty() {
+                runtime::set_can_drop(false);
+            }
         }
     }
 
@@ -162,6 +173,7 @@ impl Game for Klondike {
             }
         }
     }
+
     fn get_move_generator(&self) -> Box<dyn FnMut(&mut solver::State)> {
         Box::new(generate_solver_moves)
     }

@@ -78,7 +78,7 @@ template $SolitaireWindow: Adw.ApplicationWindow {
     }
 
     Adw.NavigationPage game_page {
-      title: _("Game not loaded...");
+      title: _("Game not loaded");
       tag: "game";
       can-pop: false;
 
@@ -90,16 +90,19 @@ template $SolitaireWindow: Adw.ApplicationWindow {
             tooltip-text: _("New Game");
             clicked => $new_game_clicked() swapped;
           }
+
           Button undo {
             icon-name: "edit-undo-symbolic";
             tooltip-text: _("Undo");
             action-name: "win.undo";
           }
+
           Button redo {
             icon-name: "edit-redo-symbolic";
             tooltip-text: _("Redo");
             action-name: "win.redo";
           }
+
           [end]
           MenuButton {
             primary: true;
@@ -107,12 +110,9 @@ template $SolitaireWindow: Adw.ApplicationWindow {
             tooltip-text: _("Main Menu");
             menu-model: primary_menu;
           }
+
           [end]
-          Button hint {
-            icon-name: "lightbulb-symbolic";
-            tooltip-text: _("Hint");
-            action-name: "win.hint";
-          }
+          Button hint_or_drop {}
         }
 
         content: Stack game_stack {
@@ -129,6 +129,7 @@ template $SolitaireWindow: Adw.ApplicationWindow {
               margin-bottom: 12;
             };
           }
+
           StackPage {
             name: "spinner";
             child: Adw.Spinner {
@@ -148,11 +149,11 @@ menu primary_menu {
   // section {
   //   item {
   //     label: _("_Scores");
-  //     action: "win.show-score-dialog";
+  //     action: "win.scores";
   //   }
   //   item {
   //     label: _("A_pperance");
-  //     action: "win.show-apperance-dialog";
+  //     action: "win.apperance";
   //   }
   // }
   section {
