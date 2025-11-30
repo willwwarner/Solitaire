@@ -58,6 +58,8 @@ pub fn move_from_strings(origin_stack: String, card_name: String, destination_st
 }
 
 use std::cell::{Cell, RefCell};
+use std::time::Duration;
+
 thread_local! {
     static STACK_NAMES: RefCell<Vec<String>> = RefCell::new(Vec::new());
     static STACKS: RefCell<Vec<CardStack>> = RefCell::new(Vec::new());
@@ -71,7 +73,7 @@ thread_local! {
     static LATEST_SOLVING: Cell<usize> = Cell::new(0);
     static FIRST_UNSOLVABLE: Cell<usize> = Cell::new(usize::MAX);
     static FIRST_UNSOLVABLE_HISTORY: RefCell<Vec<Move>> = RefCell::new(Vec::new());
-    static SOLVER_ON: Cell<bool> = Cell::new(true);
+    static NOTIFY_UNSOLVABLE: Cell<bool> = Cell::new(true);
     static SOLVER_THREADS: RefCell<Vec<std::thread::JoinHandle<()>>> = RefCell::new(Vec::new());
 }
 
@@ -168,9 +170,7 @@ pub fn add_to_history(move_: Move) {
             return;
         }
     }
-    if SOLVER_ON.get() {
-        re_solve_threaded(&window, stack_names, game_state);
-    }
+    re_solve_threaded(&window, stack_names, game_state);
 }
 
 pub fn undo_last_move() {
@@ -219,10 +219,8 @@ pub fn redo_first_move() {
                 return;
             }
         }
-        if SOLVER_ON.get() {
-            let (stack_names, game_state) = get_solver_state();
-            re_solve_threaded(&crate::window::SolitaireWindow::get_window().unwrap(), stack_names, game_state);
-        }
+        let (stack_names, game_state) = get_solver_state();
+        re_solve_threaded(&crate::window::SolitaireWindow::get_window().unwrap(), stack_names, game_state);
     });
 }
 
@@ -291,7 +289,27 @@ pub fn get_hint() -> Option<Move> {
 }
 pub fn set_solution(moves: Vec<Move>) {
     SOLUTION_MOVES.set(moves);
-    SOLVER_ON.set(true);
+    NOTIFY_UNSOLVABLE.set(true);
+}
+
+pub fn drop() {
+    let solution = SOLUTION_MOVES.with(|s| s.borrow().clone());
+    glib::spawn_future_local(
+        async move {
+            for mut move_ in solution {
+                let origin_stack = get_stack(&move_.origin_stack).unwrap();
+                let destination_stack = get_stack(&move_.destination_stack).unwrap();
+                perform_move_with_stacks(&mut move_, &origin_stack, &destination_stack);
+                games::on_drag_completed(&origin_stack, &destination_stack, &mut move_);
+                add_to_history(move_);
+                glib::timeout_future(Duration::from_millis(300)).await;
+            }
+        }
+    );
+}
+
+pub fn set_can_drop(can_drop: bool) {
+    crate::window::SolitaireWindow::get_window().unwrap().set_can_drop(can_drop);
 }
 
 fn re_solve_threaded(window: &crate::window::SolitaireWindow, stack_names: Vec<String>, game_state: Vec<Vec<u8>>) {
@@ -300,7 +318,7 @@ fn re_solve_threaded(window: &crate::window::SolitaireWindow, stack_names: Vec<S
         SOLVER_THREADS.with_borrow_mut(|t| t.clear());
     }
 
-    window.lookup_action("hint").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
+    window.set_hint_drop_enabled(false);
     glib::spawn_future_local(glib::clone!(
         #[weak]
         window,
@@ -320,7 +338,7 @@ fn re_solve_threaded(window: &crate::window::SolitaireWindow, stack_names: Vec<S
                     set_solution(history);
                     FIRST_UNSOLVABLE.set(usize::MAX);
                     if SOLUTION_MOVES.with(|s| s.borrow().is_empty()) { continue; }
-                    window.lookup_action("hint").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(true);
+                    window.set_hint_drop_enabled(true);
                 } else {
                     if move_index < FIRST_UNSOLVABLE.get() && !games::solver::get_should_stop() {
                         FIRST_UNSOLVABLE.set(move_index);
@@ -328,18 +346,20 @@ fn re_solve_threaded(window: &crate::window::SolitaireWindow, stack_names: Vec<S
                     }
                     let first_unsolvable = FIRST_UNSOLVABLE.get();
                     if move_index == HISTORY.with_borrow(|h| h.len()) {
-                        let window = window.clone();
-                        crate::window::SolitaireWindow::incompatible_move_dialog(move |_dialog, _response| { // Undo Button
-                            undo_many(first_unsolvable - 1);
-                            update_redo_actions(&window);
-                            clear_and_abort_threads();
-                            let first_unsolvable_h = FIRST_UNSOLVABLE_HISTORY.take();
-                            if !first_unsolvable_h.is_empty() { window.lookup_action("hint").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(true); }
-                            SOLUTION_MOVES.set(first_unsolvable_h);
-                        }, move |_dialog, _response| { // Keep Playing button
-                            SOLVER_ON.set(false);
-                            clear_and_abort_threads();
-                        });
+                        if NOTIFY_UNSOLVABLE.get() {
+                            let window = window.clone();
+                            crate::window::SolitaireWindow::incompatible_move_dialog(move |_dialog, _response| { // Undo Button
+                                undo_many(first_unsolvable - 1);
+                                update_redo_actions(&window);
+                                clear_and_abort_threads();
+                                let first_unsolvable_h = FIRST_UNSOLVABLE_HISTORY.take();
+                                if !first_unsolvable_h.is_empty() { window.set_hint_drop_enabled(true); }
+                                SOLUTION_MOVES.set(first_unsolvable_h);
+                            }, move |_dialog, _response| { // Keep Playing button
+                                NOTIFY_UNSOLVABLE.set(false);
+                                clear_and_abort_threads();
+                            });
+                        } else { clear_and_abort_threads(); }
                         FIRST_UNSOLVABLE.set(usize::MAX);
                     }
                 }

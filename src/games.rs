@@ -37,7 +37,7 @@ pub fn load_game(game_name: &str, grid: &gtk::Grid) {
     let window = crate::window::SolitaireWindow::get_window().unwrap();
     window.lookup_action("undo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
     window.lookup_action("redo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
-    window.lookup_action("hint").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
+    window.set_hint_drop_enabled(false);
 
     let mut cards = runtime::get_cards();
     if cards.is_empty() {

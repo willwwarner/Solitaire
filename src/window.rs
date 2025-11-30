@@ -60,6 +60,9 @@ mod imp {
         pub undo: TemplateChild<gtk::Button>,
         #[template_child]
         pub redo: TemplateChild<gtk::Button>,
+        #[template_child]
+        pub hint_or_drop: TemplateChild<gtk::Button>,
+        pub can_drop: std::cell::Cell<bool>,
         pub new_game_is_safe: std::cell::Cell<bool>,
     }
 
@@ -111,6 +114,10 @@ impl SolitaireWindow {
             .build()
     }
 
+    fn drop(&self) {
+        runtime::drop();
+    }
+
     fn hint(&self) {
         if let Some(move_) = runtime::get_hint() {
             glib::g_message!("solitaire", "Hint: {:?}", move_);
@@ -138,6 +145,9 @@ impl SolitaireWindow {
     }
 
     fn setup_gactions(&self) {
+        let drop_action = gio::ActionEntry::builder("drop")
+            .activate(move |win: &Self, _, _| win.drop())
+            .build();
         let hint_action = gio::ActionEntry::builder("hint")
             .activate(move |win: &Self, _, _| win.hint())
             .build();
@@ -147,7 +157,7 @@ impl SolitaireWindow {
         let redo_action = gio::ActionEntry::builder("redo")
             .activate(move |win: &Self, _, _| win.redo())
             .build();
-        self.add_action_entries([hint_action, undo_action, redo_action]);
+        self.add_action_entries([drop_action, hint_action, undo_action, redo_action]);
     }
 
     #[template_callback]
@@ -173,6 +183,7 @@ impl SolitaireWindow {
                 let game_name = game.to_owned();
                 glib::g_message!("solitaire", "Starting {game_name}");
                 let window = Self::get_window().unwrap();
+                window.set_can_drop(false);
                 window.imp().new_game_is_safe.set(false);
                 window.imp().nav_view.get().push_by_tag("game");
                 window.imp().game_stack.set_visible_child_name("spinner");
@@ -192,7 +203,7 @@ impl SolitaireWindow {
                         if let Some(solution) = games::try_game(&*game_name, &card_grid).await {
                             window.imp().game_stack.set_visible_child_name("grid");
                             if !solution.is_empty() {
-                                window.lookup_action("hint").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(true);
+                                window.set_hint_drop_enabled(true);
                             }
                             runtime::set_solution(solution);
                             let won_fn = games::get_is_won_fn();
@@ -301,5 +312,26 @@ impl SolitaireWindow {
             nav_view.pop_to_tag("chooser");
         });
         dialog.present(Some(self));
+    }
+
+    pub fn set_can_drop(&self, can_drop: bool) {
+        self.lookup_action("hint").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(!can_drop);
+        self.lookup_action("drop").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(can_drop);
+        self.imp().can_drop.set(can_drop);
+        let hint_or_drop = self.imp().hint_or_drop.get();
+        if can_drop {
+            hint_or_drop.set_tooltip_text(Some(&*gettext("Drop")));
+            hint_or_drop.set_action_name(Some("win.drop"));
+            hint_or_drop.set_icon_name("object-select-symbolic");
+        } else {
+            hint_or_drop.set_tooltip_text(Some(&*gettext("Hint")));
+            hint_or_drop.set_action_name(Some("win.hint"));
+            hint_or_drop.set_icon_name("lightbulb-symbolic");
+        }
+    }
+
+    pub fn set_hint_drop_enabled(&self, enabled: bool) {
+        self.lookup_action("hint").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled((!self.imp().can_drop.get()) && enabled);
+        self.lookup_action("drop").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(self.imp().can_drop.get() && enabled);
     }
 }
