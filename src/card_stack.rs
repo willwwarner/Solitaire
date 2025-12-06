@@ -102,6 +102,7 @@ mod imp {
             let children = widget.observe_children();
             let child_count = children.n_items();
             let stack_aspect = self.aspect.get();
+            let card_aspect = renderer::ASPECT.get();
             // Don't bother with empty stacks
             if child_count == 0 {
                 return;
@@ -113,10 +114,10 @@ mod imp {
                 let max_height = (width as f32 * stack_aspect).floor() as i32;
                 if child_count == 1 {
                     if height > max_height {
-                        widget.first_child().unwrap().allocate(width, (width as f32 * renderer::ASPECT) as i32, -1, None);
+                        widget.first_child().unwrap().allocate(width, (width as f32 * card_aspect) as i32, -1, None);
                     } else {
                         let max_width = (height as f32 / stack_aspect) as i32;
-                        widget.first_child().unwrap().allocate(max_width, (max_width as f32 * renderer::ASPECT) as i32, -1, None);
+                        widget.first_child().unwrap().allocate(max_width, (max_width as f32 * card_aspect) as i32, -1, None);
                     }
                     return;
                 }
@@ -124,12 +125,12 @@ mod imp {
                 let vertical_offset;
 
                 if height > max_height {
-                    allocation_height = (width as f32 * renderer::ASPECT).floor() as i32;
+                    allocation_height = (width as f32 * card_aspect).floor() as i32;
                     vertical_offset = std::cmp::min((max_height - allocation_height) / (child_count as i32 - 1), allocation_height / 5) as u32;
                     allocation_width = width;
                 } else {
                     allocation_width = (height as f32 / stack_aspect).floor() as i32;
-                    allocation_height = (allocation_width as f32 * renderer::ASPECT).floor() as i32;
+                    allocation_height = (allocation_width as f32 * card_aspect).floor() as i32;
                     vertical_offset = std::cmp::min((height - allocation_height) / (child_count as i32 - 1), allocation_height / 5) as u32;
                 }
 
@@ -144,12 +145,12 @@ mod imp {
                 }
                 self.v_offset.set(vertical_offset);
             } else {
-                let max_card_height = (width as f32 * renderer::ASPECT).floor() as i32;
+                let max_card_height = (width as f32 * renderer::ASPECT.get()).floor() as i32;
                 if height > max_card_height {
                     allocation_width = width;
                     allocation_height = max_card_height;
                 } else {
-                    allocation_width = (height as f32 / renderer::ASPECT).floor() as i32;
+                    allocation_width = (height as f32 / renderer::ASPECT.get()).floor() as i32;
                     allocation_height = height;
                 }
 
@@ -185,17 +186,19 @@ mod imp {
             let children = widget.observe_children();
             let child_count = children.n_items();
             let card_width = self.card_width.get();
+            let card_width_f = card_width as f32;
 
             if child_count == 0 {
                 return;
             }
-
+            
+            let aspect = renderer::ASPECT.get();
             if child_count == 1 {
-                widget.first_child().unwrap().allocate(card_width, (card_width as f32 * renderer::ASPECT) as i32, -1, None);
+                widget.first_child().unwrap().allocate(card_width, (card_width_f * aspect) as i32, -1, None);
                 return;
             }
 
-            let card_height = (card_width as f32 * renderer::ASPECT).floor() as i32;
+            let card_height = (card_width_f * aspect).floor() as i32;
             if height < card_height {
                 panic!("solitaire: transfer_card_stack height is is less than card_height, height: {height}");
             }

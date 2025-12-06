@@ -29,7 +29,7 @@ mod test;
 mod klondike;
 
 pub const JOKERS: [&str; 2] = ["joker_red", "joker_black"];
-pub const SUITES: [&str; 4] = ["club", "heart", "spade", "diamond"];
+pub const SUITES: [&str; 4] = ["club", "diamond", "heart", "spade"]; // Use this order because it is the AisleRiot card theme order
 pub const RANKS: [&str; 13] = ["ace", "2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king"];
 static CURRENT_GAME: Mutex<Option<Box<dyn Game>>> = Mutex::new(None);
 
@@ -41,24 +41,8 @@ pub fn load_game(game_name: &str, grid: &gtk::Grid) {
 
     let mut cards = runtime::get_cards();
     if cards.is_empty() {
-        // Create the renderer
-        glib::g_message!("solitaire", "Loading SVG");
-        let resource = gio::resources_lookup_data("/org/gnome/gitlab/wwarner/Solitaire/assets/anglo_poker.svg", gio::ResourceLookupFlags::NONE)
-            .expect("Failed to load resource data");
-        glib::g_message!("solitaire", "loaded resource data");
-        let handle = rsvg::Loader::new()
-            .read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>)
-            .expect("Failed to load SVG");
-        let renderer = rsvg::CairoRenderer::new(&handle);
-        glib::g_message!("solitaire", "Done Loading SVG");
-
-        for i in 0..52 {
-            let card_name = format!("{}_{}", SUITES[i / 13], RANKS[i % 13]);
-            let card = Card::new(&*card_name, i as u8, &renderer);
-            cards.push(card);
-        }
-        renderer::set_back_texture(&renderer);
-        glib::g_message!("solitaire", "Done setting textures");
+        let card_theme = renderer::get_card_theme("anglo_poker");
+        renderer::create_cards(&card_theme, &mut cards);
     }
 
     // Store the current game type
