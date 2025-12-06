@@ -126,7 +126,7 @@ pub fn is_same_suit(card_1: &u8, card_2: &u8) -> bool {
 pub fn is_similar_suit(card_1: &u8, card_2: &u8) -> bool {
     let self_suit = (solver_card_to_id(card_1) / 13) as usize;
     let other_suit = (solver_card_to_id(card_2) / 13) as usize;
-    (self_suit == 0 || self_suit == 2) == (other_suit == 0 || other_suit == 2)
+    (self_suit == 0 || self_suit == 3) == (other_suit == 0 || other_suit == 3)
 }
 
 pub fn is_red(card: &u8) -> bool {

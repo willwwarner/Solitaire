@@ -18,12 +18,11 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use std::cell::Cell;
-use adw::prelude::BinExt;
-use gtk::{glib, gdk};
-use adw::subclass::prelude::*;
-use gtk::prelude::{Cast, WidgetExt};
 use crate::{games, renderer, card_stack::CardStack};
+use gtk::{glib, gdk};
+use gtk::prelude::{Cast, WidgetExt};
+use adw::{prelude::*, subclass::prelude::*};
+use std::cell::Cell;
 
 glib::wrapper! {
     pub struct Card(ObjectSubclass<imp::Card>)
@@ -54,14 +53,14 @@ mod imp {
 }
 
 impl Card {
-    pub fn new(name: &str, id: u8, renderer: &rsvg::CairoRenderer) -> Self {
+    pub fn new(name: &str, id: i32, renderer: &rsvg::CairoRenderer, card_theme: &renderer::CardTheme) -> Self {
         let this:Card = glib::Object::new();
         this.set_sensitive(true);
         this.set_can_focus(true);
         this.set_widget_name(name);
-        this.imp().card_id.set(id);
+        this.imp().card_id.set(id as u8);
         let picture = gtk::Picture::new();
-        let texture = renderer::draw_card(name, renderer, 250, 350);
+        let texture = renderer::draw_card(name, renderer, &card_theme, id % 13, id / 13);
         picture.set_paintable(Some(&texture));
         this.set_child(Some(&picture));
         this.imp().texture.set(Some(texture));
@@ -121,7 +120,7 @@ impl Card {
     pub fn is_similar_suit(&self, other_card: &Card) -> bool {
         let self_suit = self.imp().card_id.get() / 13;
         let other_suit = other_card.imp().card_id.get() / 13;
-        (self_suit == 0 || self_suit == 2) == (other_suit == 0 || other_suit == 2)
+        (self_suit == 0 || self_suit == 3) == (other_suit == 0 || other_suit == 3)
     }
 
     pub fn get_rank(&self) -> &str {
