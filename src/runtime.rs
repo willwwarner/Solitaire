@@ -156,8 +156,8 @@ pub fn add_to_history(move_: Move) {
     // Remove invalidated undo entries
     let window = crate::window::SolitaireWindow::get_window().unwrap();
     UNDO_HISTORY.with(|undos| undos.borrow_mut().clear());
-    update_redo_actions(&window);
     HISTORY.with(|h| h.borrow_mut().push(move_.clone()));
+    update_redo_actions(&window);
     let (stack_names, game_state) = get_solver_state();
     let mut ghost_solver_state = games::solver::new_ghost_state(game_state.to_owned());
     if IS_WON_FN.with_borrow_mut(|f| f.as_mut().unwrap()(&mut ghost_solver_state)) {
@@ -235,6 +235,8 @@ pub fn clear_history_and_moves() {
     HISTORY.with(|h| h.borrow_mut().clear());
     UNDO_HISTORY.with(|undos| undos.borrow_mut().clear());
     SOLUTION_MOVES.with(|s| s.borrow_mut().clear());
+    FIRST_UNSOLVABLE.set(usize::MAX);
+    FIRST_UNSOLVABLE_HISTORY.set(Vec::new());
 }
 
 pub fn get_stack(name: &str) -> Option<CardStack> {
@@ -336,8 +338,14 @@ fn re_solve_threaded(window: &crate::window::SolitaireWindow, stack_names: Vec<S
                     if move_index < HISTORY.with_borrow(|h| h.len()) { continue; }
                     clear_and_abort_threads();
                     set_solution(history);
+                    if SOLUTION_MOVES.with(|s| s.borrow().is_empty()) {
+                        if move_index < FIRST_UNSOLVABLE.get() {
+                            FIRST_UNSOLVABLE.set(move_index);
+                            FIRST_UNSOLVABLE_HISTORY.set(discarded_solver_history.clone());
+                        }
+                        continue;
+                    }
                     FIRST_UNSOLVABLE.set(usize::MAX);
-                    if SOLUTION_MOVES.with(|s| s.borrow().is_empty()) { continue; }
                     window.set_hint_drop_enabled(true);
                 } else {
                     if move_index < FIRST_UNSOLVABLE.get() && !games::solver::get_should_stop() {
