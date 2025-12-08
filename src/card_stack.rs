@@ -163,6 +163,16 @@ mod imp {
                 }
             }
         }
+
+        fn unrealize(&self) {
+            while let Some(child) = self.obj().first_child() {
+                if let Ok(child) = child.downcast::<gtk::Widget>() {
+                    child.unparent();
+                    child.unrealize();
+                }
+            }
+            self.parent_unrealize();
+        }
     }
 
     #[derive(Default)]
@@ -170,6 +180,8 @@ mod imp {
         pub origin_name: Cell<String>,
         pub v_offset: Cell<u32>,
         pub card_width: Cell<i32>,
+        pub drag_x: Cell<i32>,
+        pub drag_y: Cell<i32>,
     }
 
     #[glib::object_subclass]
@@ -282,7 +294,6 @@ impl CardStack {
         self.add_controller(click);
     }
 
-    // FIXME: this causes "Broken accounting of active state for widget" when the top card is moved (occasionally)
     pub fn split_to_new_on(&self, card_name: &str) -> TransferCardStack {
         // Attempt to locate the child with the given card name
         let children = self.observe_children();
@@ -301,35 +312,11 @@ impl CardStack {
             new_stack.add_card(&card);
             card.remove_css_class("highlight");
         }
-        self.imp().size_allocate(self.width(), self.height(), self.baseline());
+        self.queue_resize();
         new_stack.set_height_request(self.height());
         new_stack.set_width_request(self.width());
         
         new_stack
-    }
-
-    pub fn try_split_to_new_on(&self, card_name: &str) -> Result<TransferCardStack, glib::Error> {
-        // Attempt to locate the child with the given card name
-        let children = self.observe_children();
-        let total_children = children.n_items();
-        let new_stack = TransferCardStack::new();
-        new_stack.imp().v_offset.set(self.imp().v_offset.get());
-        new_stack.imp().origin_name.set(self.widget_name().to_string());
-
-        // First, find the starting index
-        let start_index = get_index(card_name, &children)?;
-        for _i in start_index..total_children {
-            let child = children.item(start_index).expect("Failed to get child from CardStack");
-            let card = child.downcast::<Card>().expect("Child is not a Card (split:1)");
-            self.remove_card(&card);
-            new_stack.add_card(&card);
-            card.remove_css_class("highlight");
-        }
-        self.imp().size_allocate(self.width(), self.height(), self.baseline());
-        new_stack.set_height_request(self.height());
-        new_stack.set_width_request(self.width());
-
-        Ok(new_stack)
     }
 
     pub fn merge_stack(&self, stack: &TransferCardStack) {
@@ -340,7 +327,7 @@ impl CardStack {
             stack.remove_card(&card);
             self.add_card(&card);
         }
-        self.imp().size_allocate(self.width(), self.height(), self.baseline());
+        self.queue_resize();
         stack.unrealize();
     }
 
@@ -354,7 +341,7 @@ impl CardStack {
         }
     }
     
-    pub fn destroy_and_return_cards(self, cards: &mut Vec<Card>) {
+    pub fn destroy_and_return_cards(&self, cards: &mut Vec<Card>) {
         let items = self.observe_children().n_items();
         for _ in 0..items {
             let child = self.first_child().expect("Failed to get first child from CardStack");
@@ -369,6 +356,7 @@ impl CardStack {
             card.flip_to_face();
             cards.push(card);
         }
+
         self.unparent();
         self.unrealize();
     }
@@ -405,15 +393,15 @@ impl CardStack {
             .actions(gdk::DragAction::MOVE)  // allow moving the stack
             .build();
 
-        drag_source.connect_prepare(move |src, _x, _y| {
+        drag_source.connect_prepare(move |src, x, y| {
             let stack = src.widget().unwrap().parent().unwrap().downcast::<CardStack>().unwrap();
             if games::verify_drag(&src.widget().unwrap().downcast().unwrap(), &stack) {
                 let move_stack = stack.split_to_new_on(&*src.widget().unwrap().widget_name());
-                // Convert the CardStack (a GObject) into a GValue, then a ContentProvider.
+                move_stack.imp().drag_x.set(x as i32);
+                move_stack.imp().drag_y.set(y as i32);
                 let value = move_stack.upcast::<glib::Object>().to_value();
-                let provider = gdk::ContentProvider::for_value(&value);
-                src.set_content(Some(&provider));  // attach the data provider
-                Some(provider)  // must return Some(provider) from prepare
+
+                Some(gdk::ContentProvider::for_value(&value))
             } else {
                 None
             }
@@ -421,7 +409,7 @@ impl CardStack {
 
         drag_source.connect_drag_begin(|src, drag| {
             let icon = gtk::DragIcon::for_drag(drag);
-            let provider = src.content().unwrap();
+            let provider = drag.content();
             let value = provider.value(glib::Type::OBJECT).unwrap();
 
             if let Ok(obj) = value.get::<glib::Object>() {
@@ -429,12 +417,13 @@ impl CardStack {
                     let stack_clone = original_stack.clone();
                     icon.set_child(Some(&stack_clone));
                     stack_clone.allocate(original_stack.width_request(), original_stack.height_request(), 0, None);
+                    drag.set_hotspot(original_stack.imp().drag_x.get(), original_stack.imp().drag_y.get());
                 }
             }
         });
 
-        drag_source.connect_drag_cancel(|src, _drag, _reason| {
-            let provider = src.content().unwrap();
+        drag_source.connect_drag_cancel(|_src, drag, _reason| {
+            let provider = drag.content();
             let value = provider.value(glib::Type::OBJECT).unwrap();
             if let Ok(obj) = value.get::<glib::Object>() {
                 let drag_stack = obj.downcast::<TransferCardStack>().unwrap();
