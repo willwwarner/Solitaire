@@ -149,6 +149,7 @@ impl Game for Klondike {
             let waste = runtime::get_stack("waste").unwrap();
 
             if slot.is_empty() {
+                if waste.is_empty() { return }
                 let n_deals = runtime::get_deals();
                 if n_deals >= 3 { return }
                 runtime::update_deals(n_deals + 1);
