@@ -43,8 +43,6 @@ mod imp {
         #[template_child]
         pub list: TemplateChild<gtk::ListBox>,
         #[template_child]
-        pub recent_row: TemplateChild<adw::ActionRow>,
-        #[template_child]
         pub nav_page: TemplateChild<adw::NavigationPage>,
         #[template_child]
         pub game_page: TemplateChild<adw::NavigationPage>,
@@ -57,13 +55,25 @@ mod imp {
         #[template_child]
         pub search_entry: TemplateChild<gtk::SearchEntry>,
         #[template_child]
+        pub search_stack: TemplateChild<gtk::Stack>,
+        #[template_child]
+        pub search_page: TemplateChild<gtk::ScrolledWindow>,
+        #[template_child]
+        pub empty_page: TemplateChild<adw::StatusPage>,
+        #[template_child]
         pub undo: TemplateChild<gtk::Button>,
         #[template_child]
         pub redo: TemplateChild<gtk::Button>,
         #[template_child]
         pub hint_or_drop: TemplateChild<gtk::Button>,
+        #[template_child]
+        pub welcome: TemplateChild<adw::StatusPage>,
+        #[template_child]
+        pub welcome_revealer: TemplateChild<gtk::Revealer>,
+
         pub can_drop: std::cell::Cell<bool>,
         pub new_game_is_safe: std::cell::Cell<bool>,
+        pub good_search: std::cell::Cell<bool>,
     }
 
     #[glib::object_subclass]
@@ -88,7 +98,11 @@ mod imp {
             let obj = self.obj();
             obj.setup_gactions();
             obj.populate_game_list(&obj.imp().list.get());
-            obj.imp().search_bar.connect_entry(&obj.imp().search_entry.get());
+            let welcome_revealer = self.welcome_revealer.get();
+            self.search_bar.get().connect_search_mode_enabled_notify(move |search_bar| {
+                welcome_revealer.set_reveal_child(!search_bar.is_search_mode())
+            });
+            self.welcome.get().set_icon_name(Some(crate::config::APP_ID));
             SELF.set(Some(obj.clone()));
         }
     }
@@ -162,7 +176,6 @@ impl SolitaireWindow {
 
     #[template_callback]
     fn recent_clicked(&self, _row: &adw::ActionRow) {
-        println!("Starting Recent!");
         let settings = gio::Settings::new(crate::APP_ID);
         games::load_game(&settings.get::<String>("recent-game"), &self.imp().card_grid.get());
         self.imp().nav_view.get().push_by_tag("game");
@@ -237,6 +250,34 @@ impl SolitaireWindow {
             });
             list.append(&action_row);
         }
+
+        let search_entry = self.imp().search_entry.get();
+        list.set_filter_func(glib::clone!(
+            #[weak(rename_to=this)] self,
+            #[weak] search_entry,
+            #[upgrade_or] true,
+            move |row| {
+                let row = row.clone().downcast::<adw::ActionRow>().unwrap();
+                let row_text = row.title().to_uppercase();
+                let matches = row_text.contains(&search_entry.text().to_uppercase());
+                if matches { this.imp().good_search.set(true) }
+                matches
+        }));
+        let search_stack = self.imp().search_stack.get();
+        let search_page = self.imp().search_page.get();
+        let empty_page = self.imp().empty_page.get();
+        search_entry.connect_search_changed(glib::clone!(
+            #[weak(rename_to=this)] self,
+            #[weak] list,
+            move |_| {
+                this.imp().good_search.set(false);
+                list.invalidate_filter();
+                if this.imp().good_search.get() {
+                    search_stack.set_visible_child(&search_page);
+                } else {
+                    search_stack.set_visible_child(&empty_page);
+                }
+        }));
     }
     
     #[template_callback]

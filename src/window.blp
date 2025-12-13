@@ -23,6 +23,7 @@ template $SolitaireWindow: Adw.ApplicationWindow {
             tooltip-text: _("Search");
             active: bind search_bar.search-mode-enabled bidirectional;
           }
+
           [end]
           MenuButton {
             primary: true;
@@ -31,47 +32,54 @@ template $SolitaireWindow: Adw.ApplicationWindow {
             menu-model: primary_menu;
           }
         }
+
         [top]
         SearchBar search_bar {
           key-capture-widget: template;
-          child: Adw.Clamp {
-            child: SearchEntry search_entry {};
-          };
+
+          SearchEntry search_entry {
+            search-delay: 100;
+            placeholder-text: _("Search Games");
+          }
         }
 
-        content: Adw.StatusPage {
-          title: _("Choose Solitaire Type");
-          description: _("Pick the type of Solitaire you want to play:");
+        content: Stack search_stack {
+          ScrolledWindow search_page {
+            Box {
+              orientation: vertical;
+              vexpand: true;
 
-          Box {
-            orientation: vertical;
-            vexpand: true;
+              Revealer welcome_revealer {
+                transition-type: slide_up;
+                reveal-child: true;
 
-            Adw.Clamp {
-              maximum-size: 500;
+                Adw.StatusPage welcome {
+                  title: _("Play Solitaire games");
+                }
+              }
 
-              ListBox list {
-                selection-mode: none;
+              Adw.Clamp {
+                maximum-size: 500;
 
-                styles [
-                  "boxed-list",
-                ]
+                Adw.PreferencesGroup {
+                  title: _("Choose game Type");
 
-                Adw.ActionRow recent_row {
-                  title: _("Continue Last Game");
-                  subtitle: _("You made 0 moves");
-                  activatable: true;
-                  activated => $recent_clicked() swapped;
-                  visible: false;
+                  ListBox list {
+                    selection-mode: none;
 
-                  [suffix]
-                  Image {
-                    icon-name: "go-next-symbolic";
-                    valign: center;
+                    styles [
+                      "boxed-list",
+                    ]
                   }
                 }
               }
             }
+          }
+
+          Adw.StatusPage empty_page {
+            title: _("No Games Found");
+            icon-name: "edit-find-symbolic";
+            vexpand: true;
           }
         };
       };
@@ -116,8 +124,11 @@ template $SolitaireWindow: Adw.ApplicationWindow {
         }
 
         content: Stack game_stack {
+          transition-type: crossfade;
+
           StackPage {
             name: "grid";
+
             child: Grid card_grid {
               halign: center;
               row-homogeneous: false;
@@ -132,6 +143,7 @@ template $SolitaireWindow: Adw.ApplicationWindow {
 
           StackPage {
             name: "spinner";
+
             child: Adw.Spinner {
               valign: center;
               halign: center;
@@ -161,7 +173,6 @@ menu primary_menu {
     //   label: _("_Preferences");
     //   action: "app.preferences";
     // }
-
     item {
       label: _("_Keyboard Shortcuts");
       action: "app.shortcuts";
