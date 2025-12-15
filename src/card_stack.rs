@@ -67,6 +67,11 @@ mod imp {
         const NAME: &'static str = "CardStack";
         type Type = super::CardStack;
         type ParentType = gtk::Widget;
+
+        fn class_init(klass: &mut Self::Class) {
+            // Hack to use libadwaita focus ring, see libadwaita#381
+            klass.set_css_name("button");
+        }
     }
 
     impl ObjectImpl for CardStack {
@@ -75,10 +80,41 @@ mod imp {
             placeholder.add_css_class("stack-placeholder");
             placeholder.insert_before(&self.obj().to_owned(), None::<&gtk::Widget>);
             self.obj().add_css_class("card-stack");
+            self.obj().add_css_class("no-padding");
         }
     }
 
     impl WidgetImpl for CardStack {
+        fn focus(&self, direction_type: gtk::DirectionType) -> bool {
+            let focus_child = self.obj().focus_child();
+            if let Some(focus_child) = focus_child {
+                if focus_child.child_focus(direction_type) { return true }
+                if self.aspect.get() == 1.4 { return false }
+                if direction_type == gtk::DirectionType::Up || direction_type == gtk::DirectionType::TabBackward {
+                    if let Some(prev) = focus_child.prev_sibling() {
+                        prev.grab_focus();
+                        return true;
+                    }
+                }
+                if direction_type == gtk::DirectionType::Down || direction_type == gtk::DirectionType::TabForward {
+                    if let Some(next) = focus_child.next_sibling() {
+                        next.grab_focus();
+                        return true;
+                    }
+                }
+            } else {
+                if let Some(child) = self.obj().last_card() {
+                    if child.is_focus() { return false }
+                    child.grab_focus();
+                    return true
+                } else if !self.obj().is_focus() {
+                    self.grab_focus();
+                    return true;
+                }
+            }
+            false
+        }
+
         fn measure(&self, orientation: gtk::Orientation, for_size: i32) -> (i32, i32, i32, i32) {
             if for_size == 0 { panic!("solitaire: card_stack: for_size == 0!") }
             // If orientation == horizontal, then for_size is the height
@@ -246,6 +282,10 @@ impl CardStack {
         }
 
         runtime::add_stack(&*this.widget_name(), &this);
+
+        this.set_focusable(true);
+        this.set_accessible_role(gtk::AccessibleRole::List);
+        this.update_property(&[gtk::accessible::Property::Description(&this.get_type())]);
 
         this
     }
