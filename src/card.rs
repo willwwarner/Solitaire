@@ -45,10 +45,22 @@ mod imp {
         const NAME: &'static str = "Card";
         type Type = super::Card;
         type ParentType = adw::Bin;
+
+        fn class_init(klass: &mut Self::Class) {
+            // Hack to use libadwaita focus ring, see libadwaita#381
+            klass.set_css_name("button");
+        }
     }
 
     impl ObjectImpl for Card {}
-    impl WidgetImpl for Card {}
+    impl WidgetImpl for Card {
+        fn focus(&self, direction_type: gtk::DirectionType) -> bool {
+            if direction_type == gtk::DirectionType::TabForward && !self.obj().is_focus() {
+                self.grab_focus();
+                true
+            } else { false }
+        }
+    }
     impl BinImpl for Card {}
 }
 
@@ -62,9 +74,16 @@ impl Card {
         let picture = gtk::Picture::new();
         let texture = renderer::draw_card(name, renderer, &card_theme, id % 13, id / 13);
         picture.set_paintable(Some(&texture));
+        picture.set_focusable(false);
         this.set_child(Some(&picture));
         this.imp().texture.set(Some(texture));
         this.imp().is_face_up.set(true);
+
+        this.set_focusable(true);
+        this.set_accessible_role(gtk::AccessibleRole::ListItem);
+        this.update_property(&[gtk::accessible::Property::Description(&name.replace("_", " "))]);
+        this.add_css_class("no-padding");
+
         this
     }
 
