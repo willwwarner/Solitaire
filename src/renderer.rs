@@ -69,7 +69,7 @@ pub fn set_back_texture(renderer: &rsvg::CairoRenderer, card_theme: &CardTheme) 
 
 pub fn get_card_theme(theme_name: &str) -> CardTheme {
     let (card_width, card_height, theme_width, theme_height) = match theme_name {
-        "anglo_poker" => (241, 337, 3132.5, 1684.8),
+        "anglo_poker" => (241, 337, 3133, 1685),
         "minimum" => (100, 140, 1300.0, 700.0),
         "minimum_dark" => (100, 140, 1300.0, 700.0),
         _ => panic!("Unknown card theme: {}", theme_name),
