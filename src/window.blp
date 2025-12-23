@@ -55,6 +55,7 @@ template $SolitaireWindow: Adw.ApplicationWindow {
 
                 Adw.StatusPage welcome {
                   title: _("Play Solitaire games");
+                  can-focus: false;
                 }
               }
 
@@ -129,15 +130,11 @@ template $SolitaireWindow: Adw.ApplicationWindow {
           StackPage {
             name: "grid";
 
-            child: Grid card_grid {
-              halign: center;
-              row-homogeneous: false;
-              column-homogeneous: false;
-              row-spacing: 6;
-              column-spacing: 6;
-              margin-start: 6;
-              margin-end: 6;
-              margin-bottom: 12;
+            child: Adw.Bin game_bin {
+              margin-start: 2;
+              margin-end: 2;
+              margin-top: 2;
+              margin-bottom: 2;
             };
           }
 

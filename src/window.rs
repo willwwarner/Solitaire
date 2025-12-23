@@ -20,12 +20,9 @@
 
 use gettextrs::gettext;
 use gtk::prelude::*;
-use adw::prelude::*;
-use adw::subclass::prelude::*;
+use adw::{prelude::*, subclass::prelude::*};
 use gtk::{gio, glib};
-use glib::subclass::InitializingObject;
-use crate::{games, runtime};
-use crate::card_stack::CardStack;
+use crate::{games, runtime, card_stack::CardStack, game_board::GameBoard};
 
 thread_local! {
     static SELF: std::cell::RefCell<Option<SolitaireWindow>> = std::cell::RefCell::new(None);
@@ -49,7 +46,7 @@ mod imp {
         #[template_child]
         pub game_stack: TemplateChild<gtk::Stack>,
         #[template_child]
-        pub card_grid: TemplateChild<gtk::Grid>,
+        pub game_bin: TemplateChild<adw::Bin>,
         #[template_child]
         pub search_bar: TemplateChild<gtk::SearchBar>,
         #[template_child]
@@ -87,7 +84,7 @@ mod imp {
             klass.bind_template_instance_callbacks();
         }
 
-        fn instance_init(obj: &InitializingObject<Self>) {
+        fn instance_init(obj: &glib::subclass::InitializingObject<Self>) {
             obj.init_template();
         }
     }
@@ -104,6 +101,7 @@ mod imp {
             });
             self.welcome.get().set_icon_name(Some(crate::config::APP_ID));
             SELF.set(Some(obj.clone()));
+            self.game_bin.get().set_child(Some(&GameBoard::new()));
         }
     }
     impl WidgetImpl for SolitaireWindow {}
@@ -128,6 +126,11 @@ impl SolitaireWindow {
             .build()
     }
 
+    #[inline]
+    fn get_gameboard(&self) -> GameBoard {
+        self.imp().game_bin.get().child().unwrap().downcast().unwrap()
+    }
+
     fn drop(&self) {
         runtime::drop();
     }
@@ -136,10 +139,10 @@ impl SolitaireWindow {
         if let Some(move_) = runtime::get_hint() {
             glib::g_message!("solitaire", "Hint: {:?}", move_);
 
-            let grid = self.imp().card_grid.get();
+            let game_board = self.get_gameboard();
 
             // Focus the source stack
-            if let Ok(source_stack) = runtime::get_child(&grid, &*move_.origin_stack) {
+            if let Ok(source_stack) = runtime::get_child(&game_board, &*move_.origin_stack) {
                 let source_stack = source_stack.downcast::<CardStack>().unwrap();
                 source_stack.hint_card(move_.card_name);
             }
@@ -177,7 +180,7 @@ impl SolitaireWindow {
     #[template_callback]
     fn recent_clicked(&self, _row: &adw::ActionRow) {
         let settings = gio::Settings::new(crate::APP_ID);
-        games::load_game(&settings.get::<String>("recent-game"), &self.imp().card_grid.get());
+        games::load_game(&settings.get::<String>("recent-game"), &self.get_gameboard());
         self.imp().nav_view.get().push_by_tag("game");
     }
 
@@ -200,7 +203,7 @@ impl SolitaireWindow {
                 window.imp().new_game_is_safe.set(false);
                 window.imp().nav_view.get().push_by_tag("game");
                 window.imp().game_stack.set_visible_child_name("spinner");
-                let card_grid = window.imp().card_grid.get();
+                let game_board = window.get_gameboard();
                 #[cfg(debug_assertions)]
                 games::test_solver_state();
 
@@ -213,7 +216,7 @@ impl SolitaireWindow {
                     #[weak]
                     action_row,
                     async move {
-                        if let Some(solution) = games::try_game(&*game_name, &card_grid).await {
+                        if let Some(solution) = games::try_game(&*game_name, &game_board).await {
                             window.imp().game_stack.set_visible_child_name("grid");
                             if !solution.is_empty() {
                                 window.set_hint_drop_enabled(true);
@@ -283,9 +286,9 @@ impl SolitaireWindow {
     #[template_callback]
     fn new_game_clicked(&self, _button: &gtk::Button) {
         let nav_view = self.imp().nav_view.get();
-        let grid = self.imp().card_grid.get();
+        let game_board = self.get_gameboard();
         if self.imp().new_game_is_safe.get() {
-            games::unload(&grid);
+            games::unload(&game_board);
             games::solver::set_should_stop(true);
             nav_view.pop_to_tag("chooser");
             return;
@@ -301,7 +304,7 @@ impl SolitaireWindow {
         ]);
 
         dialog.connect_response(Some("accept"), move |_dialog, _response| {
-            games::unload(&grid);
+            games::unload(&game_board);
             games::solver::set_should_stop(true);
             nav_view.pop_to_tag("chooser");
         });
@@ -346,9 +349,9 @@ impl SolitaireWindow {
         ]);
         dialog.set_response_appearance("new_game", adw::ResponseAppearance::Suggested);
         let nav_view = self.imp().nav_view.get();
-        let grid = self.imp().card_grid.get();
+        let game_board = self.get_gameboard();
         dialog.connect_response(Some("new_game"), move |_dialog, _response| {
-            games::unload(&grid);
+            games::unload(&game_board);
             games::solver::set_should_stop(true);
             nav_view.pop_to_tag("chooser");
         });

@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use crate::{card::Card, card_stack::CardStack, runtime::MoveInstruction::{None, Flip}, games::*, runtime};
+use crate::{card::Card, card_stack::CardStack, game_board::GameBoard, runtime::MoveInstruction::{None, Flip}, games::*, runtime};
 use gtk::subclass::prelude::*;
 
 pub struct Test {}
@@ -27,9 +27,9 @@ pub struct Test {}
 const FOUNDATION:usize = 2;
 
 impl Game for Test {
-    fn new_game(mut cards: Vec<Card>, grid: &gtk::Grid) -> Self {
+    fn new_game(mut cards: Vec<Card>, game_board: &GameBoard) -> Self {
         cards.sort_by(|a, b| a.imp().card_id.get().cmp(&b.imp().card_id.get()));
-        let stock = CardStack::new(1.4, "stock", -1);
+        let stock = CardStack::new("stock", -1, false);
         for _ in 0..52 {
             let card = &cards[0];
             card.flip_to_back();
@@ -38,12 +38,12 @@ impl Game for Test {
             cards.remove(0);
         }
         stock.add_click_to_slot();
-        grid.attach(&stock, 0, 0, 1, 1);
-        let waste = CardStack::new(1.4, "waste", -1);
-        grid.attach(&waste, 1, 0, 1, 1);
-        let foundation = CardStack::new(1.4, "foundation", -1);
+        game_board.add(&stock, 0, 0, 1, 1);
+        let waste = CardStack::new("waste", -1, false);
+        game_board.add(&waste, 1, 0, 1, 1);
+        let foundation = CardStack::new("foundation", -1, false);
         foundation.enable_drop();
-        grid.attach(&foundation, 0, 1, 1, 1);
+        game_board.add(&foundation, 0, 1, 1, 1);
         Self {}
     }
 

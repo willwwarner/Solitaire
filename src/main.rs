@@ -25,6 +25,7 @@ mod renderer;
 mod games;
 mod card;
 mod card_stack;
+mod game_board;
 mod runtime;
 
 use self::application::SolitaireApplication;
