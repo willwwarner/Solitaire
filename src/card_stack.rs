@@ -19,7 +19,7 @@
  */
 
 use adw::gio::ListModel;
-use gtk::{glib, gdk, gsk, DragSource, GestureClick};
+use gtk::{glib, gdk, DragSource, GestureClick};
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use std::cell::Cell;
@@ -57,7 +57,7 @@ mod imp {
 
     #[derive(Default)]
     pub struct CardStack {
-        pub aspect: Cell<f32>,
+        pub fan_cards: Cell<bool>,
         pub v_offset: Cell<u32>,
         pub stack_type: Cell<String>,
     }
@@ -89,7 +89,7 @@ mod imp {
             let focus_child = self.obj().focus_child();
             if let Some(focus_child) = focus_child {
                 if focus_child.child_focus(direction_type) { return true }
-                if self.aspect.get() == 1.4 { return false }
+                if self.fan_cards.get() == false { return false }
                 if direction_type == gtk::DirectionType::Up || direction_type == gtk::DirectionType::TabBackward {
                     if let Some(prev) = focus_child.prev_sibling() {
                         prev.grab_focus();
@@ -115,89 +115,53 @@ mod imp {
             false
         }
 
-        fn measure(&self, orientation: gtk::Orientation, for_size: i32) -> (i32, i32, i32, i32) {
-            if for_size == 0 { panic!("solitaire: card_stack: for_size == 0!") }
-            // If orientation == horizontal, then for_size is the height
-            if for_size == -1 {
-                if orientation == gtk::Orientation::Horizontal {
-                    return (25, 250, -1, -1);
-                } else { // orientation == gtk::Orientation::Vertical
-                    let aspect = self.aspect.get();
-                    return (25 * aspect as i32, (250.0 * aspect) as i32, -1, -1);
-                }
-            } else {
-                let aspect = self.aspect.get();
-                if orientation == gtk::Orientation::Horizontal {
-                    return (25, (for_size as f32 / aspect) as i32, -1, -1);
-                } else { // orientation == gtk::Orientation::Vertical
-                    return (25 * aspect as i32, (for_size as f32 * aspect) as i32, -1, -1);
-                }
-            }
-        }
-
         fn size_allocate(&self, width: i32, height: i32, _baseline: i32) {
             let widget = self.obj();
             let children = widget.observe_children();
             let child_count = children.n_items();
-            let stack_aspect = self.aspect.get();
+            let height_f = height as f32;
+            let width_f = width as f32;
+            let stack_aspect = height_f / width_f;
             let card_aspect = renderer::ASPECT.get();
-
-            let allocation_width;
             let allocation_height;
-            if stack_aspect != 1.4 {
-                let max_height = (width as f32 * stack_aspect).floor() as i32;
-                let vertical_offset;
+            let allocation_width;
 
-                if child_count < 3 {
-                    if height > max_height {
-                        allocation_width = width;
-                        allocation_height = (width as f32 * card_aspect) as i32;
-                    } else {
-                        allocation_width = (height as f32 / stack_aspect) as i32;
-                        allocation_height = (allocation_width as f32 * card_aspect) as i32;
-                    }
-                    vertical_offset = 0;
-                } else if height > max_height {
-                    allocation_height = (width as f32 * card_aspect).floor() as i32;
-                    vertical_offset = std::cmp::min((max_height - allocation_height) / (child_count as i32 - 2), allocation_height / 5) as u32;
-                    allocation_width = width;
+            if self.fan_cards.get() == true {
+                if stack_aspect < card_aspect { // RTL stacks
+                    allocation_width = (height_f / stack_aspect) as i32;
+                    allocation_height = height;
                 } else {
-                    allocation_width = (height as f32 / stack_aspect).floor() as i32;
-                    allocation_height = (allocation_width as f32 * card_aspect).floor() as i32;
+                    allocation_width = width;
+                    allocation_height = (width_f * card_aspect) as i32;
+                }
+                let vertical_offset;
+                if child_count < 3 {
+                    vertical_offset = 0;
+                } else {
                     vertical_offset = std::cmp::min((height - allocation_height) / (child_count as i32 - 2), allocation_height / 5) as u32;
                 }
-                let x_offset = (width - allocation_width) / 2;
 
-                // Position each card with proper spacing
                 widget.first_child().unwrap().downcast::<gtk::Widget>().unwrap().
-                    size_allocate(&gtk::Allocation::new(x_offset + 2, 2, allocation_width - 4, allocation_height - 4), -1);
+                    size_allocate(&gtk::Allocation::new(2, 2, allocation_width - 4, allocation_height - 4), -1);
                 for i in 1..child_count {
                     if let Some(child) = children.item(i) {
                         if let Ok(card) = child.downcast::<gtk::Widget>() {
                             let y_pos = ((i - 1) * vertical_offset) as i32;
-                            let allocation = gtk::Allocation::new(x_offset, y_pos, allocation_width, allocation_height);
+                            let allocation = gtk::Allocation::new(0, y_pos, allocation_width, allocation_height);
                             card.size_allocate(&allocation, -1);
                         }
                     }
                 }
                 self.v_offset.set(vertical_offset);
             } else {
-                let max_card_height = (width as f32 * card_aspect).floor() as i32;
-                if height > max_card_height {
-                    allocation_width = width;
-                    allocation_height = max_card_height;
-                } else {
-                    allocation_width = (height as f32 / card_aspect).floor() as i32;
-                    allocation_height = height;
-                }
-                let x_offset = (width - allocation_width) / 2;
-
+                allocation_width = width;
+                allocation_height = (width_f * card_aspect) as i32;
                 widget.first_child().unwrap().downcast::<gtk::Widget>().unwrap()
-                    .size_allocate(&gtk::Allocation::new(x_offset + 2, 2, allocation_width - 4, allocation_height - 4), -1);
+                    .size_allocate(&gtk::Allocation::new(2, 2, allocation_width - 4, allocation_height - 4), -1);
                 for i in 1..child_count {
                     if let Some(child) = children.item(i) {
                         if let Ok(card) = child.downcast::<gtk::Widget>() {
-                            let allocation = gtk::Allocation::new(x_offset, 0, allocation_width, allocation_height);
+                            let allocation = gtk::Allocation::new(0, 0, allocation_width, allocation_height);
                             card.size_allocate(&allocation, -1);
                         }
                     }
@@ -238,30 +202,21 @@ mod imp {
             let child_count = children.n_items();
             let card_width = self.card_width.get();
             let card_width_f = card_width as f32;
-
-            if child_count == 0 {
-                return;
-            }
-            
             let aspect = renderer::ASPECT.get();
-            if child_count == 1 {
-                widget.first_child().unwrap().allocate(card_width, (card_width_f * aspect) as i32, -1, None);
-                return;
-            }
 
-            let card_height = (card_width_f * aspect).floor() as i32;
+            let card_height = (card_width_f * aspect) as i32;
             if height < card_height {
                 panic!("solitaire: transfer_card_stack height is is less than card_height, height: {height}");
             }
 
             let vertical_offset = self.v_offset.get();
 
-            // Position each card with proper spacing
             for i in 0..child_count {
                 if let Some(child) = children.item(i) {
                     if let Ok(card) = child.downcast::<gtk::Widget>() {
-                        let y_pos = (i * vertical_offset) as f32;
-                        card.allocate(card_width, card_height, -1, Some(gsk::Transform::new().translate(&gtk::graphene::Point::new(0.0, y_pos))));
+                        let y_pos = (i * vertical_offset) as i32;
+                        let allocation = gtk::Allocation::new(0, y_pos, card_width, card_height);
+                        card.size_allocate(&allocation, -1);
                     }
                 }
             }
@@ -270,11 +225,10 @@ mod imp {
 }
 
 impl CardStack {
-    pub fn new(aspect: f32, stack_type: &str, n_of_type: i32) -> Self {
+    pub fn new(stack_type: &str, n_of_type: i32, fan_cards: bool) -> Self {
         let this:CardStack = glib::Object::new();
-        if aspect < 1.4 { panic!("solitaire: set_aspect() called with aspect < 1.4 \nRTL stacks are not currently supported."); }
-        this.imp().aspect.set(aspect);
         this.imp().stack_type.set(stack_type.to_string());
+        this.imp().fan_cards.set(fan_cards);
         if n_of_type < 0 {
             this.set_widget_name(stack_type);
         } else {
@@ -288,11 +242,6 @@ impl CardStack {
         this.update_property(&[gtk::accessible::Property::Description(&this.get_type())]);
 
         this
-    }
-
-    pub fn set_aspect(&self, aspect: f32) {
-        if aspect < 1.4 { panic!("solitaire: set_aspect() called with aspect < 1.4 \nRTL stacks are not currently supported."); }
-        self.imp().aspect.set(aspect);
     }
 
     pub fn get_type(&self) -> String {
@@ -344,7 +293,7 @@ impl CardStack {
         let new_stack = TransferCardStack::new();
         new_stack.imp().v_offset.set(self.imp().v_offset.get());
         new_stack.imp().origin_name.set(self.widget_name().to_string());
-        new_stack.imp().card_width.set(self.first_child().unwrap().width());
+        new_stack.imp().card_width.set(self.last_child().unwrap().width());
 
         // First, find the starting index
         let start_index = get_index(card_name, &children).expect("Couldn't get card");

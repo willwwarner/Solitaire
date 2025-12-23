@@ -18,7 +18,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use crate::{runtime, runtime::MoveInstruction, card::Card, card_stack::CardStack};
+use crate::{runtime, runtime::MoveInstruction, game_board::GameBoard, card::Card, card_stack::CardStack};
 use gtk::{prelude::*, subclass::prelude::*};
 use gtk::glib;
 use super::*;
@@ -30,11 +30,11 @@ impl Klondike {}
 const FOUNDATION:&[usize] = &[7, 8, 9, 10];
 
 impl Game for Klondike {
-    fn new_game(mut cards: Vec<Card>, grid: &gtk::Grid) -> Self {
+    fn new_game(mut cards: Vec<Card>, game_board: &GameBoard) -> Self {
         let mut n_cards = cards.len() as i32;
 
         for i in 0..7 {
-            let card_stack = CardStack::new(2.8 /* 2 card heights */, "tableau", i);
+            let card_stack = CardStack::new("tableau", i, true);
 
             for j in 0..(i + 1) {
                 let random_card = glib::random_int_range(0, n_cards) as usize;
@@ -50,21 +50,21 @@ impl Game for Klondike {
                 n_cards -= 1;
             }
 
-            grid.attach(&card_stack, i, 1, 1, 2);
+            game_board.add(&card_stack, i, 1, 1, 2);
 
             card_stack.enable_drop();
         }
 
         for i in 0..4 {
-            let card_stack = CardStack::new(1.4, "foundation", i);
-            grid.attach(&card_stack, i + 3, 0, 1, 1);
+            let card_stack = CardStack::new("foundation", i, false);
+            game_board.add(&card_stack, i + 3, 0, 1, 1);
             card_stack.enable_drop();
         }
 
-        let waste = CardStack::new(1.4, "waste", -1);
-        grid.attach(&waste, 1, 0, 1, 1);
+        let waste = CardStack::new("waste", -1, false);
+        game_board.add(&waste, 1, 0, 1, 1);
 
-        let stock = CardStack::new(1.4, "stock", -1);
+        let stock = CardStack::new("stock", -1, false);
         stock.add_click_to_slot();
         while n_cards > 0 {
             let random_card = glib::random_int_range(0, n_cards) as usize;
@@ -74,11 +74,11 @@ impl Game for Klondike {
                 runtime::connect_double_click(&card);
                 cards.remove(random_card);
             } else {
-                glib::g_error!("solitaire", "Failed to get card from grid");
+                glib::g_error!("solitaire", "Failed to get card from game_board");
             }
             n_cards -= 1;
         }
-        grid.attach(&stock, 0, 0, 1, 1);
+        game_board.add(&stock, 0, 0, 1, 1);
 
         Self {}
     }
