@@ -22,7 +22,7 @@ use std::sync::Mutex;
 use adw::prelude::*;
 use gtk::{gio, glib};
 use gettextrs::gettext;
-use crate::{renderer, card::Card, card_stack::CardStack, runtime};
+use crate::{renderer, card::Card, card_stack::CardStack, game_board::GameBoard, runtime};
 
 #[cfg(debug_assertions)]
 mod test;
@@ -33,7 +33,7 @@ pub const SUITES: [&str; 4] = ["club", "diamond", "heart", "spade"]; // Use this
 pub const RANKS: [&str; 13] = ["ace", "2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king"];
 static CURRENT_GAME: Mutex<Option<Box<dyn Game>>> = Mutex::new(None);
 
-pub fn load_game(game_name: &str, grid: &gtk::Grid) {
+pub fn load_game(game_name: &str, game_board: &GameBoard) {
     let window = crate::window::SolitaireWindow::get_window().unwrap();
     window.lookup_action("undo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
     window.lookup_action("redo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
@@ -49,35 +49,32 @@ pub fn load_game(game_name: &str, grid: &gtk::Grid) {
     let mut game = CURRENT_GAME.lock().unwrap();
     match game_name {
         #[cfg(debug_assertions)]
-        "Test" => *game = Some(Box::new(test::Test::new_game(cards, &grid))),
-        "Klondike" => *game = Some(Box::new(klondike::Klondike::new_game(cards, &grid))),
+        "Test" => *game = Some(Box::new(test::Test::new_game(cards, &game_board))),
+        "Klondike" => *game = Some(Box::new(klondike::Klondike::new_game(cards, &game_board))),
         _ => panic!("Unknown game: {}", game_name),
     }
-    
-
-    // Log game loading
-    println!("Loaded game: {}", game_name);
 }
 
-pub fn unload(grid: &gtk::Grid) {
+pub fn unload(game_board: &GameBoard) {
     let mut game = CURRENT_GAME.lock().unwrap();
     *game = None;
     runtime::clear_history_and_moves();
     runtime::clear_state();
     runtime::update_deals(0);
-    let items = grid.observe_children().n_items();
+    let items = game_board.observe_children().n_items();
     let mut cards = Vec::new();
     for _ in 0..items {
-        let child = grid.first_child().expect("Couldn't get child");
+        let child = game_board.first_child().expect("Couldn't get child");
         child.downcast::<CardStack>().unwrap().destroy_and_return_cards(&mut cards);
     }
     runtime::set_cards(cards);
+    game_board.reset_layout();
 }
 
 pub fn get_games() -> Vec<String> {
     vec![
         #[cfg(debug_assertions)] gettext("Test"),
-        gettext("Klondike")
+        gettext("Klondike"),
     ] //, "Spider", "FreeCell", "Tri-Peaks", "Pyramid", "Yukon"] not yet :)
 }
 
@@ -143,13 +140,13 @@ pub fn get_is_won_fn() -> Box<dyn FnMut(&mut solver::State) -> bool> {
 
 pub mod solver;
 
-pub async fn try_game(game_name: &str, card_grid: &gtk::Grid) -> Option<Vec<runtime::Move>> {
+pub async fn try_game(game_name: &str, game_board: &GameBoard) -> Option<Vec<runtime::Move>> {
     solver::set_should_stop(false);
     for _ in 0..3 {
         if solver::get_should_stop() { return None; }
-        load_game(game_name, &card_grid);
+        load_game(game_name, &game_board);
         let mut stack_names = Vec::new();
-        let stacks = card_grid.observe_children();
+        let stacks = game_board.observe_children();
         let mut game_state = Vec::new();
         for i in 0..stacks.n_items() {
             let stack = stacks.item(i).unwrap().downcast::<CardStack>().unwrap();
@@ -185,7 +182,7 @@ pub async fn try_game(game_name: &str, card_grid: &gtk::Grid) -> Option<Vec<runt
                 return Some(history);
             }
         }
-        unload(&card_grid);
+        unload(&game_board);
     }
 
     // Couldn't find a solution
@@ -250,7 +247,7 @@ pub fn test_solver_state() {
 }
 
 trait Game: Send + Sync {
-    fn new_game(cards: Vec<Card>, grid: &gtk::Grid) -> Self where Self: Sized;
+    fn new_game(cards: Vec<Card>, game_board: &GameBoard) -> Self where Self: Sized;
     fn verify_drag(&self, bottom_card: &Card, from_stack: &CardStack) -> bool;
     fn verify_drop(&self, bottom_card: &Card, to_stack: &CardStack) -> bool;
     fn on_drag_completed(&self, origin_stack: &CardStack, destination_stack: &CardStack, move_: &mut runtime::Move);
