@@ -6,5 +6,9 @@
 			<summary>The most recently played game</summary>
 			<description>The last game that was played by the user.</description>
 		</key>
+	  <key name="theme" type="s">
+			<default>'anglo_poker'</default>
+			<summary>The theme of the playing cards</summary>
+		</key>
 	</schema>
 </schemalist>

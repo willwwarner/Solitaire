@@ -1,0 +1,6 @@
+[wrap-git]
+directory = libgnome-games-support
+url = https://gitlab.gnome.org/wwarner/libgnome-games-support.git
+branch = compat-rs
+revision = fe4a160a9ee5e12541eb49964f51f15d763ceeaa
+depth = 1

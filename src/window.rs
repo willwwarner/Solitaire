@@ -22,6 +22,7 @@ use gettextrs::gettext;
 use gtk::prelude::*;
 use adw::{prelude::*, subclass::prelude::*};
 use gtk::{gio, glib};
+use lggs::prelude::*;
 use crate::{games, runtime, card_stack::CardStack, game_board::GameBoard};
 
 thread_local! {
@@ -131,6 +132,31 @@ impl SolitaireWindow {
         self.imp().game_bin.get().child().unwrap().downcast().unwrap()
     }
 
+    fn appearance(&self) {
+        use crate::renderer;
+        let theme_name = renderer::get_requested_theme();
+        let settings = gtk::gio::Settings::new(crate::APP_ID);
+        let change_theme = move |theme_name: &str, widget: &gtk::Widget| {
+            let picture = widget.to_owned().downcast::<gtk::Picture>().unwrap();
+            picture.set_content_fit(gtk::ContentFit::ScaleDown);
+            let card_theme = renderer::get_card_theme(theme_name);
+            let renderer = rsvg::CairoRenderer::new(&card_theme.handle);
+            renderer::draw_theme_preview(theme_name, &card_theme, &renderer, &picture);
+            settings.set("theme", theme_name.to_string());
+            picture.upcast()
+        };
+        let picture = gtk::Picture::new().upcast::<gtk::Widget>();
+        change_theme(&theme_name, &picture);
+
+        let theme_dialog = lggs::ThemeSelectorDialog::new(&renderer::THEME_NAMES,
+                                                          &theme_name,
+                                                          &picture);
+        theme_dialog.connect_change_theme(move |_, theme_name, widget| {
+            change_theme(theme_name, widget)
+        });
+        theme_dialog.present(Some(self));
+    }
+
     fn drop(&self) {
         runtime::drop();
     }
@@ -162,6 +188,9 @@ impl SolitaireWindow {
     }
 
     fn setup_gactions(&self) {
+        let appearance_action = gio::ActionEntry::builder("appearance")
+            .activate(move |win: &Self, _, _| win.appearance())
+            .build();
         let drop_action = gio::ActionEntry::builder("drop")
             .activate(move |win: &Self, _, _| win.drop())
             .build();
@@ -174,7 +203,7 @@ impl SolitaireWindow {
         let redo_action = gio::ActionEntry::builder("redo")
             .activate(move |win: &Self, _, _| win.redo())
             .build();
-        self.add_action_entries([drop_action, hint_action, undo_action, redo_action]);
+        self.add_action_entries([appearance_action, drop_action, hint_action, undo_action, redo_action]);
     }
 
     #[template_callback]

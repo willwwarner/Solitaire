@@ -16,5 +16,12 @@ package = "libadwaita"
 version = "0.8"
 features = ["v1_8"]
 
+[dependencies.lggs]
+package = "libgnome-games-support"
+git = "https://gitlab.gnome.org/wwarner/libgnome-games-support-rs.git"
+branch = "0.1"
+version = "0.1"
+features = ["adw_v1_8"]
+
 [features]
 solver-debug = []

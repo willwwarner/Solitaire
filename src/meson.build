@@ -42,7 +42,11 @@ run_command(
 )
 
 cargo_bin  = find_program('cargo')
-cargo_env  = [ 'CARGO_HOME=' + meson.project_build_root()  / 'cargo-home' ]
+cargo_env  = [
+  'CARGO_HOME=' + meson.project_build_root()  / 'cargo-home',
+  'RUSTFLAGS=-L ' + (meson.project_build_root() / 'subprojects' / 'libgnome-games-support' / 'games')
+  + ' -lgnome-games-support-3'
+]
 
 cargo_build = custom_target(
   'cargo-build',
