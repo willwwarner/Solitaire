@@ -40,9 +40,15 @@ pub fn load_game(game_name: &str, game_board: &GameBoard) {
     window.set_hint_drop_enabled(false);
 
     let mut cards = runtime::get_cards();
+    let theme_name = renderer::get_requested_theme();
+    if theme_name != renderer::ACTIVE_THEME.with_borrow(|t| { t.clone() }) {
+        cards.clear();
+    }
+
     if cards.is_empty() {
-        let card_theme = renderer::get_card_theme("anglo_poker");
+        let card_theme = renderer::get_card_theme(&theme_name);
         renderer::create_cards(&card_theme, &mut cards);
+        renderer::ACTIVE_THEME.set(theme_name);
     }
 
     // Store the current game type

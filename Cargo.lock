@@ -902,6 +902,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
+name = "lggs-sys"
+version = "0.1.0"
+source = "git+https://gitlab.gnome.org/wwarner/libgnome-games-support-rs.git?branch=0.1#ec3f17bd1cfc3e96344825dedc97eb47d34ca121"
+dependencies = [
+ "gdk4-sys",
+ "gio-sys",
+ "glib-sys",
+ "gobject-sys",
+ "gtk4-sys",
+ "libadwaita-sys",
+ "libc",
+ "pango-sys",
+]
+
+[[package]]
 name = "libadwaita"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -937,6 +952,22 @@ name = "libc"
 version = "0.2.175"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a82ae493e598baaea5209805c49bbf2ea7de956d50d7da0da1164f9c6d28543"
+
+[[package]]
+name = "libgnome-games-support"
+version = "0.1.0"
+source = "git+https://gitlab.gnome.org/wwarner/libgnome-games-support-rs.git?branch=0.1#ec3f17bd1cfc3e96344825dedc97eb47d34ca121"
+dependencies = [
+ "bitflags",
+ "gdk4",
+ "gio",
+ "glib",
+ "gtk4",
+ "lggs-sys",
+ "libadwaita",
+ "libc",
+ "pango",
+]
 
 [[package]]
 name = "librsvg"
@@ -1676,6 +1707,7 @@ dependencies = [
  "gtk4",
  "indexmap",
  "libadwaita",
+ "libgnome-games-support",
  "librsvg",
 ]
 

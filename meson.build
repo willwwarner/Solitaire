@@ -19,6 +19,14 @@ else
   app_id = 'org.gnome.gitlab.wwarner.Solitaire.Devel'
 endif
 
+glib_dependency = dependency('glib-2.0', version: '>= 2.80.0')
+gtk_dependency = dependency('gtk4', version: '>= 4.16.0')
+adw_dependency = dependency('libadwaita-1', version: '>= 1.8')
+libgnome_games_support = subproject ('libgnome-games-support',
+                                     default_options: 'superproject_name=solitaire')
+
+libgnome_games_support_dep = libgnome_games_support.get_variable ('lggs_dependency')
+
 subdir('data')
 subdir('src')
 subdir('po')
