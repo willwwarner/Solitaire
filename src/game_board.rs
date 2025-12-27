@@ -84,10 +84,8 @@ mod imp {
 
     impl LayoutManagerImpl for AspectGridLayout {
         fn allocate(&self, widget: &gtk::Widget, width: i32, height: i32, _baseline: i32) {
-            let mut child_widget = match widget.first_child() {
-                Some(child) => child,
-                None => return,
-            };
+            let children = widget.observe_children();
+            if children.n_items() == 0 { return }
             let col_width1;
             let row_height1;
             let row_height2;
@@ -95,56 +93,102 @@ mod imp {
             let row_constrained;
             let split;
             let h_offset;
+            let mut spacing1 = 0f64;
+            let mut spacing_split = 0;
             {
                 let width_f = width as f64;
                 let height_f = height as f64;
                 let ratio_real = height_f / width_f;
                 let card_aspect = crate::renderer::ASPECT.get() as f64;
                 row_constrained = ratio_real < self.ratio.get() * card_aspect;
+                let rows = self.rows.get();
+                let cols = self.cols.get();
+
                 if row_constrained {
-                    let rows = self.rows.get();
                     row_height1 = (height_f / rows).floor();
                     split = height_f as i32 % rows as i32;
                     row_height2 = row_height1 + 1.0;
                     col_width1 = (row_height1 / card_aspect).floor();
                     col_width2 = (row_height2 / card_aspect).floor();
-                    h_offset = (width_f - (col_width1 * self.cols.get())) as i32 / 2;
+                    let unused_x = width_f - (col_width2 * cols);
+                    let spacing_alloc = unused_x / 10.0;
+                    if cols > 1.0 {
+                        spacing1 = (spacing_alloc / (cols - 1.0)).floor();
+                        spacing_split = spacing_alloc as i32 % (cols - 1.0) as i32;
+                    }
+                    h_offset = (unused_x / 1.8) as i32; // 1.8 = 90% / 2
                 } else {
-                    let cols = self.cols.get();
                     col_width1 = (width_f / cols).floor();
                     col_width2 = col_width1 + 1.0;
                     split = width_f as i32 % cols as i32;
                     row_height1 = (col_width1 * card_aspect).floor();
                     row_height2 = (col_width2 * card_aspect).floor();
+                    let unused_y = height_f - (row_height2 * rows);
+                    let spacing_alloc = unused_y / 10.0;
+                    if rows > 1.0 {
+                        spacing1 = (spacing_alloc / (rows - 1.0)).floor();
+                        spacing_split = spacing_alloc as i32 % (rows - 1.0) as i32;
+                    }
                     h_offset = 0;
                 }
             }
-            loop {
-                let layout_child = self.obj().layout_child(&child_widget).downcast::<super::AspectGridLayoutChild>().unwrap();
 
+            let spacing2 = spacing1 + 1.0;
+            let h_mod1_base = {
+                if row_constrained { h_offset }
+                else { h_offset + split }
+            };
+            let v_mod1_base = if row_constrained { split } else { 0 };
+            let x1 = if row_constrained { col_width2 } else { col_width1 };
+            let y1 = if row_constrained { row_height1 } else { row_height2 };
+
+            let mut width;
+            let mut height;
+            let mut x;
+            let mut y;
+            let mut h_mod;
+            let mut v_mod;
+
+            for i in 0..children.n_items() {
+                let child_widget = children.item(i).unwrap().downcast::<gtk::Widget>().unwrap();
+                let layout_child = self.obj().layout_child(&child_widget).downcast::<super::AspectGridLayoutChild>().unwrap();
                 let n_constrained = if row_constrained { layout_child.row() } else { layout_child.column() } as i32;
-                let allocation = if n_constrained < split {
-                    gtk::Allocation::new((layout_child.column() * col_width2) as i32 + h_offset,
-                                         (layout_child.row() * row_height2) as i32,
-                                         (layout_child.column_span() * col_width2) as i32,
-                                         (layout_child.row_span() * row_height2) as i32)
+                if n_constrained < split {
+                    h_mod = h_offset;
+                    v_mod = 0;
+                    width = col_width2;
+                    height = row_height2;
+                    x = col_width2;
+                    y = row_height2;
                 } else {
-                    let h_mod = {
-                        if row_constrained { h_offset }
-                        else { h_offset + split }
-                    };
-                    gtk::Allocation::new((layout_child.column() * col_width1) as i32 + h_mod,
-                                         (layout_child.row() * row_height1) as i32,
-                                         (layout_child.column_span() * col_width1) as i32,
-                                         (layout_child.row_span() * row_height1) as i32)
+                    h_mod = h_mod1_base;
+                    v_mod = v_mod1_base;
+                    width = col_width1;
+                    height = row_height1;
+                    x = x1;
+                    y = y1;
                 };
+                let n_unconstrained = if row_constrained { layout_child.column() } else { layout_child.row() } as i32;
+                if row_constrained {
+                    if n_unconstrained < spacing_split { x += spacing2 }
+                    else {
+                        x += spacing1;
+                        h_mod += spacing_split;
+                    }
+                } else {
+                    if n_unconstrained < spacing_split { y += spacing2 }
+                    else {
+                        y += spacing1;
+                        v_mod += spacing_split;
+                    }
+                }
+
+                let allocation = gtk::Allocation::new((layout_child.column() * x) as i32 + h_mod,
+                                                      (layout_child.row() * y) as i32 + v_mod,
+                                                      (layout_child.column_span() * width) as i32,
+                                                      (layout_child.row_span() * height) as i32);
 
                 child_widget.size_allocate(&allocation, -1);
-                if let Some(next_child) = child_widget.next_sibling() {
-                    child_widget = next_child;
-                } else {
-                    break;
-                }
             }
         }
 

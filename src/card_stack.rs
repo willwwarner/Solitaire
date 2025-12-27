@@ -76,11 +76,13 @@ mod imp {
 
     impl ObjectImpl for CardStack {
         fn constructed(&self) {
-            let placeholder = gtk::Picture::new();
-            placeholder.add_css_class("stack-placeholder");
-            placeholder.insert_before(&self.obj().to_owned(), None::<&gtk::Widget>);
-            self.obj().add_css_class("card-stack");
-            self.obj().add_css_class("no-padding");
+            let this = self.obj();
+            this.add_css_class("card-stack");
+            this.add_css_class("no-padding");
+
+            this.set_focusable(true);
+            this.set_accessible_role(gtk::AccessibleRole::List);
+            this.update_property(&[gtk::accessible::Property::Description(&this.get_type())]);
         }
     }
 
@@ -147,7 +149,7 @@ mod imp {
                     if let Some(child) = children.item(i) {
                         if let Ok(card) = child.downcast::<gtk::Widget>() {
                             let y_pos = ((i - 1) * vertical_offset) as i32;
-                            let allocation = gtk::Allocation::new(0, y_pos, allocation_width, allocation_height);
+                            let allocation = gtk::Allocation::new(0, y_pos, allocation_width, allocation_height); // FIXME: implement RTL logic
                             card.size_allocate(&allocation, -1);
                         }
                     }
@@ -182,7 +184,6 @@ mod imp {
     pub struct TransferCardStack {
         pub origin_name: Cell<String>,
         pub v_offset: Cell<u32>,
-        pub card_width: Cell<i32>,
         pub drag_x: Cell<i32>,
         pub drag_y: Cell<i32>,
     }
@@ -196,17 +197,23 @@ mod imp {
 
     impl ObjectImpl for TransferCardStack {}
     impl WidgetImpl for TransferCardStack {
-        fn size_allocate(&self, _width: i32, height: i32, _baseline: i32) {
+        fn size_allocate(&self, width: i32, height: i32, _baseline: i32) {
             let widget = self.obj();
             let children = widget.observe_children();
             let child_count = children.n_items();
-            let card_width = self.card_width.get();
-            let card_width_f = card_width as f32;
-            let aspect = renderer::ASPECT.get();
+            let height_f = height as f32;
+            let width_f = width as f32;
+            let stack_aspect = height_f / width_f;
+            let card_aspect = renderer::ASPECT.get();
+            let allocation_height;
+            let allocation_width;
 
-            let card_height = (card_width_f * aspect) as i32;
-            if height < card_height {
-                panic!("solitaire: transfer_card_stack height is is less than card_height, height: {height}");
+            if stack_aspect < card_aspect { // RTL stacks
+                allocation_width = (height_f / stack_aspect) as i32;
+                allocation_height = height;
+            } else {
+                allocation_width = width;
+                allocation_height = (width_f * card_aspect) as i32;
             }
 
             let vertical_offset = self.v_offset.get();
@@ -215,7 +222,7 @@ mod imp {
                 if let Some(child) = children.item(i) {
                     if let Ok(card) = child.downcast::<gtk::Widget>() {
                         let y_pos = (i * vertical_offset) as i32;
-                        let allocation = gtk::Allocation::new(0, y_pos, card_width, card_height);
+                        let allocation = gtk::Allocation::new(0, y_pos, allocation_width, allocation_height);
                         card.size_allocate(&allocation, -1);
                     }
                 }
@@ -237,9 +244,9 @@ impl CardStack {
 
         runtime::add_stack(&*this.widget_name(), &this);
 
-        this.set_focusable(true);
-        this.set_accessible_role(gtk::AccessibleRole::List);
-        this.update_property(&[gtk::accessible::Property::Description(&this.get_type())]);
+        let placeholder = gtk::Picture::new();
+        placeholder.add_css_class("stack-placeholder");
+        placeholder.insert_before(&this, None::<&gtk::Widget>);
 
         this
     }
@@ -251,7 +258,7 @@ impl CardStack {
     }
 
     pub fn enable_drop(&self) {
-        let drop_target = gtk::DropTarget::new(glib::Type::OBJECT, gdk::DragAction::MOVE);
+        let drop_target = gtk::DropTarget::new(TransferCardStack::static_type(), gdk::DragAction::MOVE);
         drop_target.connect_drop(|drop, val, _x, _y| {
             let to_stack = drop.widget().unwrap().downcast::<CardStack>().unwrap();
             if let Ok(transfer_stack) = val.get::<TransferCardStack>() {
@@ -293,7 +300,6 @@ impl CardStack {
         let new_stack = TransferCardStack::new();
         new_stack.imp().v_offset.set(self.imp().v_offset.get());
         new_stack.imp().origin_name.set(self.widget_name().to_string());
-        new_stack.imp().card_width.set(self.last_child().unwrap().width());
 
         // First, find the starting index
         let start_index = get_index(card_name, &children).expect("Couldn't get card");
@@ -324,11 +330,9 @@ impl CardStack {
     }
 
     pub fn add_card(&self, card: &Card) {
-        // Only add the card if it doesn't already have a parent
         if card.parent().is_none() {
             card.insert_before(self, None::<&gtk::Widget>);
         }  else {
-            // If the card already has a parent, log a warning
             glib::g_warning!("solitaire", "Attempted to add a widget that already has a parent");
         }
     }
@@ -362,22 +366,18 @@ impl CardStack {
         }
     }
 
-    pub fn face_up_top_card(&self) -> bool {
+    pub fn face_up_top_card(&self) {
         if let Some(widget) = self.last_card() {
             let card = widget.downcast::<Card>().expect("Child is not a Card (flip)");
             card.flip_to_face();
-            return false; // The stack is not empty
         }
-        true // The stack is empty
     }
 
-    pub fn face_down_top_card(&self) -> bool {
+    pub fn face_down_top_card(&self) {
         if let Some(widget) = self.last_card() {
             let card = widget.downcast::<Card>().expect("Child is not a Card (flip)");
             card.flip_to_back();
-            return false; // The stack is not empty
         }
-        true // The stack is empty
     }
 
     pub fn add_drag_to_card(&self, card: &Card) {
@@ -391,7 +391,7 @@ impl CardStack {
                 let move_stack = stack.split_to_new_on(&*src.widget().unwrap().widget_name());
                 move_stack.imp().drag_x.set(x as i32);
                 move_stack.imp().drag_y.set(y as i32);
-                let value = move_stack.upcast::<glib::Object>().to_value();
+                let value = move_stack.to_value();
 
                 Some(gdk::ContentProvider::for_value(&value))
             } else {
@@ -402,23 +402,19 @@ impl CardStack {
         drag_source.connect_drag_begin(|src, drag| {
             let icon = gtk::DragIcon::for_drag(drag);
             let provider = drag.content();
-            let value = provider.value(glib::Type::OBJECT).unwrap();
+            let value = provider.value(TransferCardStack::static_type()).unwrap();
 
-            if let Ok(obj) = value.get::<glib::Object>() {
-                if let Ok(original_stack) = obj.downcast::<TransferCardStack>() {
-                    let stack_clone = original_stack.clone();
-                    icon.set_child(Some(&stack_clone));
-                    stack_clone.allocate(original_stack.width_request(), original_stack.height_request(), 0, None);
-                    drag.set_hotspot(original_stack.imp().drag_x.get(), original_stack.imp().drag_y.get());
-                }
+            if let Ok(original_stack) = value.get::<TransferCardStack>() {
+                icon.set_child(Some(&original_stack));
+                original_stack.allocate(original_stack.width_request(), original_stack.height_request(), 0, None);
+                drag.set_hotspot(original_stack.imp().drag_x.get(), original_stack.imp().drag_y.get());
             }
         });
 
         drag_source.connect_drag_cancel(|_src, drag, _reason| {
             let provider = drag.content();
-            let value = provider.value(glib::Type::OBJECT).unwrap();
-            if let Ok(obj) = value.get::<glib::Object>() {
-                let drag_stack = obj.downcast::<TransferCardStack>().unwrap();
+            let value = provider.value(TransferCardStack::static_type()).unwrap();
+            if let Ok(drag_stack) = value.get::<TransferCardStack>() {
                 let origin = runtime::get_stack(&*drag_stack.get_origin_name()).expect("drag_recovery: Failed to get origin stack");
                 origin.merge_stack(&drag_stack);
             }
