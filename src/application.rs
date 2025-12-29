@@ -109,7 +109,7 @@ impl SolitaireApplication {
             // Translators: Replace "translator-credits" with your name/username, and optionally an email or URL.
             .translator_credits(&gettext("translator-credits"))
             .copyright("© 2025 Will Warner \
-                        \n© 2024 Vincent Bermel")
+                        \n© 2025 Vincent Bermel")
             .license_type(gtk::License::Gpl30)
             .issue_url("https://gitlab.gnome.org/wwarner/solitaire/-/issues")
             .website("https://gitlab.gnome.org/wwarner/solitaire")
