@@ -347,12 +347,14 @@ pub(super) fn solver_debug(parent: &crate::window::SolitaireWindow, game_state: 
         }
     };
 
-    let mut game = CURRENT_GAME.lock().unwrap();
-    let game = game.as_mut().expect("solver_debug: failed to get game");
-    let mut state = DEBUG_STATE.take().unwrap();
-    game.get_move_generator()(&mut state);
-    DEBUG_STATE.set(Some(state));
-    make_node_rows(&node_list, &node_view, 0);
+    {
+        let mut game = CURRENT_GAME.lock().unwrap();
+        let game = game.as_mut().expect("solver_debug: failed to get game");
+        let mut state = DEBUG_STATE.take().unwrap();
+        game.get_move_generator()(&mut state);
+        DEBUG_STATE.set(Some(state));
+        make_node_rows(&node_list, &node_view, 0);
+    }
 
     expand_button.connect_clicked(move |button| {
         let mut game = CURRENT_GAME.lock().unwrap();
