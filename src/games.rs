@@ -64,6 +64,7 @@ pub fn load_game(game_name: &str, game_board: &GameBoard) {
 pub fn unload(game_board: &GameBoard) {
     let mut game = CURRENT_GAME.lock().unwrap();
     *game = None;
+    game_board.reset_positions();
     runtime::clear_history_and_moves();
     runtime::clear_state();
     runtime::update_deals(0);

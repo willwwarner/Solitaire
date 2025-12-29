@@ -20,7 +20,7 @@
 
 use gtk::glib;
 use gtk::{prelude::*, subclass::prelude::*};
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 
 glib::wrapper! {
     pub struct AspectGridLayoutChild(ObjectSubclass<imp::AspectGridLayoutChild>)
@@ -212,7 +212,9 @@ mod imp {
     }
 
     #[derive(Default)]
-    pub struct GameBoard {}
+    pub struct GameBoard {
+        pub back: RefCell<Vec<gtk::Widget>>,
+    }
 
     #[glib::object_subclass]
     impl ObjectSubclass for GameBoard {
@@ -226,7 +228,23 @@ mod imp {
     }
 
     impl ObjectImpl for GameBoard {}
+
     impl WidgetImpl for GameBoard {
+        fn snapshot(&self, snapshot: &gtk::Snapshot) {
+            let mut children = self.back.borrow().clone();
+            let full_children = self.obj().observe_children();
+            for i in 0..full_children.n_items() {
+                let child = full_children.item(i).unwrap().downcast::<gtk::Widget>().unwrap();
+                if !children.contains(&child) {
+                    children.push(child);
+                }
+            }
+            let obj = self.obj();
+            for child in children.iter() {
+                obj.snapshot_child(child, snapshot);
+            }
+        }
+
         fn unrealize(&self) {
             while let Some(child) = self.obj().first_child() {
                 child.unparent();
@@ -295,5 +313,23 @@ impl GameBoard {
         imp.cols.set(0.0);
         imp.rows.set(0.0);
         imp.ratio.set(0.0);
+    }
+
+    pub fn send_to_back(&self, widget: &impl IsA<gtk::Widget>) {
+        let imp = self.imp();
+        imp.back.borrow_mut().push(widget.clone().into());
+    }
+
+    pub fn reset_position(&self, widget: &impl IsA<gtk::Widget>) {
+        let imp = self.imp();
+        let pos = imp.back.borrow().iter().position(|x| x == widget);
+        if let Some(pos) = pos {
+            imp.back.borrow_mut().remove(pos);
+        }
+    }
+
+    #[inline]
+    pub fn reset_positions(&self) {
+        self.imp().back.borrow_mut().clear();
     }
 }
