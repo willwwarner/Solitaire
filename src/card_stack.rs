@@ -18,12 +18,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use adw::gio::ListModel;
-use gtk::{glib, gdk, DragSource, GestureClick};
-use adw::prelude::*;
-use adw::subclass::prelude::*;
-use std::cell::Cell;
 use crate::{card::Card, games, renderer, runtime};
+use gtk::{gdk, gio, glib, DragSource, GestureClick};
+use gtk::{prelude::*, subclass::prelude::*};
+use std::cell::Cell;
 
 glib::wrapper! {
     pub struct CardStack(ObjectSubclass<imp::CardStack>)
@@ -37,19 +35,26 @@ glib::wrapper! {
         @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
-pub fn get_index(card_name: &str, children: &ListModel) -> Result<u32, glib::Error> {
+pub fn get_index(card_name: &str, children: &gio::ListModel) -> Result<u32, glib::Error> {
     // Attempt to locate the child with the given card name
     let total_children = children.n_items();
 
     // Loop through all the children widgets to find the matching card
     for i in 0..total_children {
-        let child = children.item(i).expect("Failed to get child from CardStack").downcast::<gtk::Widget>().unwrap();
+        let child = children
+            .item(i)
+            .expect("Failed to get child from CardStack")
+            .downcast::<gtk::Widget>()
+            .unwrap();
         if child.widget_name() == card_name {
             return Ok(i);
         }
     }
 
-    Err(glib::Error::new(glib::FileError::Exist, format!("Card named '{}' was not found in the stack.", card_name).as_str()))
+    Err(glib::Error::new(
+        glib::FileError::Exist,
+        format!("Card named '{}' was not found in the stack.", card_name).as_str(),
+    ))
 }
 
 mod imp {
@@ -90,15 +95,23 @@ mod imp {
         fn focus(&self, direction_type: gtk::DirectionType) -> bool {
             let focus_child = self.obj().focus_child();
             if let Some(focus_child) = focus_child {
-                if focus_child.child_focus(direction_type) { return true }
-                if self.fan_cards.get() == false { return false }
-                if direction_type == gtk::DirectionType::Up || direction_type == gtk::DirectionType::TabBackward {
+                if focus_child.child_focus(direction_type) {
+                    return true;
+                }
+                if self.fan_cards.get() == false {
+                    return false;
+                }
+                if direction_type == gtk::DirectionType::Up
+                    || direction_type == gtk::DirectionType::TabBackward
+                {
                     if let Some(prev) = focus_child.prev_sibling() {
                         prev.grab_focus();
                         return true;
                     }
                 }
-                if direction_type == gtk::DirectionType::Down || direction_type == gtk::DirectionType::TabForward {
+                if direction_type == gtk::DirectionType::Down
+                    || direction_type == gtk::DirectionType::TabForward
+                {
                     if let Some(next) = focus_child.next_sibling() {
                         next.grab_focus();
                         return true;
@@ -106,9 +119,11 @@ mod imp {
                 }
             } else {
                 if let Some(child) = self.obj().last_card() {
-                    if child.is_focus() { return false }
+                    if child.is_focus() {
+                        return false;
+                    }
                     child.grab_focus();
-                    return true
+                    return true;
                 } else if !self.obj().is_focus() {
                     self.grab_focus();
                     return true;
@@ -129,7 +144,8 @@ mod imp {
             let allocation_width;
 
             if self.fan_cards.get() == true {
-                if stack_aspect < card_aspect { // RTL stacks
+                if stack_aspect < card_aspect {
+                    // RTL stacks
                     allocation_width = (height_f / stack_aspect) as i32;
                     allocation_height = height;
                 } else {
@@ -140,16 +156,27 @@ mod imp {
                 if child_count < 3 {
                     vertical_offset = 0;
                 } else {
-                    vertical_offset = std::cmp::min((height - allocation_height) / (child_count as i32 - 2), allocation_height / 5) as u32;
+                    vertical_offset = std::cmp::min(
+                        (height - allocation_height) / (child_count as i32 - 2),
+                        allocation_height / 5,
+                    ) as u32;
                 }
 
-                widget.first_child().unwrap().downcast::<gtk::Widget>().unwrap().
-                    size_allocate(&gtk::Allocation::new(2, 2, allocation_width - 4, allocation_height - 4), -1);
+                widget
+                    .first_child()
+                    .unwrap()
+                    .downcast::<gtk::Widget>()
+                    .unwrap()
+                    .size_allocate(
+                        &gtk::Allocation::new(2, 2, allocation_width - 4, allocation_height - 4),
+                        -1,
+                    );
                 for i in 1..child_count {
                     if let Some(child) = children.item(i) {
                         if let Ok(card) = child.downcast::<gtk::Widget>() {
                             let y_pos = ((i - 1) * vertical_offset) as i32;
-                            let allocation = gtk::Allocation::new(0, y_pos, allocation_width, allocation_height); // FIXME: implement RTL logic
+                            let allocation =
+                                gtk::Allocation::new(0, y_pos, allocation_width, allocation_height); // FIXME: implement RTL logic
                             card.size_allocate(&allocation, -1);
                         }
                     }
@@ -158,12 +185,20 @@ mod imp {
             } else {
                 allocation_width = width;
                 allocation_height = (width_f * card_aspect) as i32;
-                widget.first_child().unwrap().downcast::<gtk::Widget>().unwrap()
-                    .size_allocate(&gtk::Allocation::new(2, 2, allocation_width - 4, allocation_height - 4), -1);
+                widget
+                    .first_child()
+                    .unwrap()
+                    .downcast::<gtk::Widget>()
+                    .unwrap()
+                    .size_allocate(
+                        &gtk::Allocation::new(2, 2, allocation_width - 4, allocation_height - 4),
+                        -1,
+                    );
                 for i in 1..child_count {
                     if let Some(child) = children.item(i) {
                         if let Ok(card) = child.downcast::<gtk::Widget>() {
-                            let allocation = gtk::Allocation::new(0, 0, allocation_width, allocation_height);
+                            let allocation =
+                                gtk::Allocation::new(0, 0, allocation_width, allocation_height);
                             card.size_allocate(&allocation, -1);
                         }
                     }
@@ -208,7 +243,8 @@ mod imp {
             let allocation_height;
             let allocation_width;
 
-            if stack_aspect < card_aspect { // RTL stacks
+            if stack_aspect < card_aspect {
+                // RTL stacks
                 allocation_width = (height_f / stack_aspect) as i32;
                 allocation_height = height;
             } else {
@@ -222,7 +258,8 @@ mod imp {
                 if let Some(child) = children.item(i) {
                     if let Ok(card) = child.downcast::<gtk::Widget>() {
                         let y_pos = (i * vertical_offset) as i32;
-                        let allocation = gtk::Allocation::new(0, y_pos, allocation_width, allocation_height);
+                        let allocation =
+                            gtk::Allocation::new(0, y_pos, allocation_width, allocation_height);
                         card.size_allocate(&allocation, -1);
                     }
                 }
@@ -233,7 +270,7 @@ mod imp {
 
 impl CardStack {
     pub fn new(stack_type: &str, n_of_type: i32, fan_cards: bool) -> Self {
-        let this:CardStack = glib::Object::new();
+        let this: CardStack = glib::Object::new();
         this.imp().stack_type.set(stack_type.to_string());
         this.imp().fan_cards.set(fan_cards);
         if n_of_type < 0 {
@@ -258,26 +295,41 @@ impl CardStack {
     }
 
     pub fn enable_drop(&self) {
-        let drop_target = gtk::DropTarget::new(TransferCardStack::static_type(), gdk::DragAction::MOVE);
+        let drop_target =
+            gtk::DropTarget::new(TransferCardStack::static_type(), gdk::DragAction::MOVE);
         drop_target.connect_drop(|drop, val, _x, _y| {
             let to_stack = drop.widget().unwrap().downcast::<CardStack>().unwrap();
             if let Ok(transfer_stack) = val.get::<TransferCardStack>() {
-                let first_card = transfer_stack.first_child().unwrap().downcast::<Card>().unwrap();
+                let first_card = transfer_stack
+                    .first_child()
+                    .unwrap()
+                    .downcast::<Card>()
+                    .unwrap();
                 if games::verify_drop(&first_card, &to_stack) {
                     to_stack.merge_stack(&transfer_stack);
-                    let mut move_ = runtime::create_move(&transfer_stack.get_origin_name(),
-                                                         &first_card.widget_name(),
-                                                         &to_stack.widget_name(),
-                                                         runtime::MoveInstruction::None);
-                    games::on_drag_completed(&runtime::get_stack(&*transfer_stack.get_origin_name()).unwrap(), &to_stack, &mut move_);
                     //FIXME: do not use widget_name
+                    let mut move_ = runtime::create_move(
+                        &transfer_stack.get_origin_name(),
+                        &first_card.widget_name(),
+                        &to_stack.widget_name(),
+                        runtime::MoveInstruction::None,
+                    );
+                    games::on_drag_completed(
+                        &runtime::get_stack(&*transfer_stack.get_origin_name()).unwrap(),
+                        &to_stack,
+                        &mut move_,
+                    );
                     runtime::add_to_history(move_);
                     return true;
+                } else {
+                    return false;
                 }
-                else { return false; }
             } else {
                 let type_name = drop.value_type().to_string();
-                glib::g_warning!("solitaire", "Tried to drop a non-TransferCardStack onto a CardStack type: {type_name}");
+                glib::g_warning!(
+                    "solitaire",
+                    "Tried to drop a non-TransferCardStack onto a CardStack type: {type_name}"
+                );
                 return false;
             }
         });
@@ -287,7 +339,7 @@ impl CardStack {
     pub fn add_click_to_slot(&self) {
         let click = GestureClick::new();
         let slot_clone = self.to_owned();
-        click.connect_begin(move |_click, _sequence| {
+        click.connect_pressed(move |_click, _n_press, _x, _y| {
             games::on_slot_click(&slot_clone);
         });
         self.add_controller(click);
@@ -299,13 +351,20 @@ impl CardStack {
         let total_children = children.n_items();
         let new_stack = TransferCardStack::new();
         new_stack.imp().v_offset.set(self.imp().v_offset.get());
-        new_stack.imp().origin_name.set(self.widget_name().to_string());
+        new_stack
+            .imp()
+            .origin_name
+            .set(self.widget_name().to_string());
 
         // First, find the starting index
         let start_index = get_index(card_name, &children).expect("Couldn't get card");
         for _i in start_index..total_children {
-            let child = children.item(start_index).expect("Failed to get child from CardStack");
-            let card = child.downcast::<Card>().expect("Child is not a Card (split:1)");
+            let child = children
+                .item(start_index)
+                .expect("Failed to get child from CardStack");
+            let card = child
+                .downcast::<Card>()
+                .expect("Child is not a Card (split:1)");
             self.remove_card(&card);
             new_stack.add_card(&card);
             card.remove_css_class("highlight");
@@ -313,15 +372,19 @@ impl CardStack {
         self.queue_resize();
         new_stack.set_height_request(self.height());
         new_stack.set_width_request(self.width());
-        
+
         new_stack
     }
 
     pub fn merge_stack(&self, stack: &TransferCardStack) {
         let items = stack.observe_children().n_items();
         for _i in 0..items {
-            let child = stack.first_child().expect("Failed to get first child from CardStack");
-            let card = child.downcast::<Card>().expect("Child is not a Card (merge)");
+            let child = stack
+                .first_child()
+                .expect("Failed to get first child from CardStack");
+            let card = child
+                .downcast::<Card>()
+                .expect("Child is not a Card (merge)");
             stack.remove_card(&card);
             self.add_card(&card);
         }
@@ -332,15 +395,20 @@ impl CardStack {
     pub fn add_card(&self, card: &Card) {
         if card.parent().is_none() {
             card.insert_before(self, None::<&gtk::Widget>);
-        }  else {
-            glib::g_warning!("solitaire", "Attempted to add a widget that already has a parent");
+        } else {
+            glib::g_warning!(
+                "solitaire",
+                "Attempted to add a widget that already has a parent"
+            );
         }
     }
 
     pub fn destroy_and_return_cards(self, cards: &mut Vec<Card>) {
         let items = self.observe_children().n_items() - 1;
         for _ in 0..items {
-            let card = self.first_card().expect("Failed to get first card from CardStack");
+            let card = self
+                .first_card()
+                .expect("Failed to get first card from CardStack");
             card.remove_css_class("highlight");
             for controller in &card.observe_controllers() {
                 if let Ok(controller) = controller {
@@ -351,7 +419,11 @@ impl CardStack {
             card.flip_to_face();
             cards.push(card);
         }
-        self.first_child().unwrap().downcast::<gtk::Widget>().unwrap().unparent();
+        self.first_child()
+            .unwrap()
+            .downcast::<gtk::Widget>()
+            .unwrap()
+            .unparent();
 
         self.unparent();
         self.unrealize();
@@ -368,25 +440,33 @@ impl CardStack {
 
     pub fn face_up_top_card(&self) {
         if let Some(widget) = self.last_card() {
-            let card = widget.downcast::<Card>().expect("Child is not a Card (flip)");
+            let card = widget
+                .downcast::<Card>()
+                .expect("Child is not a Card (flip)");
             card.flip_to_face();
         }
     }
 
     pub fn face_down_top_card(&self) {
         if let Some(widget) = self.last_card() {
-            let card = widget.downcast::<Card>().expect("Child is not a Card (flip)");
+            let card = widget
+                .downcast::<Card>()
+                .expect("Child is not a Card (flip)");
             card.flip_to_back();
         }
     }
 
     pub fn add_drag_to_card(&self, card: &Card) {
-        let drag_source = DragSource::builder()
-            .actions(gdk::DragAction::MOVE)  // allow moving the stack
-            .build();
+        let drag_source = DragSource::builder().actions(gdk::DragAction::MOVE).build();
 
         drag_source.connect_prepare(move |src, x, y| {
-            let stack = src.widget().unwrap().parent().unwrap().downcast::<CardStack>().unwrap();
+            let stack = src
+                .widget()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .downcast::<CardStack>()
+                .unwrap();
             if games::verify_drag(&src.widget().unwrap().downcast().unwrap(), &stack) {
                 let move_stack = stack.split_to_new_on(&*src.widget().unwrap().widget_name());
                 move_stack.imp().drag_x.set(x as i32);
@@ -406,8 +486,16 @@ impl CardStack {
 
             if let Ok(original_stack) = value.get::<TransferCardStack>() {
                 icon.set_child(Some(&original_stack));
-                original_stack.allocate(original_stack.width_request(), original_stack.height_request(), 0, None);
-                drag.set_hotspot(original_stack.imp().drag_x.get(), original_stack.imp().drag_y.get());
+                original_stack.allocate(
+                    original_stack.width_request(),
+                    original_stack.height_request(),
+                    0,
+                    None,
+                );
+                drag.set_hotspot(
+                    original_stack.imp().drag_x.get(),
+                    original_stack.imp().drag_y.get(),
+                );
             }
         });
 
@@ -415,7 +503,8 @@ impl CardStack {
             let provider = drag.content();
             let value = provider.value(TransferCardStack::static_type()).unwrap();
             if let Ok(drag_stack) = value.get::<TransferCardStack>() {
-                let origin = runtime::get_stack(&*drag_stack.get_origin_name()).expect("drag_recovery: Failed to get origin stack");
+                let origin = runtime::get_stack(&*drag_stack.get_origin_name())
+                    .expect("drag_recovery: Failed to get origin stack");
                 origin.merge_stack(&drag_stack);
             }
             true
@@ -423,22 +512,32 @@ impl CardStack {
 
         card.add_controller(drag_source);
     }
-    
+
     pub fn get_solver_stack(&self) -> Vec<u8> {
         let mut solver_cards = Vec::new();
         let children = self.observe_children();
         let total_children = children.n_items();
         for i in 1..total_children {
-            let child = children.item(i).expect("Failed to get child from CardStack");
-            let card = child.downcast::<Card>().expect("Child is not a Card (get_solver_stack)");
-            solver_cards.push(games::solver::card_name_to_solver(&card.widget_name(), !card.imp().is_face_up.get()));
+            let child = children
+                .item(i)
+                .expect("Failed to get child from CardStack");
+            let card = child
+                .downcast::<Card>()
+                .expect("Child is not a Card (get_solver_stack)");
+            solver_cards.push(games::solver::card_name_to_solver(
+                &card.widget_name(),
+                !card.imp().is_face_up.get(),
+            ));
         }
         solver_cards
     }
-    
+
     pub fn hint_card(&self, card_name: String) {
-        let card = runtime::get_child(self, &*card_name).expect("highlight_card: Couldn't get card");
-        if card.has_css_class("highlight") { return; }
+        let card =
+            runtime::get_child(self, &*card_name).expect("highlight_card: Couldn't get card");
+        if card.has_css_class("highlight") {
+            return;
+        }
         card.add_css_class("highlight");
     }
 
@@ -463,7 +562,10 @@ impl CardStack {
     }
 
     pub fn get_card(&self, index: usize) -> Option<Card> {
-        self.observe_children().item(index as u32)?.downcast::<Card>().ok()
+        self.observe_children()
+            .item(index as u32)?
+            .downcast::<Card>()
+            .ok()
     }
 }
 
@@ -473,12 +575,13 @@ impl TransferCardStack {
     }
 
     pub fn add_card(&self, card: &Card) {
-        // Only add the card if it doesn't already have a parent
         if card.parent().is_none() {
             card.insert_before(self, None::<&gtk::Widget>);
         } else {
-            // If the card already has a parent, log a warning
-            glib::g_warning!("solitaire", "Attempted to add a widget that already has a parent");
+            glib::g_warning!(
+                "solitaire",
+                "Attempted to add a widget that already has a parent"
+            );
         }
     }
 

@@ -18,12 +18,15 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use crate::{runtime, runtime::MoveInstruction, game_board::GameBoard, card::Card, card_stack::CardStack, window};
-use gtk::{prelude::*, subclass::prelude::*};
-use gtk::glib;
 use super::*;
+use crate::{
+    card::Card, card_stack::CardStack, game_board::GameBoard, runtime, runtime::MoveInstruction,
+    window,
+};
+use gtk::glib;
+use gtk::{prelude::*, subclass::prelude::*};
 
-const LEVEL_SIZES:[i32; 4] = [3, 6, 9, 10];
+const LEVEL_SIZES: [i32; 4] = [3, 6, 9, 10];
 
 pub struct TriPeaks {}
 
@@ -37,7 +40,9 @@ impl Game for TriPeaks {
             let random_card = glib::random_int_range(0, n_cards) as usize;
             let card = &cards[random_card];
             card_stack.add_card(&card);
-            if flip { card.flip() }
+            if flip {
+                card.flip()
+            }
             card_stack.add_drag_to_card(&card);
             runtime::connect_double_click(&card);
             cards.remove(random_card);
@@ -81,35 +86,78 @@ impl Game for TriPeaks {
         Self {}
     }
     fn verify_drag(&self, bottom_card: &Card, _from_stack: &CardStack) -> bool {
-        if !bottom_card.imp().is_face_up.get() { false } else { true }
+        if !bottom_card.imp().is_face_up.get() {
+            false
+        } else {
+            true
+        }
     }
 
     fn verify_drop(&self, bottom_card: &Card, to_stack: &CardStack) -> bool {
         let stack_type = to_stack.get_type();
         if stack_type == "waste" {
-            if to_stack.is_empty() { return false }
+            if to_stack.is_empty() {
+                return false;
+            }
             let top_card = to_stack.last_card().unwrap();
-            if top_card.is_one_rank_above(&bottom_card) || bottom_card.is_one_rank_above(&top_card) { return true }
+            if top_card.is_one_rank_above(&bottom_card) || bottom_card.is_one_rank_above(&top_card)
+            {
+                return true;
+            }
         }
         false
     }
 
-    fn on_drag_completed(&self, origin_stack: &CardStack, _destination_stack: &CardStack, move_: &mut runtime::Move) {
+    fn on_drag_completed(
+        &self,
+        origin_stack: &CardStack,
+        _destination_stack: &CardStack,
+        move_: &mut runtime::Move,
+    ) {
         fn try_flip(stack: &CardStack, above: i32) {
-            if above == -1 { return }
-            if stack.first_card().is_some() { return }
-            if stack.next_sibling().unwrap().downcast::<CardStack>().unwrap().first_card().is_none() {
-                runtime::get_stack(&format!("pyramid_{above}")).expect(&format!("tri_peaks: couldn't get pyramid_{above}")).face_up_top_card();
+            if above == -1 {
+                return;
+            }
+            if stack.first_card().is_some() {
+                return;
+            }
+            if stack
+                .next_sibling()
+                .unwrap()
+                .downcast::<CardStack>()
+                .unwrap()
+                .first_card()
+                .is_none()
+            {
+                runtime::get_stack(&format!("pyramid_{above}"))
+                    .expect(&format!("tri_peaks: couldn't get pyramid_{above}"))
+                    .face_up_top_card();
             }
         }
 
         if origin_stack.get_type() == "pyramid" {
-            window::SolitaireWindow::get_window().unwrap().get_gameboard().send_to_back(origin_stack);
+            window::SolitaireWindow::get_window()
+                .unwrap()
+                .get_gameboard()
+                .send_to_back(origin_stack);
             origin_stack.set_can_target(false); // Force GTK to consider other stacks for dragging
-            let num: i32 = origin_stack.widget_name().split_once('_').unwrap().1.parse().unwrap();
+            let num: i32 = origin_stack
+                .widget_name()
+                .split_once('_')
+                .unwrap()
+                .1
+                .parse()
+                .unwrap();
 
             if let Some(prev) = origin_stack.prev_sibling() {
-                let above = get_above(prev.widget_name().split_once('_').unwrap().1.parse().unwrap());
+                let above = get_above(
+                    prev.widget_name()
+                        .split_once('_')
+                        .unwrap()
+                        .1
+                        .parse()
+                        .unwrap(),
+                );
                 try_flip(&prev.downcast().unwrap(), above);
             }
 
@@ -120,21 +168,55 @@ impl Game for TriPeaks {
         }
     }
 
-    fn pre_undo_drag(&self, origin_stack: &CardStack, _dropped_stack: &CardStack, move_: &mut runtime::Move) {
+    fn pre_undo_drag(
+        &self,
+        origin_stack: &CardStack,
+        _dropped_stack: &CardStack,
+        move_: &mut runtime::Move,
+    ) {
         fn try_unflip(stack: &CardStack, above: i32) {
-            if above == -1 { return }
-            if stack.first_card().is_some() { return }
-            if stack.next_sibling().unwrap().downcast::<CardStack>().unwrap().first_card().is_none() {
-                runtime::get_stack(&format!("pyramid_{above}")).expect(&format!("tri_peaks: couldn't get pyramid_{above}")).face_down_top_card();
+            if above == -1 {
+                return;
+            }
+            if stack.first_card().is_some() {
+                return;
+            }
+            if stack
+                .next_sibling()
+                .unwrap()
+                .downcast::<CardStack>()
+                .unwrap()
+                .first_card()
+                .is_none()
+            {
+                runtime::get_stack(&format!("pyramid_{above}"))
+                    .expect(&format!("tri_peaks: couldn't get pyramid_{above}"))
+                    .face_down_top_card();
             }
         }
         if origin_stack.get_type() == "pyramid" {
-            window::SolitaireWindow::get_window().unwrap().get_gameboard().reset_position(origin_stack);
+            window::SolitaireWindow::get_window()
+                .unwrap()
+                .get_gameboard()
+                .reset_position(origin_stack);
             origin_stack.set_can_target(true);
-            let num: i32 = origin_stack.widget_name().split_once('_').unwrap().1.parse().unwrap();
+            let num: i32 = origin_stack
+                .widget_name()
+                .split_once('_')
+                .unwrap()
+                .1
+                .parse()
+                .unwrap();
 
             if let Some(prev) = origin_stack.prev_sibling() {
-                let above = get_above(prev.widget_name().split_once('_').unwrap().1.parse().unwrap());
+                let above = get_above(
+                    prev.widget_name()
+                        .split_once('_')
+                        .unwrap()
+                        .1
+                        .parse()
+                        .unwrap(),
+                );
                 try_unflip(&prev.downcast().unwrap(), above);
             }
 
@@ -152,7 +234,7 @@ impl Game for TriPeaks {
             let waste = runtime::get_stack("waste").unwrap();
 
             if slot.is_empty() {
-                return
+                return;
             } else {
                 let card = slot.last_card().unwrap();
                 slot.remove_card(&card);
@@ -160,10 +242,12 @@ impl Game for TriPeaks {
                 waste.add_card(&card);
                 waste.add_drag_to_card(&card);
                 card.remove_css_class("highlight");
-                runtime::add_to_history(runtime::create_move(&slot.widget_name(),
-                                                             &card.widget_name(),
-                                                             "waste",
-                                                             MoveInstruction::Flip));
+                runtime::add_to_history(runtime::create_move(
+                    &slot.widget_name(),
+                    &card.widget_name(),
+                    "waste",
+                    MoveInstruction::Flip,
+                ));
             }
         }
     }
@@ -179,7 +263,9 @@ impl Game for TriPeaks {
 
 fn is_won(state: &mut solver::State) -> bool {
     for i in 0..4 {
-        if !state.get_stack(i).is_empty() { return false }
+        if !state.get_stack(i).is_empty() {
+            return false;
+        }
     }
     true
 }
@@ -223,16 +309,22 @@ fn generate_solver_moves(state: &mut solver::State) {
     }
     fn onmove(move_option: &mut solver::Move, state: &mut solver::State, undo: bool) {
         fn try_flip(state: &mut solver::State, num: usize, above: i32, move_: &mut solver::Move) {
-            if above == -1 { return }
+            if above == -1 {
+                return;
+            }
             let stack = state.get_stack(num);
-            if stack.first().is_some() { return }
+            if stack.first().is_some() {
+                return;
+            }
             if state.get_stack(num + 1).is_empty() {
                 let above = above as usize;
                 solver::flip(state.get_stack_mut(above).last_mut().unwrap());
 
                 if let Some(flip) = move_.flip_index {
                     move_.flip_index = Some(flip + above);
-                } else { move_.flip_index = Some(above); }
+                } else {
+                    move_.flip_index = Some(above);
+                }
             }
         }
 
@@ -260,10 +352,16 @@ fn generate_solver_moves(state: &mut solver::State) {
             if !pyramid.is_empty() {
                 let pyramid_card = pyramid[0];
                 if !solver::is_flipped(&pyramid_card) {
-                    if solver::is_one_rank_above(&waste_top, &pyramid_card) ||
-                        solver::is_one_rank_above(&pyramid_card, &waste_top) {
+                    if solver::is_one_rank_above(&waste_top, &pyramid_card)
+                        || solver::is_one_rank_above(&pyramid_card, &waste_top)
+                    {
                         // FIXME: check if we flipped any cards, and add that to the move's rank
-                        state.try_move(solver::create_move(i, &pyramid_card, WASTE, MoveInstruction::None), 5, get_priority, onmove);
+                        state.try_move(
+                            solver::create_move(i, &pyramid_card, WASTE, MoveInstruction::None),
+                            5,
+                            get_priority,
+                            onmove,
+                        );
                     }
                 }
             }
@@ -272,7 +370,11 @@ fn generate_solver_moves(state: &mut solver::State) {
 
     let stock = state.get_stack(29);
     if let Some(last) = stock.last() {
-        state.try_move(solver::create_move(29, &last, WASTE, MoveInstruction::Flip), 1, get_priority, solver::no_onmove);
+        state.try_move(
+            solver::create_move(29, &last, WASTE, MoveInstruction::Flip),
+            1,
+            get_priority,
+            solver::no_onmove,
+        );
     }
 }
-

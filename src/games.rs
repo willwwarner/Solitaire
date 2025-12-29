@@ -18,31 +18,43 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use std::sync::Mutex;
+use crate::{card::Card, card_stack::CardStack, game_board::GameBoard, renderer, runtime};
 use adw::prelude::*;
-use gtk::{gio, glib};
 use gettextrs::gettext;
-use crate::{renderer, card::Card, card_stack::CardStack, game_board::GameBoard, runtime};
+use gtk::{gio, glib};
+use std::sync::Mutex;
 
+mod klondike;
 #[cfg(debug_assertions)]
 mod test;
-mod klondike;
 mod tri_peaks;
 
 pub const JOKERS: [&str; 2] = ["joker_red", "joker_black"];
 pub const SUITES: [&str; 4] = ["club", "diamond", "heart", "spade"]; // Use this order because it is the AisleRiot card theme order
-pub const RANKS: [&str; 13] = ["ace", "2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king"];
+pub const RANKS: [&str; 13] = [
+    "ace", "2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king",
+];
 static CURRENT_GAME: Mutex<Option<Box<dyn Game>>> = Mutex::new(None);
 
 pub fn load_game(game_name: &str, game_board: &GameBoard) {
     let window = crate::window::SolitaireWindow::get_window().unwrap();
-    window.lookup_action("undo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
-    window.lookup_action("redo").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(false);
+    window
+        .lookup_action("undo")
+        .unwrap()
+        .downcast::<gio::SimpleAction>()
+        .unwrap()
+        .set_enabled(false);
+    window
+        .lookup_action("redo")
+        .unwrap()
+        .downcast::<gio::SimpleAction>()
+        .unwrap()
+        .set_enabled(false);
     window.set_hint_drop_enabled(false);
 
     let mut cards = runtime::get_cards();
     let theme_name = renderer::get_requested_theme();
-    if theme_name != renderer::ACTIVE_THEME.with_borrow(|t| { t.clone() }) {
+    if theme_name != renderer::ACTIVE_THEME.with_borrow(|t| t.clone()) {
         cards.clear();
     }
 
@@ -74,7 +86,10 @@ pub fn unload(game_board: &GameBoard) {
     let mut cards = Vec::new();
     for _ in 0..items {
         let child = game_board.first_child().expect("Couldn't get child");
-        child.downcast::<CardStack>().unwrap().destroy_and_return_cards(&mut cards);
+        child
+            .downcast::<CardStack>()
+            .unwrap()
+            .destroy_and_return_cards(&mut cards);
     }
     runtime::set_cards(cards);
     game_board.reset_layout();
@@ -82,7 +97,8 @@ pub fn unload(game_board: &GameBoard) {
 
 pub fn get_games() -> Vec<String> {
     vec![
-        #[cfg(debug_assertions)] gettext("Test"),
+        #[cfg(debug_assertions)]
+        gettext("Test"),
         gettext("Klondike"),
         gettext("Tri-Peaks"),
     ] //, "Spider", "FreeCell", "Tri-Peaks", "Pyramid", "Yukon"] not yet :)
@@ -94,7 +110,7 @@ pub fn get_game_description(game_name: &str) -> String {
         "Test" => gettext("Test Game"),
         "Klondike" => gettext("Classic Solitaire"),
         "Tri-Peaks" => gettext("Clear Three Peaks of Cards"),
-        _ => "".to_string()
+        _ => "".to_string(),
     }
 }
 
@@ -112,14 +128,22 @@ pub fn on_slot_click(slot: &CardStack) {
     }
 }
 
-pub fn on_drag_completed(origin_stack: &CardStack, destination_stack: &CardStack, move_: &mut runtime::Move) {
+pub fn on_drag_completed(
+    origin_stack: &CardStack,
+    destination_stack: &CardStack,
+    move_: &mut runtime::Move,
+) {
     let mut game = CURRENT_GAME.lock().unwrap();
     if let Some(game) = game.as_mut() {
         game.on_drag_completed(origin_stack, destination_stack, move_);
     }
 }
 
-pub fn pre_undo_drag(origin_stack: &CardStack, dropped_stack: &CardStack, move_: &mut runtime::Move) {
+pub fn pre_undo_drag(
+    origin_stack: &CardStack,
+    dropped_stack: &CardStack,
+    move_: &mut runtime::Move,
+) {
     let mut game = CURRENT_GAME.lock().unwrap();
     if let Some(game) = game.as_mut() {
         game.pre_undo_drag(origin_stack, dropped_stack, move_);
@@ -154,7 +178,9 @@ pub mod solver;
 pub async fn try_game(game_name: &str, game_board: &GameBoard) -> Option<Vec<runtime::Move>> {
     solver::set_should_stop(false);
     for _ in 0..3 {
-        if solver::get_should_stop() { return None; }
+        if solver::get_should_stop() {
+            return None;
+        }
         load_game(game_name, &game_board);
         let mut stack_names = Vec::new();
         let stacks = game_board.observe_children();
@@ -165,13 +191,18 @@ pub async fn try_game(game_name: &str, game_board: &GameBoard) -> Option<Vec<run
             stack_names.push(stack.widget_name().to_string());
         }
         #[cfg(feature = "solver-debug")]
-        solver::solver_debug(&crate::window::SolitaireWindow::get_window().unwrap(), game_state.clone(), stack_names.clone());
+        solver::solver_debug(
+            &crate::window::SolitaireWindow::get_window().unwrap(),
+            game_state.clone(),
+            stack_names.clone(),
+        );
 
         let (sender, receiver) = async_channel::bounded(1);
         std::thread::spawn(move || {
             let mut game = CURRENT_GAME.lock().unwrap();
             if let Some(game) = game.as_mut() {
-                let result = solver::solve(game_state, game.get_move_generator(), game.get_is_won_fn());
+                let result =
+                    solver::solve(game_state, game.get_move_generator(), game.get_is_won_fn());
                 sender.send_blocking(result).unwrap();
             }
         });
@@ -184,7 +215,7 @@ pub async fn try_game(game_name: &str, game_board: &GameBoard) -> Option<Vec<run
                         card_name: solver::solver_card_to_name(move_option.card).to_string(),
                         destination_stack: stack_names[move_option.destination_stack].clone(),
                         instruction: move_option.instruction.clone(),
-                        flip_index: move_option.flip_index
+                        flip_index: move_option.flip_index,
                     });
                 }
                 for move_option in &history {
@@ -217,28 +248,43 @@ pub fn re_solve(stack_names: Vec<String>, game_state: Vec<Vec<u8>>) -> Option<Ve
             card_name: solver::solver_card_to_name(move_option.card).to_string(),
             destination_stack: stack_names[move_option.destination_stack].clone(),
             instruction: move_option.instruction.clone(),
-            flip_index: move_option.flip_index
+            flip_index: move_option.flip_index,
         });
     }
     Some(history)
 }
 
 pub fn test_solver_state() {
-    use runtime::MoveInstruction::{None, Flip};
+    use runtime::MoveInstruction::{Flip, None};
     let mut game_state = Vec::new();
     let mut stack_a = Vec::new();
-    stack_a.push(solver::card_name_to_solver(&glib::GString::from("club_ace"), false));
-    for i in 2..7 { stack_a.push(solver::card_name_to_solver(&glib::GString::from(format!("club_{i}")), false)); }
-    for i in 7..9 {stack_a.push(solver::card_name_to_solver(&glib::GString::from(format!("club_{i}")), true)); }
+    stack_a.push(solver::card_name_to_solver(
+        &glib::GString::from("club_ace"),
+        false,
+    ));
+    for i in 2..7 {
+        stack_a.push(solver::card_name_to_solver(
+            &glib::GString::from(format!("club_{i}")),
+            false,
+        ));
+    }
+    for i in 7..9 {
+        stack_a.push(solver::card_name_to_solver(
+            &glib::GString::from(format!("club_{i}")),
+            true,
+        ));
+    }
     game_state.insert(0, stack_a);
     let stack_b = Vec::new();
     game_state.insert(1, stack_b);
 
     // SAMPLE MOVE UNDO CHECK
-    let moves = vec![solver::create_move(0, &solver::card_name_to_solver("club_6", false), 1, None),
-                     solver::create_move(0, &solver::card_name_to_solver("club_ace", false), 1, None),
-                     solver::create_move(0, &solver::card_name_to_solver("club_6", false), 1, Flip),
-                     solver::create_move(0, &solver::card_name_to_solver("club_ace", false), 1, Flip)];
+    let moves = vec![
+        solver::create_move(0, &solver::card_name_to_solver("club_6", false), 1, None),
+        solver::create_move(0, &solver::card_name_to_solver("club_ace", false), 1, None),
+        solver::create_move(0, &solver::card_name_to_solver("club_6", false), 1, Flip),
+        solver::create_move(0, &solver::card_name_to_solver("club_ace", false), 1, Flip),
+    ];
 
     for mut mv in moves {
         let mv_copy = mv.clone();
@@ -249,20 +295,43 @@ pub fn test_solver_state() {
         assert_eq!(mv, mv_copy, "move/undo mismatch for {:?}", mv);
     }
 
-    assert_eq!(solver::card_name_to_solver("club_ace", false), solver::card_flipped(&solver::card_name_to_solver("club_ace", true)));
+    assert_eq!(
+        solver::card_name_to_solver("club_ace", false),
+        solver::card_flipped(&solver::card_name_to_solver("club_ace", true))
+    );
 
     let card_name = "club_6";
     let card_id = solver::card_name_to_solver(card_name, false);
-    assert_eq!(card_name, solver::solver_card_to_name(card_id), "Card name mismatch for {card_id}");
-    assert_eq!(solver::card_flipped(&card_id), solver::card_name_to_solver(card_name, true), "Card ID mismatch for {card_name}");
+    assert_eq!(
+        card_name,
+        solver::solver_card_to_name(card_id),
+        "Card name mismatch for {card_id}"
+    );
+    assert_eq!(
+        solver::card_flipped(&card_id),
+        solver::card_name_to_solver(card_name, true),
+        "Card ID mismatch for {card_name}"
+    );
 }
 
 trait Game: Send + Sync {
-    fn new_game(cards: Vec<Card>, game_board: &GameBoard) -> Self where Self: Sized;
+    fn new_game(cards: Vec<Card>, game_board: &GameBoard) -> Self
+    where
+        Self: Sized;
     fn verify_drag(&self, bottom_card: &Card, from_stack: &CardStack) -> bool;
     fn verify_drop(&self, bottom_card: &Card, to_stack: &CardStack) -> bool;
-    fn on_drag_completed(&self, origin_stack: &CardStack, destination_stack: &CardStack, move_: &mut runtime::Move);
-    fn pre_undo_drag(&self, previous_origin_stack: &CardStack, previous_destination_stack: &CardStack, move_: &mut runtime::Move);
+    fn on_drag_completed(
+        &self,
+        origin_stack: &CardStack,
+        destination_stack: &CardStack,
+        move_: &mut runtime::Move,
+    );
+    fn pre_undo_drag(
+        &self,
+        previous_origin_stack: &CardStack,
+        previous_destination_stack: &CardStack,
+        move_: &mut runtime::Move,
+    );
     fn on_double_click(&self, card: &Card);
     fn on_slot_click(&self, slot: &CardStack);
     fn get_move_generator(&self) -> Box<dyn FnMut(&mut solver::State)>;

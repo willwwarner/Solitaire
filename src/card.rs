@@ -18,10 +18,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use crate::{games, renderer, card_stack::CardStack};
-use gtk::{glib, gdk};
-use gtk::prelude::{Cast, WidgetExt};
+use crate::{card_stack::CardStack, games, renderer};
 use adw::{prelude::*, subclass::prelude::*};
+use gtk::prelude::{Cast, WidgetExt};
+use gtk::{gdk, glib};
 use std::cell::Cell;
 
 glib::wrapper! {
@@ -58,15 +58,22 @@ mod imp {
             if direction_type == gtk::DirectionType::TabForward && !self.obj().is_focus() {
                 self.grab_focus();
                 true
-            } else { false }
+            } else {
+                false
+            }
         }
     }
     impl BinImpl for Card {}
 }
 
 impl Card {
-    pub fn new(name: &str, id: i32, renderer: &rsvg::CairoRenderer, card_theme: &renderer::CardTheme) -> Self {
-        let this:Card = glib::Object::new();
+    pub fn new(
+        name: &str,
+        id: i32,
+        renderer: &rsvg::CairoRenderer,
+        card_theme: &renderer::CardTheme,
+    ) -> Self {
+        let this: Card = glib::Object::new();
         this.set_sensitive(true);
         this.set_can_focus(true);
         this.set_widget_name(name);
@@ -81,7 +88,9 @@ impl Card {
 
         this.set_focusable(true);
         this.set_accessible_role(gtk::AccessibleRole::ListItem);
-        this.update_property(&[gtk::accessible::Property::Description(&name.replace("_", " "))]);
+        this.update_property(&[gtk::accessible::Property::Description(
+            &name.replace("_", " "),
+        )]);
         this.add_css_class("no-padding");
 
         this
@@ -91,14 +100,18 @@ impl Card {
         let is_face_up = self.imp().is_face_up.get();
         let picture = self.child().unwrap().downcast::<gtk::Picture>().unwrap();
         if is_face_up {
-            if let Some(back_texture) = renderer::BACK_TEXTURE.with(|t| { t.borrow().to_owned() }) {
+            if let Some(back_texture) = renderer::BACK_TEXTURE.with(|t| t.borrow().to_owned()) {
                 picture.set_paintable(Some(&back_texture));
-            } else { glib::g_critical!("solitaire", "Tried to flip a card with no back texture"); }
+            } else {
+                glib::g_critical!("solitaire", "Tried to flip a card with no back texture");
+            }
         } else {
             if let Some(face_texture) = self.imp().texture.take() {
                 picture.set_paintable(Some(&face_texture));
                 self.imp().texture.set(Some(face_texture));
-            } else { glib::g_critical!("solitaire", "Tried to flip a card with no face texture"); }
+            } else {
+                glib::g_critical!("solitaire", "Tried to flip a card with no face texture");
+            }
         }
         self.imp().is_face_up.set(!is_face_up);
     }
@@ -119,7 +132,7 @@ impl Card {
         let is_face_up = self.imp().is_face_up.get();
         let picture = self.child().unwrap().downcast::<gtk::Picture>().unwrap();
         if is_face_up {
-            if let Some(back_texture) = renderer::BACK_TEXTURE.with(|t| { t.borrow().to_owned() }) {
+            if let Some(back_texture) = renderer::BACK_TEXTURE.with(|t| t.borrow().to_owned()) {
                 picture.set_paintable(Some(&back_texture));
             }
             self.imp().is_face_up.set(false);
@@ -146,7 +159,7 @@ impl Card {
         let rank = self.imp().card_id.get() % 13;
         games::RANKS[rank as usize]
     }
-    
+
     pub fn get_stack(&self) -> Option<CardStack> {
         self.parent()?.downcast::<CardStack>().ok()
     }

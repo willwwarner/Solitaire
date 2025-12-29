@@ -85,7 +85,9 @@ mod imp {
     impl LayoutManagerImpl for AspectGridLayout {
         fn allocate(&self, widget: &gtk::Widget, width: i32, height: i32, _baseline: i32) {
             let children = widget.observe_children();
-            if children.n_items() == 0 { return }
+            if children.n_items() == 0 {
+                return;
+            }
             let col_width1;
             let row_height1;
             let row_height2;
@@ -135,12 +137,23 @@ mod imp {
 
             let spacing2 = spacing1 + 1.0;
             let h_mod1_base = {
-                if row_constrained { h_offset }
-                else { h_offset + split }
+                if row_constrained {
+                    h_offset
+                } else {
+                    h_offset + split
+                }
             };
             let v_mod1_base = if row_constrained { split } else { 0 };
-            let x1 = if row_constrained { col_width2 } else { col_width1 };
-            let y1 = if row_constrained { row_height1 } else { row_height2 };
+            let x1 = if row_constrained {
+                col_width2
+            } else {
+                col_width1
+            };
+            let y1 = if row_constrained {
+                row_height1
+            } else {
+                row_height2
+            };
 
             let mut width;
             let mut height;
@@ -151,8 +164,16 @@ mod imp {
 
             for i in 0..children.n_items() {
                 let child_widget = children.item(i).unwrap().downcast::<gtk::Widget>().unwrap();
-                let layout_child = self.obj().layout_child(&child_widget).downcast::<super::AspectGridLayoutChild>().unwrap();
-                let n_constrained = if row_constrained { layout_child.row() } else { layout_child.column() } as i32;
+                let layout_child = self
+                    .obj()
+                    .layout_child(&child_widget)
+                    .downcast::<super::AspectGridLayoutChild>()
+                    .unwrap();
+                let n_constrained = if row_constrained {
+                    layout_child.row()
+                } else {
+                    layout_child.column()
+                } as i32;
                 if n_constrained < split {
                     h_mod = h_offset;
                     v_mod = 0;
@@ -168,25 +189,33 @@ mod imp {
                     x = x1;
                     y = y1;
                 };
-                let n_unconstrained = if row_constrained { layout_child.column() } else { layout_child.row() } as i32;
+                let n_unconstrained = if row_constrained {
+                    layout_child.column()
+                } else {
+                    layout_child.row()
+                } as i32;
                 if row_constrained {
-                    if n_unconstrained < spacing_split { x += spacing2 }
-                    else {
+                    if n_unconstrained < spacing_split {
+                        x += spacing2
+                    } else {
                         x += spacing1;
                         h_mod += spacing_split;
                     }
                 } else {
-                    if n_unconstrained < spacing_split { y += spacing2 }
-                    else {
+                    if n_unconstrained < spacing_split {
+                        y += spacing2
+                    } else {
                         y += spacing1;
                         v_mod += spacing_split;
                     }
                 }
 
-                let allocation = gtk::Allocation::new((layout_child.column() * x) as i32 + h_mod,
-                                                      (layout_child.row() * y) as i32 + v_mod,
-                                                      (layout_child.column_span() * width) as i32,
-                                                      (layout_child.row_span() * height) as i32);
+                let allocation = gtk::Allocation::new(
+                    (layout_child.column() * x) as i32 + h_mod,
+                    (layout_child.row() * y) as i32 + v_mod,
+                    (layout_child.column_span() * width) as i32,
+                    (layout_child.row_span() * height) as i32,
+                );
 
                 child_widget.size_allocate(&allocation, -1);
             }
@@ -196,7 +225,12 @@ mod imp {
             Some(super::AspectGridLayoutChild::static_type())
         }
 
-        fn measure(&self, _widget: &gtk::Widget, orientation: gtk::Orientation, for_size: i32) -> (i32, i32, i32, i32) {
+        fn measure(
+            &self,
+            _widget: &gtk::Widget,
+            orientation: gtk::Orientation,
+            for_size: i32,
+        ) -> (i32, i32, i32, i32) {
             let card_aspect = crate::renderer::ASPECT.get() as f64;
             let nat_size;
             if for_size == -1 {
@@ -234,7 +268,11 @@ mod imp {
             let mut children = self.back.borrow().clone();
             let full_children = self.obj().observe_children();
             for i in 0..full_children.n_items() {
-                let child = full_children.item(i).unwrap().downcast::<gtk::Widget>().unwrap();
+                let child = full_children
+                    .item(i)
+                    .unwrap()
+                    .downcast::<gtk::Widget>()
+                    .unwrap();
                 if !children.contains(&child) {
                     children.push(child);
                 }
@@ -260,10 +298,24 @@ impl GameBoard {
         glib::Object::new()
     }
 
-    pub fn add(&self, widget: &impl IsA<gtk::Widget>, column: i32, row: i32, width: i32, height: i32) {
-        if widget.parent().is_some() { return; }
+    pub fn add(
+        &self,
+        widget: &impl IsA<gtk::Widget>,
+        column: i32,
+        row: i32,
+        width: i32,
+        height: i32,
+    ) {
+        if widget.parent().is_some() {
+            return;
+        }
         widget.set_parent(&self.clone().upcast::<gtk::Widget>());
-        let layout_child = self.layout_manager().unwrap().layout_child(widget).downcast::<AspectGridLayoutChild>().unwrap();
+        let layout_child = self
+            .layout_manager()
+            .unwrap()
+            .layout_child(widget)
+            .downcast::<AspectGridLayoutChild>()
+            .unwrap();
         layout_child.set_column(column as f64);
         layout_child.set_row(row as f64);
         layout_child.set_column_span(width as f64);
@@ -271,9 +323,21 @@ impl GameBoard {
         self.recalculate_layout(widget);
     }
 
-    pub fn add_float(&self, widget: &impl IsA<gtk::Widget>, column: f64, row: f64, width: f64, height: f64) {
+    pub fn add_float(
+        &self,
+        widget: &impl IsA<gtk::Widget>,
+        column: f64,
+        row: f64,
+        width: f64,
+        height: f64,
+    ) {
         widget.set_parent(&self.clone().upcast::<gtk::Widget>());
-        let layout_child = self.layout_manager().unwrap().layout_child(widget).downcast::<AspectGridLayoutChild>().unwrap();
+        let layout_child = self
+            .layout_manager()
+            .unwrap()
+            .layout_child(widget)
+            .downcast::<AspectGridLayoutChild>()
+            .unwrap();
         layout_child.set_column(column);
         layout_child.set_row(row);
         layout_child.set_column_span(width);
@@ -296,9 +360,16 @@ impl GameBoard {
             .downcast::<AspectGridLayout>()
             .unwrap();
         let imp = layout.imp();
-        let layout_child = layout.layout_child(new_widget).downcast::<AspectGridLayoutChild>().unwrap();
-        if set_if_greater(&imp.rows, layout_child.row() + layout_child.row_span()) ||
-           set_if_greater(&imp.cols, layout_child.column() + layout_child.column_span()) {
+        let layout_child = layout
+            .layout_child(new_widget)
+            .downcast::<AspectGridLayoutChild>()
+            .unwrap();
+        if set_if_greater(&imp.rows, layout_child.row() + layout_child.row_span())
+            || set_if_greater(
+                &imp.cols,
+                layout_child.column() + layout_child.column_span(),
+            )
+        {
             imp.ratio.set(imp.rows.get() / imp.cols.get());
         }
     }

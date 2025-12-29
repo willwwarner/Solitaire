@@ -18,7 +18,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use crate::{games, card::Card};
+use crate::{card::Card, games};
 use gtk::gdk::*;
 
 thread_local! {
@@ -35,22 +35,31 @@ pub fn get_requested_theme() -> String {
     settings.get::<String>("theme")
 }
 
-pub fn draw_theme_preview(name: &str, card_theme: &CardTheme, renderer: &rsvg::CairoRenderer, picture: &gtk::Picture) {
+pub fn draw_theme_preview(
+    name: &str,
+    card_theme: &CardTheme,
+    renderer: &rsvg::CairoRenderer,
+    picture: &gtk::Picture,
+) {
     let width = card_theme.theme_width as i32;
     let height = card_theme.theme_height as i32;
-    let surface = cairo::ImageSurface::
-        create(cairo::Format::ARgb32, width, height)
+    let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, width, height)
         .expect("Couldn't create surface");
 
     let cr = cairo::Context::new(&surface).expect("Couldn't create cairo context");
     // Render a single SVG layer, marked by a <g>
     renderer
-        .render_document(&cr, &cairo::Rectangle::new(0f64, 0f64, card_theme.theme_width, card_theme.theme_height))
+        .render_document(
+            &cr,
+            &cairo::Rectangle::new(0f64, 0f64, card_theme.theme_width, card_theme.theme_height),
+        )
         .expect(&format!("Failed to render layer {name}"));
 
     drop(cr);
     let stride = surface.stride() as usize;
-    let data = surface.take_data().expect("Failed to get data from surface");
+    let data = surface
+        .take_data()
+        .expect("Failed to get data from surface");
     // Create a texture from the surface
     let bytes = glib::Bytes::from(&data[..]);
     let texture = MemoryTexture::new(
@@ -71,23 +80,40 @@ pub struct CardTheme {
     theme_height: f64,
 }
 
-pub fn draw_card(name: &str, renderer: &rsvg::CairoRenderer, card_theme: &CardTheme, card_x: i32, card_y: i32) -> MemoryTexture {
-    let surface = cairo::ImageSurface::
-        create(cairo::Format::ARgb32, card_theme.card_width, card_theme.card_height)
-        .expect("Couldn't create surface");
+pub fn draw_card(
+    name: &str,
+    renderer: &rsvg::CairoRenderer,
+    card_theme: &CardTheme,
+    card_x: i32,
+    card_y: i32,
+) -> MemoryTexture {
+    let surface = cairo::ImageSurface::create(
+        cairo::Format::ARgb32,
+        card_theme.card_width,
+        card_theme.card_height,
+    )
+    .expect("Couldn't create surface");
 
     let cr = cairo::Context::new(&surface).expect("Couldn't create cairo context");
     // Render a single SVG layer, marked by a <g>
     renderer
-        .render_layer(&cr, Some(&format!("#{name}")),
-                      &cairo::Rectangle::new((-card_theme.card_width * card_x) as f64,
-                                             (-card_theme.card_height * card_y) as f64,
-                                             card_theme.theme_width, card_theme.theme_height))
+        .render_layer(
+            &cr,
+            Some(&format!("#{name}")),
+            &cairo::Rectangle::new(
+                (-card_theme.card_width * card_x) as f64,
+                (-card_theme.card_height * card_y) as f64,
+                card_theme.theme_width,
+                card_theme.theme_height,
+            ),
+        )
         .expect(&format!("Failed to render layer {name}"));
 
     drop(cr);
     let stride = surface.stride() as usize;
-    let data = surface.take_data().expect("Failed to get data from surface");
+    let data = surface
+        .take_data()
+        .expect("Failed to get data from surface");
     // Create a texture from the surface
     let bytes = glib::Bytes::from(&data[..]);
     MemoryTexture::new(
@@ -101,7 +127,7 @@ pub fn draw_card(name: &str, renderer: &rsvg::CairoRenderer, card_theme: &CardTh
 
 pub fn set_back_texture(renderer: &rsvg::CairoRenderer, card_theme: &CardTheme) {
     let texture = draw_card("back", renderer, &card_theme, 2, 4); //TODO: More card sizes
-    BACK_TEXTURE.with(|t| { t.borrow_mut().replace(texture) });
+    BACK_TEXTURE.with(|t| t.borrow_mut().replace(texture));
 }
 
 pub fn get_card_theme(theme_name: &str) -> CardTheme {
@@ -113,14 +139,27 @@ pub fn get_card_theme(theme_name: &str) -> CardTheme {
     };
 
     glib::g_message!("solitaire", "Loading SVG");
-    let resource = gio::resources_lookup_data(&*format!("/org/gnome/gitlab/wwarner/Solitaire/card_themes/{theme_name}.svg"), gio::ResourceLookupFlags::NONE)
-        .expect("Failed to load resource data");
+    let resource = gio::resources_lookup_data(
+        &*format!("/org/gnome/gitlab/wwarner/Solitaire/card_themes/{theme_name}.svg"),
+        gio::ResourceLookupFlags::NONE,
+    )
+    .expect("Failed to load resource data");
     glib::g_message!("solitaire", "loaded resource data");
     let handle = rsvg::Loader::new()
-        .read_stream(&gio::MemoryInputStream::from_bytes(&resource), None::<&gio::File>, None::<&gio::Cancellable>)
+        .read_stream(
+            &gio::MemoryInputStream::from_bytes(&resource),
+            None::<&gio::File>,
+            None::<&gio::Cancellable>,
+        )
         .expect("Failed to load SVG");
     glib::g_message!("solitaire", "Done Loading SVG");
-    CardTheme { handle, card_width, card_height, theme_width: theme_width as f64, theme_height: theme_height as f64 }
+    CardTheme {
+        handle,
+        card_width,
+        card_height,
+        theme_width: theme_width as f64,
+        theme_height: theme_height as f64,
+    }
 }
 
 pub fn create_cards(card_theme: &CardTheme, cards: &mut Vec<Card>) {

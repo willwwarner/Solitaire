@@ -18,9 +18,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use gtk::{DragSource, GestureClick, gio, glib};
-use gtk::prelude::{IsA, ListModelExt, WidgetExt, Cast, ActionMapExt};
-use crate::{games, card::Card, card_stack::CardStack};
+use crate::{card::Card, card_stack::CardStack, games};
+use gtk::prelude::{ActionMapExt, Cast, IsA, ListModelExt, WidgetExt};
+use gtk::{gio, glib, DragSource, GestureClick};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Move {
@@ -37,7 +37,12 @@ pub enum MoveInstruction {
     None,
 }
 
-pub fn create_move(origin_stack: &str, card_name: &str, destination_stack: &str, instruction: MoveInstruction) -> Move {
+pub fn create_move(
+    origin_stack: &str,
+    card_name: &str,
+    destination_stack: &str,
+    instruction: MoveInstruction,
+) -> Move {
     Move {
         origin_stack: origin_stack.to_string(),
         card_name: card_name.to_string(),
@@ -47,7 +52,12 @@ pub fn create_move(origin_stack: &str, card_name: &str, destination_stack: &str,
     }
 }
 
-pub fn move_from_strings(origin_stack: String, card_name: String, destination_stack: String, instruction: MoveInstruction) -> Move {
+pub fn move_from_strings(
+    origin_stack: String,
+    card_name: String,
+    destination_stack: String,
+    instruction: MoveInstruction,
+) -> Move {
     Move {
         origin_stack,
         card_name,
@@ -94,13 +104,18 @@ pub fn get_child(from: &impl IsA<gtk::Widget>, name: &str) -> Result<gtk::Widget
     // Loop through all the children widgets to find the matching card
     for i in 0..children.n_items() {
         let child = children.item(i).expect("Failed to get child from a Widget");
-        let child_widget = child.downcast::<gtk::Widget>().expect("Failed to downcast child to a Widget");
+        let child_widget = child
+            .downcast::<gtk::Widget>()
+            .expect("Failed to downcast child to a Widget");
         if child_widget.widget_name() == name {
             return Ok(child_widget);
         }
     }
 
-    Err(glib::Error::new(glib::FileError::Exist, format!("Card named '{}' was not found in the stack.", name).as_str()))
+    Err(glib::Error::new(
+        glib::FileError::Exist,
+        format!("Card named '{}' was not found in the stack.", name).as_str(),
+    ))
 }
 
 pub fn connect_double_click(card: &Card) {
@@ -131,22 +146,32 @@ pub fn perform_move(move_: &mut Move) {
     perform_move_with_stacks(move_, &origin_stack, &destination_stack);
 }
 
-pub fn perform_move_with_stacks(move_: &mut Move, origin_stack: &CardStack, destination_stack: &CardStack) {
+pub fn perform_move_with_stacks(
+    move_: &mut Move,
+    origin_stack: &CardStack,
+    destination_stack: &CardStack,
+) {
     match move_.instruction {
-        MoveInstruction::Flip => { //Fixme
+        MoveInstruction::Flip => {
+            //Fixme
             let origin_children = origin_stack.observe_children();
-            let split_index = crate::card_stack::get_index(&*move_.card_name, &origin_children).unwrap();
+            let split_index =
+                crate::card_stack::get_index(&*move_.card_name, &origin_children).unwrap();
             move_.card_name = origin_stack.last_child().unwrap().widget_name().to_string();
             for _ in split_index..origin_children.n_items() {
-                let card = origin_stack.last_child().unwrap().downcast::<Card>().unwrap();
+                let card = origin_stack
+                    .last_child()
+                    .unwrap()
+                    .downcast::<Card>()
+                    .unwrap();
                 card.flip();
                 card.unparent();
                 destination_stack.add_card(&card);
                 card.remove_css_class("highlight");
             }
-            return
-        },
-        MoveInstruction::None => {},
+            return;
+        }
+        MoveInstruction::None => {}
     }
     let transfer_stack = origin_stack.split_to_new_on(&*move_.card_name);
     destination_stack.merge_stack(&transfer_stack);
@@ -174,7 +199,9 @@ pub fn add_to_history(move_: Move) {
 }
 
 pub fn undo_last_move() {
-    if HISTORY.with(|h| h.borrow().is_empty()) { return; }
+    if HISTORY.with(|h| h.borrow().is_empty()) {
+        return;
+    }
     HISTORY.with(|history| {
         let mut history = history.borrow_mut();
         let mut last_entry = history.pop().unwrap();
@@ -182,7 +209,8 @@ pub fn undo_last_move() {
         let origin_stack = get_stack(&last_entry.destination_stack).unwrap();
         games::pre_undo_drag(&destination_stack, &origin_stack, &mut last_entry);
         perform_move_with_stacks(&mut last_entry, &origin_stack, &destination_stack);
-        if SOLUTION_MOVES.with(|s| !s.borrow().is_empty()) { // Fixme: This will make won games be re-solved
+        if SOLUTION_MOVES.with(|s| !s.borrow().is_empty()) {
+            // Fixme: This will make won games be re-solved
             SOLUTION_MOVES.with(|s| s.borrow_mut().insert(0, last_entry.clone()));
         }
         UNDO_HISTORY.with(|undos| undos.borrow_mut().push(last_entry));
@@ -190,7 +218,9 @@ pub fn undo_last_move() {
 }
 
 fn undo_many(last_index: usize) {
-    if HISTORY.with(|h| h.borrow().is_empty()) { return; }
+    if HISTORY.with(|h| h.borrow().is_empty()) {
+        return;
+    }
     HISTORY.with(|history| {
         let mut history = history.borrow_mut();
         for _ in last_index..history.len() {
@@ -205,7 +235,9 @@ fn undo_many(last_index: usize) {
 }
 
 pub fn redo_first_move() {
-    if UNDO_HISTORY.with(|undos| undos.borrow().is_empty()) { return; }
+    if UNDO_HISTORY.with(|undos| undos.borrow().is_empty()) {
+        return;
+    }
     UNDO_HISTORY.with(|undos| {
         let mut first_entry = undos.borrow_mut().pop().unwrap();
         let origin_stack = get_stack(&first_entry.origin_stack).unwrap();
@@ -220,13 +252,25 @@ pub fn redo_first_move() {
             }
         }
         let (stack_names, game_state) = get_solver_state();
-        re_solve_threaded(&crate::window::SolitaireWindow::get_window().unwrap(), stack_names, game_state);
+        re_solve_threaded(
+            &crate::window::SolitaireWindow::get_window().unwrap(),
+            stack_names,
+            game_state,
+        );
     });
 }
 
 pub fn update_redo_actions(window: &crate::window::SolitaireWindow) {
-    let undo_action = window.lookup_action("undo").unwrap().downcast::<gio::SimpleAction>().unwrap();
-    let redo_action = window.lookup_action("redo").unwrap().downcast::<gio::SimpleAction>().unwrap();
+    let undo_action = window
+        .lookup_action("undo")
+        .unwrap()
+        .downcast::<gio::SimpleAction>()
+        .unwrap();
+    let redo_action = window
+        .lookup_action("redo")
+        .unwrap()
+        .downcast::<gio::SimpleAction>()
+        .unwrap();
     HISTORY.with(|h| undo_action.set_enabled(!h.borrow().is_empty()));
     UNDO_HISTORY.with(|undos| redo_action.set_enabled(!undos.borrow().is_empty()));
 }
@@ -296,25 +340,29 @@ pub fn set_solution(moves: Vec<Move>) {
 
 pub fn drop() {
     let solution = SOLUTION_MOVES.with(|s| s.borrow().clone());
-    glib::spawn_future_local(
-        async move {
-            for mut move_ in solution {
-                let origin_stack = get_stack(&move_.origin_stack).unwrap();
-                let destination_stack = get_stack(&move_.destination_stack).unwrap();
-                perform_move_with_stacks(&mut move_, &origin_stack, &destination_stack);
-                games::on_drag_completed(&origin_stack, &destination_stack, &mut move_);
-                add_to_history(move_);
-                glib::timeout_future(Duration::from_millis(300)).await;
-            }
+    glib::spawn_future_local(async move {
+        for mut move_ in solution {
+            let origin_stack = get_stack(&move_.origin_stack).unwrap();
+            let destination_stack = get_stack(&move_.destination_stack).unwrap();
+            perform_move_with_stacks(&mut move_, &origin_stack, &destination_stack);
+            games::on_drag_completed(&origin_stack, &destination_stack, &mut move_);
+            add_to_history(move_);
+            glib::timeout_future(Duration::from_millis(300)).await;
         }
-    );
+    });
 }
 
 pub fn set_can_drop(can_drop: bool) {
-    crate::window::SolitaireWindow::get_window().unwrap().set_can_drop(can_drop);
+    crate::window::SolitaireWindow::get_window()
+        .unwrap()
+        .set_can_drop(can_drop);
 }
 
-fn re_solve_threaded(window: &crate::window::SolitaireWindow, stack_names: Vec<String>, game_state: Vec<Vec<u8>>) {
+fn re_solve_threaded(
+    window: &crate::window::SolitaireWindow,
+    stack_names: Vec<String>,
+    game_state: Vec<Vec<u8>>,
+) {
     fn clear_and_abort_threads() {
         games::solver::set_should_stop(true);
         SOLVER_THREADS.with_borrow_mut(|t| t.clear());
@@ -335,7 +383,9 @@ fn re_solve_threaded(window: &crate::window::SolitaireWindow, stack_names: Vec<S
             SOLVER_THREADS.with_borrow_mut(|s| s.push(t));
             while let Ok(result) = receiver.recv().await {
                 if let Some(history) = result {
-                    if move_index < HISTORY.with_borrow(|h| h.len()) { continue; }
+                    if move_index < HISTORY.with_borrow(|h| h.len()) {
+                        continue;
+                    }
                     clear_and_abort_threads();
                     set_solution(history);
                     if SOLUTION_MOVES.with(|s| s.borrow().is_empty()) {
@@ -356,18 +406,27 @@ fn re_solve_threaded(window: &crate::window::SolitaireWindow, stack_names: Vec<S
                     if move_index == HISTORY.with_borrow(|h| h.len()) {
                         if NOTIFY_UNSOLVABLE.get() {
                             let window = window.clone();
-                            crate::window::SolitaireWindow::incompatible_move_dialog(move |_dialog, _response| { // Undo Button
-                                undo_many(first_unsolvable - 1);
-                                update_redo_actions(&window);
-                                clear_and_abort_threads();
-                                let first_unsolvable_h = FIRST_UNSOLVABLE_HISTORY.take();
-                                if !first_unsolvable_h.is_empty() { window.set_hint_drop_enabled(true); }
-                                SOLUTION_MOVES.set(first_unsolvable_h);
-                            }, move |_dialog, _response| { // Keep Playing button
-                                NOTIFY_UNSOLVABLE.set(false);
-                                clear_and_abort_threads();
-                            });
-                        } else { clear_and_abort_threads(); }
+                            crate::window::SolitaireWindow::incompatible_move_dialog(
+                                move |_dialog, _response| {
+                                    // Undo Button
+                                    undo_many(first_unsolvable - 1);
+                                    update_redo_actions(&window);
+                                    clear_and_abort_threads();
+                                    let first_unsolvable_h = FIRST_UNSOLVABLE_HISTORY.take();
+                                    if !first_unsolvable_h.is_empty() {
+                                        window.set_hint_drop_enabled(true);
+                                    }
+                                    SOLUTION_MOVES.set(first_unsolvable_h);
+                                },
+                                move |_dialog, _response| {
+                                    // Keep Playing button
+                                    NOTIFY_UNSOLVABLE.set(false);
+                                    clear_and_abort_threads();
+                                },
+                            );
+                        } else {
+                            clear_and_abort_threads();
+                        }
                         FIRST_UNSOLVABLE.set(usize::MAX);
                     }
                 }

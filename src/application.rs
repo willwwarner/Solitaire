@@ -18,12 +18,12 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use gettextrs::gettext;
+use crate::config::{APP_ID, VERSION};
+use crate::SolitaireWindow;
 use adw::prelude::*;
 use adw::subclass::prelude::*;
+use gettextrs::gettext;
 use gtk::{gio, glib};
-use crate::config::{VERSION, APP_ID};
-use crate::SolitaireWindow;
 
 mod imp {
     use super::*;
@@ -108,8 +108,10 @@ impl SolitaireApplication {
             .artists(vec!["Vincent Bermel"])
             // Translators: Replace "translator-credits" with your name/username, and optionally an email or URL.
             .translator_credits(&gettext("translator-credits"))
-            .copyright("© 2025 Will Warner \
-                        \n© 2025 Vincent Bermel")
+            .copyright(
+                "© 2025 Will Warner \
+                        \n© 2025 Vincent Bermel",
+            )
             .license_type(gtk::License::Gpl30)
             .issue_url("https://gitlab.gnome.org/wwarner/solitaire/-/issues")
             .website("https://gitlab.gnome.org/wwarner/solitaire")

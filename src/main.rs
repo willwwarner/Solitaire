@@ -19,22 +19,22 @@
  */
 
 mod application;
-mod config;
-mod window;
-mod renderer;
-mod games;
 mod card;
 mod card_stack;
+mod config;
 mod game_board;
+mod games;
+mod renderer;
 mod runtime;
+mod window;
 
 use self::application::SolitaireApplication;
 use self::window::SolitaireWindow;
 
-use config::{GETTEXT_PACKAGE, LOCALEDIR, PKGDATADIR, APP_ID};
+use config::{APP_ID, GETTEXT_PACKAGE, LOCALEDIR, PKGDATADIR};
 use gettextrs::{bind_textdomain_codeset, bindtextdomain, textdomain};
-use gtk::{gio, glib};
 use gtk::prelude::*;
+use gtk::{gio, glib};
 
 fn main() -> glib::ExitCode {
     // Set up gettext translations

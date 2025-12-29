@@ -18,12 +18,12 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+use crate::{card_stack::CardStack, game_board::GameBoard, games, runtime};
+use adw::{prelude::*, subclass::prelude::*};
 use gettextrs::gettext;
 use gtk::prelude::*;
-use adw::{prelude::*, subclass::prelude::*};
 use gtk::{gio, glib};
 use lggs::prelude::*;
-use crate::{games, runtime, card_stack::CardStack, game_board::GameBoard};
 
 thread_local! {
     static SELF: std::cell::RefCell<Option<SolitaireWindow>> = std::cell::RefCell::new(None);
@@ -97,10 +97,14 @@ mod imp {
             obj.setup_gactions();
             obj.populate_game_list(&obj.imp().list.get());
             let welcome_revealer = self.welcome_revealer.get();
-            self.search_bar.get().connect_search_mode_enabled_notify(move |search_bar| {
-                welcome_revealer.set_reveal_child(!search_bar.is_search_mode())
-            });
-            self.welcome.get().set_icon_name(Some(crate::config::APP_ID));
+            self.search_bar
+                .get()
+                .connect_search_mode_enabled_notify(move |search_bar| {
+                    welcome_revealer.set_reveal_child(!search_bar.is_search_mode())
+                });
+            self.welcome
+                .get()
+                .set_icon_name(Some(crate::config::APP_ID));
             SELF.set(Some(obj.clone()));
             self.game_bin.get().set_child(Some(&GameBoard::new()));
         }
@@ -129,7 +133,13 @@ impl SolitaireWindow {
 
     #[inline]
     pub fn get_gameboard(&self) -> GameBoard {
-        self.imp().game_bin.get().child().unwrap().downcast().unwrap()
+        self.imp()
+            .game_bin
+            .get()
+            .child()
+            .unwrap()
+            .downcast()
+            .unwrap()
     }
 
     fn appearance(&self) {
@@ -149,16 +159,14 @@ impl SolitaireWindow {
         picture.set_margin_start(6);
         picture.set_margin_end(6);
 
-        let theme_dialog = lggs::ThemeSelectorDialog::new(&renderer::THEME_NAMES,
-                                                          &theme_name,
-                                                          &picture);
+        let theme_dialog =
+            lggs::ThemeSelectorDialog::new(&renderer::THEME_NAMES, &theme_name, &picture);
         change_theme(&theme_name, &picture.upcast::<gtk::Widget>());
 
         theme_dialog.set_content_height(350);
         theme_dialog.set_content_width(600);
-        theme_dialog.connect_change_theme(move |_, theme_name, widget| {
-            change_theme(theme_name, widget)
-        });
+        theme_dialog
+            .connect_change_theme(move |_, theme_name, widget| change_theme(theme_name, widget));
         theme_dialog.present(Some(self));
     }
 
@@ -181,7 +189,7 @@ impl SolitaireWindow {
             println!("No hints available!");
         }
     }
-    
+
     fn undo(&self) {
         runtime::undo_last_move();
         runtime::update_redo_actions(self);
@@ -208,13 +216,22 @@ impl SolitaireWindow {
         let redo_action = gio::ActionEntry::builder("redo")
             .activate(move |win: &Self, _, _| win.redo())
             .build();
-        self.add_action_entries([appearance_action, drop_action, hint_action, undo_action, redo_action]);
+        self.add_action_entries([
+            appearance_action,
+            drop_action,
+            hint_action,
+            undo_action,
+            redo_action,
+        ]);
     }
 
     #[template_callback]
     fn recent_clicked(&self, _row: &adw::ActionRow) {
         let settings = gio::Settings::new(crate::APP_ID);
-        games::load_game(&settings.get::<String>("recent-game"), &self.get_gameboard());
+        games::load_game(
+            &settings.get::<String>("recent-game"),
+            &self.get_gameboard(),
+        );
         self.imp().nav_view.get().push_by_tag("game");
     }
 
@@ -259,7 +276,9 @@ impl SolitaireWindow {
                             let won_fn = games::get_is_won_fn();
                             runtime::set_won_fn(won_fn);
                         } else {
-                            if games::solver::get_should_stop() { return; }
+                            if games::solver::get_should_stop() {
+                                return;
+                            }
                             let dialog = adw::AlertDialog::builder()
                                 .heading(gettext("Failed to make a winnable game"))
                                 .body(gettext("Would you like to try again?"))
@@ -267,18 +286,31 @@ impl SolitaireWindow {
                                 .close_response("delete_event")
                                 .build();
                             dialog.add_responses(&[
-                                ("accept",          gettext("Try Again").as_str()),
-                                ("delete_event",    gettext("Go Back").as_str())
+                                ("accept", gettext("Try Again").as_str()),
+                                ("delete_event", gettext("Go Back").as_str()),
                             ]);
-                            dialog.set_response_appearance("accept", adw::ResponseAppearance::Suggested);
+                            dialog.set_response_appearance(
+                                "accept",
+                                adw::ResponseAppearance::Suggested,
+                            );
                             let owned_row = action_row.clone();
                             dialog.connect_response(Some("accept"), move |_dialog, _response| {
                                 owned_row.emit_activate();
                             });
 
-                            dialog.connect_response(Some("delete_event"), move |dialog, _response| {
-                                dialog.root().unwrap().downcast::<SolitaireWindow>().unwrap().imp().nav_view.pop_to_tag("chooser");
-                            });
+                            dialog.connect_response(
+                                Some("delete_event"),
+                                move |dialog, _response| {
+                                    dialog
+                                        .root()
+                                        .unwrap()
+                                        .downcast::<SolitaireWindow>()
+                                        .unwrap()
+                                        .imp()
+                                        .nav_view
+                                        .pop_to_tag("chooser");
+                                },
+                            );
 
                             dialog.present(Some(&window));
                         }
@@ -290,22 +322,30 @@ impl SolitaireWindow {
 
         let search_entry = self.imp().search_entry.get();
         list.set_filter_func(glib::clone!(
-            #[weak(rename_to=this)] self,
-            #[weak] search_entry,
-            #[upgrade_or] true,
+            #[weak(rename_to=this)]
+            self,
+            #[weak]
+            search_entry,
+            #[upgrade_or]
+            true,
             move |row| {
                 let row = row.clone().downcast::<adw::ActionRow>().unwrap();
                 let row_text = row.title().to_uppercase();
                 let matches = row_text.contains(&search_entry.text().to_uppercase());
-                if matches { this.imp().good_search.set(true) }
+                if matches {
+                    this.imp().good_search.set(true)
+                }
                 matches
-        }));
+            }
+        ));
         let search_stack = self.imp().search_stack.get();
         let search_page = self.imp().search_page.get();
         let empty_page = self.imp().empty_page.get();
         search_entry.connect_search_changed(glib::clone!(
-            #[weak(rename_to=this)] self,
-            #[weak] list,
+            #[weak(rename_to=this)]
+            self,
+            #[weak]
+            list,
             move |_| {
                 this.imp().good_search.set(false);
                 list.invalidate_filter();
@@ -314,9 +354,10 @@ impl SolitaireWindow {
                 } else {
                     search_stack.set_visible_child(&empty_page);
                 }
-        }));
+            }
+        ));
     }
-    
+
     #[template_callback]
     fn new_game_clicked(&self, _button: &gtk::Button) {
         let nav_view = self.imp().nav_view.get();
@@ -329,12 +370,14 @@ impl SolitaireWindow {
         }
         let dialog = adw::AlertDialog::builder()
             .heading(gettext("Do you want to start a new game?"))
-            .body(gettext("If you start a new game, your current progress will be lost."))
+            .body(gettext(
+                "If you start a new game, your current progress will be lost.",
+            ))
             .default_response("delete_event")
             .build();
         dialog.add_responses(&[
-            ("accept",          gettext("Start New Game").as_str()),
-            ("delete_event",    gettext("Keep Current Game").as_str())
+            ("accept", gettext("Start New Game").as_str()),
+            ("delete_event", gettext("Keep Current Game").as_str()),
         ]);
 
         dialog.connect_response(Some("accept"), move |_dialog, _response| {
@@ -349,10 +392,14 @@ impl SolitaireWindow {
     pub fn get_window() -> Option<SolitaireWindow> {
         SELF.with(|window| window.borrow().to_owned())
     }
-    
-    pub fn incompatible_move_dialog<U: Fn(&adw::AlertDialog, &str) + 'static, K: Fn(&adw::AlertDialog, &str) + 'static>
-        (undo_move: U, keep_playing: K) {
-        
+
+    pub fn incompatible_move_dialog<
+        U: Fn(&adw::AlertDialog, &str) + 'static,
+        K: Fn(&adw::AlertDialog, &str) + 'static,
+    >(
+        undo_move: U,
+        keep_playing: K,
+    ) {
         let window = Self::get_window().unwrap();
         let dialog = adw::AlertDialog::builder()
             .heading(gettext("Game is no longer winnable"))
@@ -361,8 +408,8 @@ impl SolitaireWindow {
             .close_response("delete_event")
             .build();
         dialog.add_responses(&[
-            ("delete_event",    &*gettext("Keep Playing")),
-            ("undo",            &*gettext("Undo Move"))
+            ("delete_event", &*gettext("Keep Playing")),
+            ("undo", &*gettext("Undo Move")),
         ]);
         dialog.set_response_appearance("delete_event", adw::ResponseAppearance::Destructive);
         dialog.connect_response(Some("undo"), undo_move);
@@ -378,8 +425,8 @@ impl SolitaireWindow {
             .default_response("new_game")
             .build();
         dialog.add_responses(&[
-            ("new_game",        &*gettext("New Game")),
-            ("delete_event",    &*gettext("Keep Playing"))
+            ("new_game", &*gettext("New Game")),
+            ("delete_event", &*gettext("Keep Playing")),
         ]);
         dialog.set_response_appearance("new_game", adw::ResponseAppearance::Suggested);
         let nav_view = self.imp().nav_view.get();
@@ -393,8 +440,16 @@ impl SolitaireWindow {
     }
 
     pub fn set_can_drop(&self, can_drop: bool) {
-        self.lookup_action("hint").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(!can_drop);
-        self.lookup_action("drop").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(can_drop);
+        self.lookup_action("hint")
+            .unwrap()
+            .downcast::<gio::SimpleAction>()
+            .unwrap()
+            .set_enabled(!can_drop);
+        self.lookup_action("drop")
+            .unwrap()
+            .downcast::<gio::SimpleAction>()
+            .unwrap()
+            .set_enabled(can_drop);
         self.imp().can_drop.set(can_drop);
         let hint_or_drop = self.imp().hint_or_drop.get();
         if can_drop {
@@ -409,7 +464,15 @@ impl SolitaireWindow {
     }
 
     pub fn set_hint_drop_enabled(&self, enabled: bool) {
-        self.lookup_action("hint").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled((!self.imp().can_drop.get()) && enabled);
-        self.lookup_action("drop").unwrap().downcast::<gio::SimpleAction>().unwrap().set_enabled(self.imp().can_drop.get() && enabled);
+        self.lookup_action("hint")
+            .unwrap()
+            .downcast::<gio::SimpleAction>()
+            .unwrap()
+            .set_enabled((!self.imp().can_drop.get()) && enabled);
+        self.lookup_action("drop")
+            .unwrap()
+            .downcast::<gio::SimpleAction>()
+            .unwrap()
+            .set_enabled(self.imp().can_drop.get() && enabled);
     }
 }

@@ -18,16 +18,18 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use crate::{runtime, runtime::MoveInstruction, game_board::GameBoard, card::Card, card_stack::CardStack};
-use gtk::{prelude::*, subclass::prelude::*};
-use gtk::glib;
 use super::*;
+use crate::{
+    card::Card, card_stack::CardStack, game_board::GameBoard, runtime, runtime::MoveInstruction,
+};
+use gtk::glib;
+use gtk::{prelude::*, subclass::prelude::*};
 
 pub struct Klondike {}
 
 impl Klondike {}
 
-const FOUNDATION:&[usize] = &[7, 8, 9, 10];
+const FOUNDATION: &[usize] = &[7, 8, 9, 10];
 
 impl Game for Klondike {
     fn new_game(mut cards: Vec<Card>, game_board: &GameBoard) -> Self {
@@ -40,7 +42,9 @@ impl Game for Klondike {
                 let random_card = glib::random_int_range(0, n_cards) as usize;
                 if let Some(card) = cards.get(random_card) {
                     card_stack.add_card(&card);
-                    if j < i { card.flip() }
+                    if j < i {
+                        card.flip()
+                    }
                     card_stack.add_drag_to_card(&card);
                     runtime::connect_double_click(&card);
                     cards.remove(random_card);
@@ -83,27 +87,51 @@ impl Game for Klondike {
         Self {}
     }
     fn verify_drag(&self, bottom_card: &Card, _from_stack: &CardStack) -> bool {
-        if !bottom_card.imp().is_face_up.get() { false } else { true }
+        if !bottom_card.imp().is_face_up.get() {
+            false
+        } else {
+            true
+        }
     }
 
     fn verify_drop(&self, bottom_card: &Card, to_stack: &CardStack) -> bool {
         let stack_type = to_stack.get_type();
         if stack_type == "tableau" {
-            if to_stack.is_empty() && bottom_card.get_rank() == "king" { return true }
-            else if to_stack.is_empty() { return false }
+            if to_stack.is_empty() && bottom_card.get_rank() == "king" {
+                return true;
+            } else if to_stack.is_empty() {
+                return false;
+            }
             let top_card = to_stack.last_card().unwrap();
-            if (!bottom_card.is_similar_suit(&top_card)) && top_card.is_one_rank_above(&bottom_card) { return true }
-            else { return false }
+            if (!bottom_card.is_similar_suit(&top_card)) && top_card.is_one_rank_above(&bottom_card)
+            {
+                return true;
+            } else {
+                return false;
+            }
         } else if stack_type == "foundation" {
-            if to_stack.is_empty() && bottom_card.get_rank() == "ace" { return true }
-            else if to_stack.is_empty() { return false }
+            if to_stack.is_empty() && bottom_card.get_rank() == "ace" {
+                return true;
+            } else if to_stack.is_empty() {
+                return false;
+            }
             let top_card = to_stack.last_card().unwrap();
-            if bottom_card.is_same_suit(&top_card) && bottom_card.is_one_rank_above(&top_card) { return true }
-            else { false }
-        } else { false }
+            if bottom_card.is_same_suit(&top_card) && bottom_card.is_one_rank_above(&top_card) {
+                return true;
+            } else {
+                false
+            }
+        } else {
+            false
+        }
     }
 
-    fn on_drag_completed(&self, origin_stack: &CardStack, destination_stack: &CardStack, move_: &mut runtime::Move) {
+    fn on_drag_completed(
+        &self,
+        origin_stack: &CardStack,
+        destination_stack: &CardStack,
+        move_: &mut runtime::Move,
+    ) {
         if origin_stack.get_type() == "tableau" {
             if let Some(last_card) = origin_stack.last_card() {
                 if !last_card.is_face_up() {
@@ -120,7 +148,12 @@ impl Game for Klondike {
         }
     }
 
-    fn pre_undo_drag(&self, origin_stack: &CardStack, dropped_stack: &CardStack, move_: &mut runtime::Move) {
+    fn pre_undo_drag(
+        &self,
+        origin_stack: &CardStack,
+        dropped_stack: &CardStack,
+        move_: &mut runtime::Move,
+    ) {
         if origin_stack.get_type() == "tableau" {
             if let Some(flip_index) = move_.flip_index {
                 origin_stack.get_card(flip_index).unwrap().flip();
@@ -138,7 +171,7 @@ impl Game for Klondike {
     fn on_double_click(&self, card: &Card) {
         let card_stack = card.get_stack().unwrap();
         if card_stack.get_type() == "foundation" {
-            return
+            return;
         } else {
             try_distribute(card, &card_stack, self);
         }
@@ -149,15 +182,21 @@ impl Game for Klondike {
             let waste = runtime::get_stack("waste").unwrap();
 
             if slot.is_empty() {
-                if waste.is_empty() { return }
+                if waste.is_empty() {
+                    return;
+                }
                 let n_deals = runtime::get_deals();
-                if n_deals >= 3 { return }
+                if n_deals >= 3 {
+                    return;
+                }
                 runtime::update_deals(n_deals + 1);
                 //Fixme: Don't use widget_name
-                let mut move_ = runtime::create_move("waste",
-                                                     &waste.first_card().unwrap().widget_name(),
-                                                     "stock",
-                                                     MoveInstruction::Flip);
+                let mut move_ = runtime::create_move(
+                    "waste",
+                    &waste.first_card().unwrap().widget_name(),
+                    "stock",
+                    MoveInstruction::Flip,
+                );
                 runtime::perform_move(&mut move_);
                 runtime::add_to_history(move_);
             } else {
@@ -167,10 +206,12 @@ impl Game for Klondike {
                 waste.add_card(&card);
                 waste.add_drag_to_card(&card);
                 card.remove_css_class("highlight");
-                runtime::add_to_history(runtime::create_move(&slot.widget_name(),
-                                                             &card.widget_name(),
-                                                             "waste",
-                                                             MoveInstruction::Flip));
+                runtime::add_to_history(runtime::create_move(
+                    &slot.widget_name(),
+                    &card.widget_name(),
+                    "waste",
+                    MoveInstruction::Flip,
+                ));
             }
         }
     }
@@ -200,9 +241,9 @@ fn is_won(state: &mut solver::State) -> bool {
 }
 
 fn generate_solver_moves(state: &mut solver::State) {
-    const STOCK:usize = 12;
-    const WASTE:usize = 11;
-    const TABLEAU:&[usize] = &[0, 1, 2, 3, 4, 5, 6];
+    const STOCK: usize = 12;
+    const WASTE: usize = 11;
+    const TABLEAU: &[usize] = &[0, 1, 2, 3, 4, 5, 6];
 
     fn get_priority(state: &mut solver::State) -> usize {
         let mut outs = 0; // outs = number of cards that are out (in foundations)
@@ -213,7 +254,9 @@ fn generate_solver_moves(state: &mut solver::State) {
     }
 
     fn set_if_greater(a: &mut u8, b: &u8) {
-        if *a < *b { *a = *b }
+        if *a < *b {
+            *a = *b
+        }
     }
 
     fn onmove(move_option: &mut solver::Move, state: &mut solver::State, undo: bool) {
@@ -236,22 +279,40 @@ fn generate_solver_moves(state: &mut solver::State) {
     }
 
     // Check for moves to foundation
-    for (i, tableau_card) in state.get_stacks_top(&[11, 0, 1, 2, 3, 4, 5, 6]) { // from waste and tableau
-        if solver::is_flipped(&tableau_card) { continue } // this should never happen anyways
+    for (i, tableau_card) in state.get_stacks_top(&[11, 0, 1, 2, 3, 4, 5, 6]) {
+        // from waste and tableau
+        if solver::is_flipped(&tableau_card) {
+            continue;
+        } // this should never happen anyways
         let mut max_red = 0;
         let mut max_black = 0;
         let mut consider_moves = Vec::new();
         for (j, foundation_stack) in state.get_stacks(FOUNDATION) {
             if let Some(foundation_card) = foundation_stack.last() {
                 let rank_id = solver::solver_card_to_id(&foundation_card) % 13;
-                if solver::is_red(&foundation_card) { set_if_greater(&mut max_black, &(rank_id + 1)) }
-                else { set_if_greater(&mut max_red, &(rank_id + 1)) }
-                if solver::is_same_suit(&foundation_card, &tableau_card) && solver::is_one_rank_above(&foundation_card, &tableau_card) {
-                    consider_moves.push(solver::create_move(i, &tableau_card, j, MoveInstruction::None));
+                if solver::is_red(&foundation_card) {
+                    set_if_greater(&mut max_black, &(rank_id + 1))
+                } else {
+                    set_if_greater(&mut max_red, &(rank_id + 1))
+                }
+                if solver::is_same_suit(&foundation_card, &tableau_card)
+                    && solver::is_one_rank_above(&foundation_card, &tableau_card)
+                {
+                    consider_moves.push(solver::create_move(
+                        i,
+                        &tableau_card,
+                        j,
+                        MoveInstruction::None,
+                    ));
                 }
             } else {
                 if solver::get_rank(&tableau_card) == "ace" {
-                    state.try_move(solver::create_move(i, &tableau_card, j, MoveInstruction::None), 100, get_priority, onmove);
+                    state.try_move(
+                        solver::create_move(i, &tableau_card, j, MoveInstruction::None),
+                        100,
+                        get_priority,
+                        onmove,
+                    );
                     return; // for performance reasons we suggest only automoves, if we find one
                 }
             }
@@ -278,11 +339,16 @@ fn generate_solver_moves(state: &mut solver::State) {
 
     let stock = state.get_stack_owned(STOCK);
     if !stock.is_empty() {
-        state.try_move(solver::create_move(STOCK, stock.last().unwrap(), WASTE, MoveInstruction::Flip), 5, get_priority, solver::no_onmove);
+        state.try_move(
+            solver::create_move(STOCK, stock.last().unwrap(), WASTE, MoveInstruction::Flip),
+            5,
+            get_priority,
+            solver::no_onmove,
+        );
     }
 
     // Check where to put a king
-    let mut first_empty_stack:Option<usize> = None;
+    let mut first_empty_stack: Option<usize> = None;
     for (i, tableau_stack) in state.get_stacks(TABLEAU) {
         if tableau_stack.is_empty() {
             first_empty_stack = Some(i);
@@ -290,32 +356,94 @@ fn generate_solver_moves(state: &mut solver::State) {
         }
     }
 
-    for (i, from_stack) in state.get_stacks(&[0, 1, 2, 3, 4, 5, 6, 11]) { // from tableau and waste
+    for (i, from_stack) in state.get_stacks(&[0, 1, 2, 3, 4, 5, 6, 11]) {
+        // from tableau and waste
         let mut len = from_stack.len();
-        if i == 11 && len > 0 { len = 1 } // we can only draw from the top of waste (once)
+        if i == 11 && len > 0 {
+            len = 1
+        } // we can only draw from the top of waste (once)
         for from_card_i in 0..len {
-            let from_card = if i == 11 { from_stack.last().unwrap() } else { &from_stack[from_card_i] }; // we can only draw from the top of waste
-            if solver::is_flipped(&from_card) { continue }
+            let from_card = if i == 11 {
+                from_stack.last().unwrap()
+            } else {
+                &from_stack[from_card_i]
+            }; // we can only draw from the top of waste
+            if solver::is_flipped(&from_card) {
+                continue;
+            }
             for (j, to_card) in state.get_stacks_top(TABLEAU) {
-                if j == i { continue }
-                if solver::is_one_rank_above(&from_card, &to_card) && !solver::is_similar_suit(&from_card, &to_card) {
+                if j == i {
+                    continue;
+                }
+                if solver::is_one_rank_above(&from_card, &to_card)
+                    && !solver::is_similar_suit(&from_card, &to_card)
+                {
                     if i == 11 {
-                        state.try_move(solver::create_move(i, &from_card, j, MoveInstruction::None), 40, get_priority, onmove);
-                    } else if from_card_i > 0 && solver::is_flipped(&from_stack[from_card_i - 1]) { // does the move flip a card?
-                        state.try_move(solver::create_move(i, &from_card, j, MoveInstruction::None), 30, get_priority, onmove);
+                        state.try_move(
+                            solver::create_move(i, &from_card, j, MoveInstruction::None),
+                            40,
+                            get_priority,
+                            onmove,
+                        );
+                    } else if from_card_i > 0 && solver::is_flipped(&from_stack[from_card_i - 1]) {
+                        // does the move flip a card?
+                        state.try_move(
+                            solver::create_move(i, &from_card, j, MoveInstruction::None),
+                            30,
+                            get_priority,
+                            onmove,
+                        );
                     } else {
-                        state.try_move(solver::create_move(i, &from_card, j, MoveInstruction::None), 1, get_priority, onmove);
+                        state.try_move(
+                            solver::create_move(i, &from_card, j, MoveInstruction::None),
+                            1,
+                            get_priority,
+                            onmove,
+                        );
                     }
                 }
             }
             if solver::get_rank(&from_card) == "king" && first_empty_stack.is_some() {
-                if from_card_i == 0 { continue } // don't move kings if they are placed
+                if from_card_i == 0 {
+                    continue;
+                } // don't move kings if they are placed
                 if i == 11 {
-                    state.try_move(solver::create_move(i, &from_card, first_empty_stack.unwrap(), MoveInstruction::None), 40, get_priority, onmove);
-                } else if solver::is_flipped(&from_stack[from_card_i - 1]) { // does the move flip a card?
-                    state.try_move(solver::create_move(i, &from_card, first_empty_stack.unwrap(), MoveInstruction::None), 30, get_priority, onmove);
+                    state.try_move(
+                        solver::create_move(
+                            i,
+                            &from_card,
+                            first_empty_stack.unwrap(),
+                            MoveInstruction::None,
+                        ),
+                        40,
+                        get_priority,
+                        onmove,
+                    );
+                } else if solver::is_flipped(&from_stack[from_card_i - 1]) {
+                    // does the move flip a card?
+                    state.try_move(
+                        solver::create_move(
+                            i,
+                            &from_card,
+                            first_empty_stack.unwrap(),
+                            MoveInstruction::None,
+                        ),
+                        30,
+                        get_priority,
+                        onmove,
+                    );
                 } else {
-                    state.try_move(solver::create_move(i, &from_card, first_empty_stack.unwrap(), MoveInstruction::None), 1, get_priority, onmove);
+                    state.try_move(
+                        solver::create_move(
+                            i,
+                            &from_card,
+                            first_empty_stack.unwrap(),
+                            MoveInstruction::None,
+                        ),
+                        1,
+                        get_priority,
+                        onmove,
+                    );
                 }
             }
         }
@@ -323,37 +451,50 @@ fn generate_solver_moves(state: &mut solver::State) {
 
     let waste = state.get_stack(WASTE);
     if stock.is_empty() && !waste.is_empty() {
-        state.try_move(solver::create_move(WASTE, &waste[0], STOCK, MoveInstruction::Flip), 2, get_priority, solver::no_onmove);
+        state.try_move(
+            solver::create_move(WASTE, &waste[0], STOCK, MoveInstruction::Flip),
+            2,
+            get_priority,
+            solver::no_onmove,
+        );
     }
 }
 
 fn try_distribute(card: &Card, parent: &CardStack, game: &Klondike) {
-    if !card.imp().is_face_up.get() { return }
-    if &parent.last_card().unwrap() != card { return }
+    if !card.imp().is_face_up.get() {
+        return;
+    }
+    if &parent.last_card().unwrap() != card {
+        return;
+    }
 
     for i in 0..4 {
         let stack = runtime::get_stack(format!("foundation_{i}").as_str()).unwrap();
         if let Some(last_card) = stack.last_card() {
             if last_card.is_same_suit(card) && card.is_one_rank_above(&last_card) {
-                let mut move_ = runtime::create_move(&parent.widget_name(),
-                                                     &card.widget_name(),
-                                                     &stack.widget_name(),
-                                                     MoveInstruction::None);
+                let mut move_ = runtime::create_move(
+                    &parent.widget_name(),
+                    &card.widget_name(),
+                    &stack.widget_name(),
+                    MoveInstruction::None,
+                );
                 runtime::perform_move_with_stacks(&mut move_, parent, &stack);
                 game.on_drag_completed(parent, &stack, &mut move_);
                 runtime::add_to_history(move_);
-                return
+                return;
             }
         } else {
             if card.get_rank() == "ace" {
-                let mut move_ = runtime::create_move(&parent.widget_name(),
-                                                     &card.widget_name(),
-                                                     &stack.widget_name(),
-                                                     MoveInstruction::None);
+                let mut move_ = runtime::create_move(
+                    &parent.widget_name(),
+                    &card.widget_name(),
+                    &stack.widget_name(),
+                    MoveInstruction::None,
+                );
                 runtime::perform_move_with_stacks(&mut move_, parent, &stack);
                 game.on_drag_completed(parent, &stack, &mut move_);
                 runtime::add_to_history(move_);
-                return
+                return;
             }
         }
     }
