@@ -135,22 +135,27 @@ impl SolitaireWindow {
     fn appearance(&self) {
         use crate::renderer;
         let theme_name = renderer::get_requested_theme();
-        let settings = gtk::gio::Settings::new(crate::APP_ID);
+        let settings = gio::Settings::new(crate::APP_ID);
         let change_theme = move |theme_name: &str, widget: &gtk::Widget| {
             let picture = widget.to_owned().downcast::<gtk::Picture>().unwrap();
-            picture.set_content_fit(gtk::ContentFit::ScaleDown);
             let card_theme = renderer::get_card_theme(theme_name);
             let renderer = rsvg::CairoRenderer::new(&card_theme.handle);
             renderer::draw_theme_preview(theme_name, &card_theme, &renderer, &picture);
             settings.set("theme", theme_name.to_string());
             picture.upcast()
         };
-        let picture = gtk::Picture::new().upcast::<gtk::Widget>();
-        change_theme(&theme_name, &picture);
+        let picture = gtk::Picture::new();
+        picture.set_content_fit(gtk::ContentFit::ScaleDown);
+        picture.set_margin_start(6);
+        picture.set_margin_end(6);
 
         let theme_dialog = lggs::ThemeSelectorDialog::new(&renderer::THEME_NAMES,
                                                           &theme_name,
                                                           &picture);
+        change_theme(&theme_name, &picture.upcast::<gtk::Widget>());
+
+        theme_dialog.set_content_height(350);
+        theme_dialog.set_content_width(600);
         theme_dialog.connect_change_theme(move |_, theme_name, widget| {
             change_theme(theme_name, widget)
         });
