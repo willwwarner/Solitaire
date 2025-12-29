@@ -27,6 +27,7 @@ use crate::{renderer, card::Card, card_stack::CardStack, game_board::GameBoard, 
 #[cfg(debug_assertions)]
 mod test;
 mod klondike;
+mod tri_peaks;
 
 pub const JOKERS: [&str; 2] = ["joker_red", "joker_black"];
 pub const SUITES: [&str; 4] = ["club", "diamond", "heart", "spade"]; // Use this order because it is the AisleRiot card theme order
@@ -57,6 +58,7 @@ pub fn load_game(game_name: &str, game_board: &GameBoard) {
         #[cfg(debug_assertions)]
         "Test" => *game = Some(Box::new(test::Test::new_game(cards, &game_board))),
         "Klondike" => *game = Some(Box::new(klondike::Klondike::new_game(cards, &game_board))),
+        "Tri-Peaks" => *game = Some(Box::new(tri_peaks::TriPeaks::new_game(cards, &game_board))),
         _ => panic!("Unknown game: {}", game_name),
     }
 }
@@ -82,6 +84,7 @@ pub fn get_games() -> Vec<String> {
     vec![
         #[cfg(debug_assertions)] gettext("Test"),
         gettext("Klondike"),
+        gettext("Tri-Peaks"),
     ] //, "Spider", "FreeCell", "Tri-Peaks", "Pyramid", "Yukon"] not yet :)
 }
 
@@ -90,6 +93,7 @@ pub fn get_game_description(game_name: &str) -> String {
         #[cfg(debug_assertions)]
         "Test" => gettext("Test Game"),
         "Klondike" => gettext("Classic Solitaire"),
+        "Tri-Peaks" => gettext("Clear Three Peaks of Cards"),
         _ => "".to_string()
     }
 }

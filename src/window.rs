@@ -128,7 +128,7 @@ impl SolitaireWindow {
     }
 
     #[inline]
-    fn get_gameboard(&self) -> GameBoard {
+    pub fn get_gameboard(&self) -> GameBoard {
         self.imp().game_bin.get().child().unwrap().downcast().unwrap()
     }
 
