@@ -1,0 +1,161 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $SolitaireWindow: Adw.ApplicationWindow {
+  title: _("Solitaire");
+  default-width: 800;
+  default-height: 800;
+
+  styles [
+    "devel",
+  ]
+
+  content: Adw.NavigationView nav_view {
+    Adw.NavigationPage nav_page {
+      title: _("Solitaire");
+      tag: "chooser";
+
+      child: Adw.ToolbarView {
+        [top]
+        Adw.HeaderBar {
+          ToggleButton {
+            icon-name: "edit-find-symbolic";
+            tooltip-text: _("Search");
+            active: bind search_bar.search-mode-enabled bidirectional;
+          }
+          [end]
+          MenuButton {
+            primary: true;
+            icon-name: "open-menu-symbolic";
+            tooltip-text: _("Main Menu");
+            menu-model: primary_menu;
+          }
+        }
+        [top]
+        SearchBar search_bar {
+          key-capture-widget: template;
+          child: Adw.Clamp {
+            child: SearchEntry search_entry {
+              placeholder-text: _("Search games");
+            };
+          };
+        }
+
+        content: Adw.StatusPage {
+          title: _("Choose Solitaire Type");
+          description: _("Pick the type of Solitaire you want to play:");
+
+          Box {
+            orientation: vertical;
+            vexpand: true;
+
+            Adw.Clamp {
+              maximum-size: 500;
+
+              ListBox list {
+                selection-mode: none;
+
+                styles [
+                  "boxed-list",
+                ]
+
+                Adw.ActionRow recent_row {
+                  title: _("Continue Last Game");
+                  subtitle: _("You made 0 moves");
+                  activatable: true;
+                  activated => $recent_clicked() swapped;
+                  visible: false;
+
+                  [suffix]
+                  Image {
+                    icon-name: "go-next-symbolic";
+                    valign: center;
+                  }
+                }
+              }
+            }
+          }
+        };
+      };
+    }
+
+    Adw.NavigationPage game_page {
+      title: _("Game not loaded...");
+      tag: "game";
+      can-pop: false;
+
+      child: Adw.ToolbarView {
+        [top]
+        Adw.HeaderBar {
+          Button new_game {
+            icon-name: "go-previous-symbolic";
+            tooltip-text: _("New Game");
+            clicked => $new_game_clicked() swapped;
+          }
+          Button undo {
+            icon-name: "edit-undo-symbolic";
+            tooltip-text: _("Undo");
+            action-name: "win.undo";
+          }
+          Button redo {
+            icon-name: "edit-redo-symbolic";
+            tooltip-text: _("Redo");
+            action-name: "win.redo";
+          }
+          [end]
+          MenuButton {
+            primary: true;
+            icon-name: "open-menu-symbolic";
+            tooltip-text: _("Main Menu");
+            menu-model: primary_menu;
+          }
+          [end]
+          Button hint {
+            icon-name: "lightbulb-symbolic";
+            tooltip-text: _("Hint");
+            action-name: "win.hint";
+          }
+        }
+
+        content: Grid card_grid {
+          row-homogeneous: false;
+          column-homogeneous: false;
+          row-spacing: 6;
+          column-spacing: 2;
+          margin-start: 6;
+          margin-end: 6;
+          margin-bottom: 12;
+        };
+      };
+    }
+  };
+}
+
+menu primary_menu {
+  // section {
+  //   item {
+  //     label: _("_Scores");
+  //     action: "win.show-score-dialog";
+  //   }
+  //   item {
+  //     label: _("A_pperance");
+  //     action: "win.show-apperance-dialog";
+  //   }
+  // }
+  section {
+    // item {
+    //   label: _("_Preferences");
+    //   action: "app.preferences";
+    // }
+
+    item {
+      label: _("_Keyboard Shortcuts");
+      action: "win.show-help-overlay";
+    }
+
+    item {
+      label: _("_About Solitaire");
+      action: "app.about";
+    }
+  }
+}

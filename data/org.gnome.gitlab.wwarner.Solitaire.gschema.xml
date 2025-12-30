@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="solitaire">
+	<schema id="@app-id@" path="/org/gnome/gitlab/wwarner/Solitaire/">
+		<key name="recent-game" type="s">
+			<default>'none'</default>
+			<summary>The most recently played game</summary>
+			<description>The last game that was played by the user.</description>
+		</key>
+	</schema>
+</schemalist>

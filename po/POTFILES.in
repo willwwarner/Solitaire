@@ -1,0 +1,6 @@
+# List of source files containing translatable strings.
+# Please keep this file sorted alphabetically.
+data/org.gnome.gitlab.wwarner.Solitaire.desktop.in
+data/org.gnome.gitlab.wwarner.Solitaire.metainfo.xml.in
+data/org.gnome.gitlab.wwarner.Solitaire.gschema.xml
+src/window.ui

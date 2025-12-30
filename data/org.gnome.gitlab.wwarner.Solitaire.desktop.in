@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Solitaire
+Exec=solitaire
+Icon=@app-id@
+Terminal=true
+Type=Application
+Categories=Utility;
+Keywords=GTK;
+StartupNotify=true
+DBusActivatable=true
