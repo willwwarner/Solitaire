@@ -201,8 +201,7 @@ pub async fn try_game(game_name: &str, game_board: &GameBoard) -> Option<Vec<run
         std::thread::spawn(move || {
             let mut game = CURRENT_GAME.lock().unwrap();
             if let Some(game) = game.as_mut() {
-                let result =
-                    solver::solve(game_state, game.move_generator(), game.is_won_fn());
+                let result = solver::solve(game_state, game.move_generator(), game.is_won_fn());
                 sender.send_blocking(result).unwrap();
             }
         });

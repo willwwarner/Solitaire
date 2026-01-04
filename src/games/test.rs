@@ -89,14 +89,16 @@ impl Game for Test {
         _origin_stack: &CardStack,
         _destination_stack: &CardStack,
         _move: &mut runtime::Move,
-    ) {}
+    ) {
+    }
 
     fn pre_undo_drag(
         &self,
         _previous_origin_stack: &CardStack,
         _previous_destination_stack: &CardStack,
         _move: &mut runtime::Move,
-    ) {}
+    ) {
+    }
 
     fn card_double_click(&self, card: &Card) {
         let card_stack = card.stack().unwrap();
