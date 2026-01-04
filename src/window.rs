@@ -273,7 +273,7 @@ impl SolitaireWindow {
                                 window.set_hint_drop_enabled(true);
                             }
                             runtime::set_solution(solution);
-                            let won_fn = games::get_is_won_fn();
+                            let won_fn = games::is_won_fn();
                             runtime::set_won_fn(won_fn);
                         } else {
                             if games::solver::get_should_stop() {

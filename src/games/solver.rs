@@ -155,7 +155,7 @@ pub fn is_red(card: &u8) -> bool {
     suit == 1 || suit == 3
 }
 
-pub fn get_rank(card: &u8) -> &str {
+pub fn card_rank(card: &u8) -> &str {
     let rank = solver_card_to_id(card) % 13;
     RANKS[rank as usize]
 }
@@ -456,7 +456,7 @@ pub(super) fn solver_debug(
         let mut game = CURRENT_GAME.lock().unwrap();
         let game = game.as_mut().expect("solver_debug: failed to get game");
         let mut state = DEBUG_STATE.take().unwrap();
-        game.get_move_generator()(&mut state);
+        game.move_generator()(&mut state);
         DEBUG_STATE.set(Some(state));
         make_node_rows(&node_list, &node_view, 0);
     }
@@ -473,7 +473,7 @@ pub(super) fn solver_debug(
             for _ in 0..n_expand {
                 let mut state = DEBUG_STATE.take().unwrap();
                 let node_index = state.nodes.len();
-                game.get_move_generator()(&mut state);
+                game.move_generator()(&mut state);
                 if let Some(node) = state.nodes.last() {
                     state.game_state = state.states[node.state_key].clone();
                 }

@@ -71,7 +71,7 @@ impl Game for TriPeaks {
         game_board.add(&waste, 1, 0, 1, 1);
 
         let stock = CardStack::new("stock", -1, false);
-        stock.add_click_to_slot();
+        stock.add_click();
         while n_cards > 0 {
             let random_card = glib::random_int_range(0, n_cards) as usize;
             let card = &cards[random_card];
@@ -94,7 +94,7 @@ impl Game for TriPeaks {
     }
 
     fn verify_drop(&self, bottom_card: &Card, to_stack: &CardStack) -> bool {
-        let stack_type = to_stack.get_type();
+        let stack_type = to_stack.stack_type();
         if stack_type == "waste" {
             if to_stack.is_empty() {
                 return false;
@@ -108,7 +108,7 @@ impl Game for TriPeaks {
         false
     }
 
-    fn on_drag_completed(
+    fn drag_completed(
         &self,
         origin_stack: &CardStack,
         _destination_stack: &CardStack,
@@ -135,7 +135,7 @@ impl Game for TriPeaks {
             }
         }
 
-        if origin_stack.get_type() == "pyramid" {
+        if origin_stack.stack_type() == "pyramid" {
             window::SolitaireWindow::get_window()
                 .unwrap()
                 .get_gameboard()
@@ -194,7 +194,7 @@ impl Game for TriPeaks {
                     .face_down_top_card();
             }
         }
-        if origin_stack.get_type() == "pyramid" {
+        if origin_stack.stack_type() == "pyramid" {
             window::SolitaireWindow::get_window()
                 .unwrap()
                 .get_gameboard()
@@ -227,10 +227,10 @@ impl Game for TriPeaks {
         }
     }
 
-    fn on_double_click(&self, _card: &Card) {}
+    fn card_double_click(&self, _card: &Card) {}
 
-    fn on_slot_click(&self, slot: &CardStack) {
-        if slot.get_type() == "stock" {
+    fn stack_click(&self, slot: &CardStack) {
+        if slot.stack_type() == "stock" {
             let waste = runtime::get_stack("waste").unwrap();
 
             if slot.is_empty() {
@@ -252,11 +252,11 @@ impl Game for TriPeaks {
         }
     }
 
-    fn get_move_generator(&self) -> Box<dyn FnMut(&mut solver::State)> {
+    fn move_generator(&self) -> Box<dyn FnMut(&mut solver::State)> {
         Box::new(generate_solver_moves)
     }
 
-    fn get_is_won_fn(&self) -> Box<dyn FnMut(&mut solver::State) -> bool> {
+    fn is_won_fn(&self) -> Box<dyn FnMut(&mut solver::State) -> bool> {
         Box::new(is_won)
     }
 }

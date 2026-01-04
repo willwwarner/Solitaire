@@ -117,25 +117,25 @@ pub fn get_game_description(game_name: &str) -> String {
 pub fn on_double_click(card: &Card) {
     let mut game = CURRENT_GAME.lock().unwrap();
     if let Some(game) = game.as_mut() {
-        game.on_double_click(card);
+        game.card_double_click(card);
     }
 }
 
-pub fn on_slot_click(slot: &CardStack) {
+pub fn stack_click(stack: &CardStack) {
     let mut game = CURRENT_GAME.lock().unwrap();
     if let Some(game) = game.as_mut() {
-        game.on_slot_click(slot);
+        game.stack_click(stack);
     }
 }
 
-pub fn on_drag_completed(
+pub fn drag_completed(
     origin_stack: &CardStack,
     destination_stack: &CardStack,
     move_: &mut runtime::Move,
 ) {
     let mut game = CURRENT_GAME.lock().unwrap();
     if let Some(game) = game.as_mut() {
-        game.on_drag_completed(origin_stack, destination_stack, move_);
+        game.drag_completed(origin_stack, destination_stack, move_);
     }
 }
 
@@ -168,9 +168,9 @@ pub fn verify_drop(bottom_card: &Card, to_stack: &CardStack) -> bool {
     }
 }
 
-pub fn get_is_won_fn() -> Box<dyn FnMut(&mut solver::State) -> bool> {
+pub fn is_won_fn() -> Box<dyn FnMut(&mut solver::State) -> bool> {
     let mut game = CURRENT_GAME.lock().unwrap();
-    game.as_mut().unwrap().get_is_won_fn()
+    game.as_mut().unwrap().is_won_fn()
 }
 
 pub mod solver;
@@ -202,7 +202,7 @@ pub async fn try_game(game_name: &str, game_board: &GameBoard) -> Option<Vec<run
             let mut game = CURRENT_GAME.lock().unwrap();
             if let Some(game) = game.as_mut() {
                 let result =
-                    solver::solve(game_state, game.get_move_generator(), game.get_is_won_fn());
+                    solver::solve(game_state, game.move_generator(), game.is_won_fn());
                 sender.send_blocking(result).unwrap();
             }
         });
@@ -236,8 +236,8 @@ pub fn re_solve(stack_names: Vec<String>, game_state: Vec<Vec<u8>>) -> Option<Ve
     {
         let mut game = CURRENT_GAME.lock().unwrap();
         let game = game.as_mut().unwrap();
-        move_generator = game.get_move_generator();
-        is_won_fn = game.get_is_won_fn();
+        move_generator = game.move_generator();
+        is_won_fn = game.is_won_fn();
     }
     solver::set_should_stop(false);
     let result = solver::solve(game_state, move_generator, is_won_fn);
@@ -320,7 +320,7 @@ trait Game: Send + Sync {
         Self: Sized;
     fn verify_drag(&self, bottom_card: &Card, from_stack: &CardStack) -> bool;
     fn verify_drop(&self, bottom_card: &Card, to_stack: &CardStack) -> bool;
-    fn on_drag_completed(
+    fn drag_completed(
         &self,
         origin_stack: &CardStack,
         destination_stack: &CardStack,
@@ -332,8 +332,8 @@ trait Game: Send + Sync {
         previous_destination_stack: &CardStack,
         move_: &mut runtime::Move,
     );
-    fn on_double_click(&self, card: &Card);
-    fn on_slot_click(&self, slot: &CardStack);
-    fn get_move_generator(&self) -> Box<dyn FnMut(&mut solver::State)>;
-    fn get_is_won_fn(&self) -> Box<dyn FnMut(&mut solver::State) -> bool>;
+    fn card_double_click(&self, card: &Card);
+    fn stack_click(&self, slot: &CardStack);
+    fn move_generator(&self) -> Box<dyn FnMut(&mut solver::State)>;
+    fn is_won_fn(&self) -> Box<dyn FnMut(&mut solver::State) -> bool>;
 }

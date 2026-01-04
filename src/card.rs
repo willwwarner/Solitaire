@@ -155,12 +155,12 @@ impl Card {
         (self_suit == 0 || self_suit == 3) == (other_suit == 0 || other_suit == 3)
     }
 
-    pub fn get_rank(&self) -> &str {
+    pub fn rank(&self) -> &str {
         let rank = self.imp().card_id.get() % 13;
         games::RANKS[rank as usize]
     }
 
-    pub fn get_stack(&self) -> Option<CardStack> {
+    pub fn stack(&self) -> Option<CardStack> {
         self.parent()?.downcast::<CardStack>().ok()
     }
 
