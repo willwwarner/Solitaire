@@ -300,12 +300,8 @@ impl CardStack {
         drop_target.connect_drop(|drop, val, _x, _y| {
             let to_stack = drop.widget().unwrap().downcast::<CardStack>().unwrap();
             if let Ok(transfer_stack) = val.get::<TransferCardStack>() {
-                let first_card = transfer_stack
-                    .first_child()
-                    .unwrap()
-                    .downcast::<Card>()
-                    .unwrap();
-                if games::verify_drop(&first_card, &to_stack) {
+                let first_card = transfer_stack.first_card();
+                if games::verify_drop(&transfer_stack, &to_stack) {
                     to_stack.merge_stack(&transfer_stack);
                     //FIXME: do not use widget_name
                     let mut move_ = runtime::create_move(
@@ -583,6 +579,29 @@ impl TransferCardStack {
                 "Attempted to add a widget that already has a parent"
             );
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.last_child().is_none()
+    }
+
+    pub fn last_card(&self) -> Card {
+        self.last_child().unwrap().downcast::<Card>().unwrap()
+    }
+
+    pub fn first_card(&self) -> Card {
+        self.first_child().unwrap().downcast::<Card>().unwrap()
+    }
+
+    pub fn n_cards(&self) -> usize {
+        self.observe_children().n_items() as usize
+    }
+
+    pub fn get_card(&self, index: usize) -> Option<Card> {
+        self.observe_children()
+            .item(index as u32)?
+            .downcast::<Card>()
+            .ok()
     }
 
     pub fn get_origin_name(&self) -> String {

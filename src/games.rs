@@ -18,7 +18,12 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use crate::{card::Card, card_stack::CardStack, game_board::GameBoard, renderer, runtime};
+use crate::{
+    card::Card,
+    card_stack::{CardStack, TransferCardStack},
+    game_board::GameBoard,
+    renderer, runtime,
+};
 use adw::prelude::*;
 use gettextrs::gettext;
 use gtk::{gio, glib};
@@ -34,6 +39,7 @@ pub const SUITES: [&str; 4] = ["club", "diamond", "heart", "spade"]; // Use this
 pub const RANKS: [&str; 13] = [
     "ace", "2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king",
 ];
+
 static CURRENT_GAME: Mutex<Option<Box<dyn Game>>> = Mutex::new(None);
 
 pub fn load_game(game_name: &str, game_board: &GameBoard) {
@@ -159,10 +165,10 @@ pub fn verify_drag(bottom_card: &Card, from_stack: &CardStack) -> bool {
     }
 }
 
-pub fn verify_drop(bottom_card: &Card, to_stack: &CardStack) -> bool {
+pub fn verify_drop(transfer_stack: &TransferCardStack, to_stack: &CardStack) -> bool {
     let mut game = CURRENT_GAME.lock().unwrap();
     if let Some(game) = game.as_mut() {
-        game.verify_drop(bottom_card, to_stack)
+        game.verify_drop(transfer_stack, to_stack)
     } else {
         false
     }
@@ -318,7 +324,7 @@ trait Game: Send + Sync {
     where
         Self: Sized;
     fn verify_drag(&self, bottom_card: &Card, from_stack: &CardStack) -> bool;
-    fn verify_drop(&self, bottom_card: &Card, to_stack: &CardStack) -> bool;
+    fn verify_drop(&self, transfer_stack: &TransferCardStack, to_stack: &CardStack) -> bool;
     fn drag_completed(
         &self,
         origin_stack: &CardStack,

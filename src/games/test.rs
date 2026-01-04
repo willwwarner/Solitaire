@@ -21,11 +21,11 @@
 
 use crate::{
     card::Card,
-    card_stack::CardStack,
+    card_stack::{CardStack, TransferCardStack},
     game_board::GameBoard,
     games::*,
     runtime,
-    runtime::MoveInstruction::{Flip, None},
+    runtime::MoveInstruction,
 };
 use gtk::subclass::prelude::*;
 
@@ -62,7 +62,8 @@ impl Game for Test {
         }
     }
 
-    fn verify_drop(&self, bottom_card: &Card, to_stack: &CardStack) -> bool {
+    fn verify_drop(&self, transfer_stack: &TransferCardStack, to_stack: &CardStack) -> bool {
+        let bottom_card = transfer_stack.first_card();
         if to_stack.stack_type() == "waste" {
             if let Some(top_card) = to_stack.last_card() {
                 top_card.is_one_rank_above(&bottom_card)
@@ -114,8 +115,12 @@ impl Game for Test {
                     }
                 }
                 if perform_move {
-                    let mut move_ =
-                        runtime::create_move("waste", &*top_card.widget_name(), "foundation", None);
+                    let mut move_ = runtime::create_move(
+                        "waste",
+                        &*top_card.widget_name(),
+                        "foundation",
+                        MoveInstruction::None,
+                    );
                     runtime::perform_move_with_stacks(&mut move_, &card_stack, &foundation);
                     self.drag_completed(&card_stack, &foundation, &mut move_);
                     runtime::add_to_history(move_);
@@ -128,8 +133,12 @@ impl Game for Test {
         if slot.stack_type() == "stock" {
             let waste = runtime::get_stack("waste").unwrap();
             if let Some(top_card) = slot.last_card() {
-                let mut move_ =
-                    runtime::create_move("stock", &*top_card.widget_name(), "waste", Flip);
+                let mut move_ = runtime::create_move(
+                    "stock",
+                    &*top_card.widget_name(),
+                    "waste",
+                    MoveInstruction::Flip,
+                );
                 runtime::perform_move_with_stacks(&mut move_, slot, &waste);
                 self.drag_completed(slot, &waste, &mut move_);
                 runtime::add_to_history(move_);
@@ -168,7 +177,7 @@ fn generate_solver_moves(state: &mut solver::State) {
         if let Some(top_waste) = state.get_stack(WASTE).last() {
             if solver::is_one_rank_above(&top_stock, &top_waste) {
                 state.try_move(
-                    solver::create_move(STOCK, &top_stock, WASTE, Flip),
+                    solver::create_move(STOCK, &top_stock, WASTE, MoveInstruction::Flip),
                     2,
                     get_priority,
                     |_, _, _| {},
@@ -177,7 +186,7 @@ fn generate_solver_moves(state: &mut solver::State) {
         }
         if solver::card_rank(&top_stock) == "king" {
             state.try_move(
-                solver::create_move(STOCK, &top_stock, WASTE, Flip),
+                solver::create_move(STOCK, &top_stock, WASTE, MoveInstruction::Flip),
                 2,
                 get_priority,
                 |_, _, _| {},
@@ -189,7 +198,7 @@ fn generate_solver_moves(state: &mut solver::State) {
         if let Some(top_foundation) = state.get_stack(FOUNDATION).last() {
             if solver::is_one_rank_above(&top_foundation, &top_waste) {
                 state.try_move(
-                    solver::create_move(WASTE, &top_waste, FOUNDATION, None),
+                    solver::create_move(WASTE, &top_waste, FOUNDATION, MoveInstruction::None),
                     1,
                     get_priority,
                     |_, _, _| {},
@@ -198,7 +207,7 @@ fn generate_solver_moves(state: &mut solver::State) {
         }
         if solver::card_rank(&top_waste) == "ace" {
             state.try_move(
-                solver::create_move(WASTE, &top_waste, FOUNDATION, None),
+                solver::create_move(WASTE, &top_waste, FOUNDATION, MoveInstruction::None),
                 1,
                 get_priority,
                 |_, _, _| {},

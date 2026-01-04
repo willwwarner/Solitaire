@@ -20,7 +20,11 @@
 
 use super::*;
 use crate::{
-    card::Card, card_stack::CardStack, game_board::GameBoard, runtime, runtime::MoveInstruction,
+    card::Card,
+    card_stack::{CardStack, TransferCardStack},
+    game_board::GameBoard,
+    runtime,
+    runtime::MoveInstruction,
 };
 use gtk::glib;
 use gtk::{prelude::*, subclass::prelude::*};
@@ -94,8 +98,9 @@ impl Game for Klondike {
         }
     }
 
-    fn verify_drop(&self, bottom_card: &Card, to_stack: &CardStack) -> bool {
+    fn verify_drop(&self, transfer_stack: &TransferCardStack, to_stack: &CardStack) -> bool {
         let stack_type = to_stack.stack_type();
+        let bottom_card = transfer_stack.first_card();
         if stack_type == "tableau" {
             if to_stack.is_empty() && bottom_card.rank() == "king" {
                 return true;
@@ -109,7 +114,7 @@ impl Game for Klondike {
             } else {
                 return false;
             }
-        } else if stack_type == "foundation" {
+        } else if stack_type == "foundation" && transfer_stack.n_cards() == 1 {
             if to_stack.is_empty() && bottom_card.rank() == "ace" {
                 return true;
             } else if to_stack.is_empty() {

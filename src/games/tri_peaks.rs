@@ -20,7 +20,11 @@
 
 use super::*;
 use crate::{
-    card::Card, card_stack::CardStack, game_board::GameBoard, runtime, runtime::MoveInstruction,
+    card::Card,
+    card_stack::{CardStack, TransferCardStack},
+    game_board::GameBoard,
+    runtime,
+    runtime::MoveInstruction,
     window,
 };
 use gtk::glib;
@@ -93,13 +97,14 @@ impl Game for TriPeaks {
         }
     }
 
-    fn verify_drop(&self, bottom_card: &Card, to_stack: &CardStack) -> bool {
+    fn verify_drop(&self, transfer_stack: &TransferCardStack, to_stack: &CardStack) -> bool {
         let stack_type = to_stack.stack_type();
         if stack_type == "waste" {
             if to_stack.is_empty() {
                 return false;
             }
             let top_card = to_stack.last_card().unwrap();
+            let bottom_card = transfer_stack.first_card();
             if top_card.is_one_rank_above(&bottom_card) || bottom_card.is_one_rank_above(&top_card)
             {
                 return true;
