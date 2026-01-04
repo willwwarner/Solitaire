@@ -35,7 +35,7 @@ glib::wrapper! {
         @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
-pub fn get_index(card_name: &str, children: &gio::ListModel) -> Result<u32, glib::Error> {
+pub fn child_index(card_name: &str, children: &gio::ListModel) -> Result<u32, glib::Error> {
     // Attempt to locate the child with the given card name
     let total_children = children.n_items();
 
@@ -87,7 +87,7 @@ mod imp {
 
             this.set_focusable(true);
             this.set_accessible_role(gtk::AccessibleRole::List);
-            this.update_property(&[gtk::accessible::Property::Description(&this.get_type())]);
+            this.update_property(&[gtk::accessible::Property::Description(&this.stack_type())]);
         }
     }
 
@@ -288,7 +288,7 @@ impl CardStack {
         this
     }
 
-    pub fn get_type(&self) -> String {
+    pub fn stack_type(&self) -> String {
         let value = self.imp().stack_type.take();
         self.imp().stack_type.set(value.clone());
         value
@@ -314,7 +314,7 @@ impl CardStack {
                         &to_stack.widget_name(),
                         runtime::MoveInstruction::None,
                     );
-                    games::on_drag_completed(
+                    games::drag_completed(
                         &runtime::get_stack(&*transfer_stack.get_origin_name()).unwrap(),
                         &to_stack,
                         &mut move_,
@@ -336,11 +336,11 @@ impl CardStack {
         self.add_controller(drop_target);
     }
 
-    pub fn add_click_to_slot(&self) {
+    pub fn add_click(&self) {
         let click = GestureClick::new();
-        let slot_clone = self.to_owned();
+        let stack_clone = self.clone();
         click.connect_pressed(move |_click, _n_press, _x, _y| {
-            games::on_slot_click(&slot_clone);
+            games::stack_click(&stack_clone);
         });
         self.add_controller(click);
     }
@@ -357,7 +357,7 @@ impl CardStack {
             .set(self.widget_name().to_string());
 
         // First, find the starting index
-        let start_index = get_index(card_name, &children).expect("Couldn't get card");
+        let start_index = child_index(card_name, &children).expect("Couldn't get card");
         for _i in start_index..total_children {
             let child = children
                 .item(start_index)

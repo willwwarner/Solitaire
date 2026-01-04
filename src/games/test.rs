@@ -44,7 +44,7 @@ impl Game for Test {
             stock.add_card(&card);
             cards.remove(0);
         }
-        stock.add_click_to_slot();
+        stock.add_click();
         game_board.add(&stock, 0, 0, 1, 1);
         let waste = CardStack::new("waste", -1, false);
         game_board.add(&waste, 1, 0, 1, 1);
@@ -63,18 +63,18 @@ impl Game for Test {
     }
 
     fn verify_drop(&self, bottom_card: &Card, to_stack: &CardStack) -> bool {
-        if to_stack.get_type() == "waste" {
+        if to_stack.stack_type() == "waste" {
             if let Some(top_card) = to_stack.last_card() {
                 top_card.is_one_rank_above(&bottom_card)
-            } else if bottom_card.get_rank() == "king" {
+            } else if bottom_card.rank() == "king" {
                 true
             } else {
                 false
             }
-        } else if to_stack.get_type() == "foundation" {
+        } else if to_stack.stack_type() == "foundation" {
             if let Some(top_card) = to_stack.last_card() {
                 bottom_card.is_one_rank_above(&top_card)
-            } else if bottom_card.get_rank() == "ace" {
+            } else if bottom_card.rank() == "ace" {
                 true
             } else {
                 false
@@ -84,7 +84,7 @@ impl Game for Test {
         }
     }
 
-    fn on_drag_completed(
+    fn drag_completed(
         &self,
         _origin_stack: &CardStack,
         _destination_stack: &CardStack,
@@ -100,13 +100,13 @@ impl Game for Test {
     ) {
     }
 
-    fn on_double_click(&self, card: &Card) {
-        let card_stack = card.get_stack().unwrap();
-        if card_stack.get_type() == "waste" {
+    fn card_double_click(&self, card: &Card) {
+        let card_stack = card.stack().unwrap();
+        if card_stack.stack_type() == "waste" {
             if let Some(top_card) = card_stack.last_card() {
                 let mut perform_move = false;
                 let foundation = runtime::get_stack("foundation").unwrap();
-                if top_card.get_rank() == "ace" {
+                if top_card.rank() == "ace" {
                     perform_move = true
                 } else if let Some(foundation_top) = &foundation.last_card() {
                     if top_card.is_one_rank_above(foundation_top) {
@@ -115,34 +115,34 @@ impl Game for Test {
                 }
                 if perform_move {
                     let mut move_ =
-                        runtime::create_move("stock", &*top_card.widget_name(), "foundation", None);
+                        runtime::create_move("waste", &*top_card.widget_name(), "foundation", None);
                     runtime::perform_move_with_stacks(&mut move_, &card_stack, &foundation);
-                    self.on_drag_completed(&card_stack, &foundation, &mut move_);
+                    self.drag_completed(&card_stack, &foundation, &mut move_);
                     runtime::add_to_history(move_);
                 }
             }
         }
     }
 
-    fn on_slot_click(&self, slot: &CardStack) {
-        if slot.get_type() == "stock" {
+    fn stack_click(&self, slot: &CardStack) {
+        if slot.stack_type() == "stock" {
             let waste = runtime::get_stack("waste").unwrap();
             if let Some(top_card) = slot.last_card() {
                 let mut move_ =
                     runtime::create_move("stock", &*top_card.widget_name(), "waste", Flip);
                 runtime::perform_move_with_stacks(&mut move_, slot, &waste);
-                self.on_drag_completed(slot, &waste, &mut move_);
+                self.drag_completed(slot, &waste, &mut move_);
                 runtime::add_to_history(move_);
                 waste.add_drag_to_card(&top_card);
             }
         }
     }
 
-    fn get_move_generator(&self) -> Box<dyn FnMut(&mut solver::State)> {
+    fn move_generator(&self) -> Box<dyn FnMut(&mut solver::State)> {
         Box::new(generate_solver_moves)
     }
 
-    fn get_is_won_fn(&self) -> Box<dyn FnMut(&mut solver::State) -> bool> {
+    fn is_won_fn(&self) -> Box<dyn FnMut(&mut solver::State) -> bool> {
         Box::new(is_won)
     }
 }
@@ -175,7 +175,7 @@ fn generate_solver_moves(state: &mut solver::State) {
                 );
             }
         }
-        if solver::get_rank(&top_stock) == "king" {
+        if solver::card_rank(&top_stock) == "king" {
             state.try_move(
                 solver::create_move(STOCK, &top_stock, WASTE, Flip),
                 2,
@@ -196,7 +196,7 @@ fn generate_solver_moves(state: &mut solver::State) {
                 );
             }
         }
-        if solver::get_rank(&top_waste) == "ace" {
+        if solver::card_rank(&top_waste) == "ace" {
             state.try_move(
                 solver::create_move(WASTE, &top_waste, FOUNDATION, None),
                 1,

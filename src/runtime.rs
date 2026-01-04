@@ -156,7 +156,7 @@ pub fn perform_move_with_stacks(
             //Fixme
             let origin_children = origin_stack.observe_children();
             let split_index =
-                crate::card_stack::get_index(&*move_.card_name, &origin_children).unwrap();
+                crate::card_stack::child_index(&*move_.card_name, &origin_children).unwrap();
             move_.card_name = origin_stack.last_child().unwrap().widget_name().to_string();
             for _ in split_index..origin_children.n_items() {
                 let card = origin_stack
@@ -243,7 +243,7 @@ pub fn redo_first_move() {
         let origin_stack = get_stack(&first_entry.origin_stack).unwrap();
         let destination_stack = get_stack(&first_entry.destination_stack).unwrap();
         perform_move(&mut first_entry);
-        games::on_drag_completed(&origin_stack, &destination_stack, &mut first_entry);
+        games::drag_completed(&origin_stack, &destination_stack, &mut first_entry);
         HISTORY.with(|history| history.borrow_mut().push(first_entry.clone()));
         if let Some(solution_move) = get_hint() {
             if solution_move == first_entry {
@@ -345,7 +345,7 @@ pub fn drop() {
             let origin_stack = get_stack(&move_.origin_stack).unwrap();
             let destination_stack = get_stack(&move_.destination_stack).unwrap();
             perform_move_with_stacks(&mut move_, &origin_stack, &destination_stack);
-            games::on_drag_completed(&origin_stack, &destination_stack, &mut move_);
+            games::drag_completed(&origin_stack, &destination_stack, &mut move_);
             add_to_history(move_);
             glib::timeout_future(Duration::from_millis(300)).await;
         }
