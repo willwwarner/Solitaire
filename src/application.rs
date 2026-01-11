@@ -109,7 +109,7 @@ impl SolitaireApplication {
             // Translators: Replace "translator-credits" with your name/username, and optionally an email or URL.
             .translator_credits(&gettext("translator-credits"))
             .copyright(
-                "© 2025-2026 Will Warner\n \
+                "© 2025-2026 Will Warner\n\
                  © 2025-2026 Vincent Bermel",
             )
             .license_type(gtk::License::Gpl30)

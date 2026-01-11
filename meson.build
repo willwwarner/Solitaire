@@ -1,5 +1,5 @@
 project('solitaire', ['c', 'rust'],
-          version: 'DEV',
+          version: '50.alpha',
     meson_version: '>= 1.0.0',
   default_options: [ 'warning_level=2', 'werror=false', ],
 )
