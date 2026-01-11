@@ -1,6 +1,6 @@
 /* application.rs
  *
- * Copyright 2025 Will Warner
+ * Copyright 2025-2026 Will Warner
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -109,13 +109,13 @@ impl SolitaireApplication {
             // Translators: Replace "translator-credits" with your name/username, and optionally an email or URL.
             .translator_credits(&gettext("translator-credits"))
             .copyright(
-                "© 2025 Will Warner \
-                        \n© 2025 Vincent Bermel",
+                "© 2025-2026 Will Warner\n \
+                 © 2025-2026 Vincent Bermel",
             )
             .license_type(gtk::License::Gpl30)
             .issue_url("https://gitlab.gnome.org/wwarner/solitaire/-/issues")
             .website("https://gitlab.gnome.org/wwarner/solitaire")
-            .comments("Play Solitaire games")
+            .comments("Play patience games")
             .build();
 
         about.present(Some(&window));

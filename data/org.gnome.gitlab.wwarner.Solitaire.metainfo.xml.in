@@ -5,14 +5,19 @@
   <project_license>GPL-3.0-or-later</project_license>
 
   <name>Solitaire</name>
-  <summary>Play solitaire games</summary>
+  <summary>Play patience games</summary>
   <description>
     <p>
-      Solitaire features a collection of patience games, and a simple interface to play them.
+      Solitaire features simple interface to play a variety of
+      solitaire/patience games.
     </p>
     <p>
-      Solitaire can figure out if the game you're playing can be won, and it will tell you if not.
-      If you need a hint, Solitaire will give you one that is guaranteed to lead to a win.
+      Solitaire can figure out if the game you're playing can be won,
+      and will let you undo the move that made the game unwinnable.
+    </p>
+    <p>
+      If you need a hint, Solitaire will give you one that is guaranteed to
+      lead to a win.
     </p>
   </description>
   <requires>
