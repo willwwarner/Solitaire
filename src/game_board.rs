@@ -118,7 +118,7 @@ mod imp {
                         spacing1 = (spacing_alloc / (cols - 1.0)).floor();
                         spacing_split = spacing_alloc as i32 % (cols - 1.0) as i32;
                     }
-                    h_offset = (unused_x / 1.8) as i32; // 1.8 = 90% / 2
+                    h_offset = (unused_x * 0.45) as i32; // 90% / 2
                 } else {
                     col_width1 = (width_f / cols).floor();
                     col_width2 = col_width1 + 1.0;
