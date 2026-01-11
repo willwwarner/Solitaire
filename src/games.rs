@@ -1,6 +1,6 @@
 /* games.rs
  *
- * Copyright 2025 Will Warner
+ * Copyright 2025-2026 Will Warner
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,6 +30,7 @@ use gtk::{gio, glib};
 use std::sync::Mutex;
 
 mod klondike;
+mod freecell;
 #[cfg(debug_assertions)]
 mod test;
 mod tri_peaks;
@@ -76,6 +77,7 @@ pub fn load_game(game_name: &str, game_board: &GameBoard) {
         #[cfg(debug_assertions)]
         "Test" => *game = Some(Box::new(test::Test::new_game(cards, &game_board))),
         "Klondike" => *game = Some(Box::new(klondike::Klondike::new_game(cards, &game_board))),
+        "FreeCell" => *game = Some(Box::new(freecell::FreeCell::new_game(cards, &game_board))),
         "Tri-Peaks" => *game = Some(Box::new(tri_peaks::TriPeaks::new_game(cards, &game_board))),
         _ => panic!("Unknown game: {}", game_name),
     }
@@ -106,8 +108,9 @@ pub fn get_games() -> Vec<String> {
         #[cfg(debug_assertions)]
         gettext("Test"),
         gettext("Klondike"),
+        gettext("FreeCell"),
         gettext("Tri-Peaks"),
-    ] //, "Spider", "FreeCell", "Tri-Peaks", "Pyramid", "Yukon"] not yet :)
+    ] //, "Spider", "Pyramid", "Yukon"] not yet :)
 }
 
 pub fn get_game_description(game_name: &str) -> String {
@@ -115,6 +118,7 @@ pub fn get_game_description(game_name: &str) -> String {
         #[cfg(debug_assertions)]
         "Test" => gettext("Test Game"),
         "Klondike" => gettext("Classic Solitaire"),
+        "FreeCell" => gettext("Build Foundations using Free Cells"),
         "Tri-Peaks" => gettext("Clear Three Peaks of Cards"),
         _ => "".to_string(),
     }
