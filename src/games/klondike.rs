@@ -141,7 +141,7 @@ impl Game for Klondike {
         if type_ == "tableau" {
             if let Some(last_card) = origin_stack.last_card() {
                 if !last_card.is_face_up() {
-                    move_.flip_index = Some(origin_stack.n_cards() - 1);
+                    move_.flip_index = Some(origin_stack.n_cards());
                     last_card.flip();
                 }
             }
@@ -246,10 +246,11 @@ fn is_won(state: &mut solver::State) -> bool {
     true
 }
 
+#[rustfmt::skip]
 fn generate_solver_moves(state: &mut solver::State) {
-    const STOCK: usize = 12;
-    const WASTE: usize = 11;
-    const TABLEAU: &[usize] = &[0, 1, 2, 3, 4, 5, 6];
+    const STOCK:usize = 12;
+    const WASTE:usize = 11;
+    const TABLEAU:&[usize] = &[0, 1, 2, 3, 4, 5, 6];
 
     fn get_priority(state: &mut solver::State) -> usize {
         let mut outs = 0; // outs = number of cards that are out (in foundations)
@@ -260,9 +261,7 @@ fn generate_solver_moves(state: &mut solver::State) {
     }
 
     fn set_if_greater(a: &mut u8, b: &u8) {
-        if *a < *b {
-            *a = *b
-        }
+        if *a < *b { *a = *b }
     }
 
     fn onmove(move_option: &mut solver::Move, state: &mut solver::State, undo: bool) {
@@ -285,40 +284,22 @@ fn generate_solver_moves(state: &mut solver::State) {
     }
 
     // Check for moves to foundation
-    for (i, tableau_card) in state.get_stacks_top(&[11, 0, 1, 2, 3, 4, 5, 6]) {
-        // from waste and tableau
-        if solver::is_flipped(&tableau_card) {
-            continue;
-        } // this should never happen anyways
+    for (i, tableau_card) in state.get_stacks_top(&[11, 0, 1, 2, 3, 4, 5, 6]) { // from waste and tableau
+        if solver::is_flipped(&tableau_card) { continue } // this should never happen anyways
         let mut max_red = 0;
         let mut max_black = 0;
         let mut consider_moves = Vec::new();
         for (j, foundation_stack) in state.get_stacks(FOUNDATION) {
             if let Some(foundation_card) = foundation_stack.last() {
                 let rank_id = solver::solver_card_to_id(&foundation_card) % 13;
-                if solver::is_red(&foundation_card) {
-                    set_if_greater(&mut max_black, &(rank_id + 1))
-                } else {
-                    set_if_greater(&mut max_red, &(rank_id + 1))
-                }
-                if solver::is_same_suit(&foundation_card, &tableau_card)
-                    && solver::is_one_rank_above(&foundation_card, &tableau_card)
-                {
-                    consider_moves.push(solver::create_move(
-                        i,
-                        &tableau_card,
-                        j,
-                        MoveInstruction::None,
-                    ));
+                if solver::is_red(&foundation_card) { set_if_greater(&mut max_black, &(rank_id + 1)) }
+                else { set_if_greater(&mut max_red, &(rank_id + 1)) }
+                if solver::is_same_suit(&foundation_card, &tableau_card) && solver::is_one_rank_above(&foundation_card, &tableau_card) {
+                    consider_moves.push(solver::create_move(i, &tableau_card, j, MoveInstruction::None));
                 }
             } else {
                 if solver::card_rank(&tableau_card) == "ace" {
-                    state.try_move(
-                        solver::create_move(i, &tableau_card, j, MoveInstruction::None),
-                        100,
-                        get_priority,
-                        onmove,
-                    );
+                    state.try_move(solver::create_move(i, &tableau_card, j, MoveInstruction::None), 100, get_priority, onmove);
                     return; // for performance reasons we suggest only automoves, if we find one
                 }
             }
@@ -345,16 +326,11 @@ fn generate_solver_moves(state: &mut solver::State) {
 
     let stock = state.get_stack_owned(STOCK);
     if !stock.is_empty() {
-        state.try_move(
-            solver::create_move(STOCK, stock.last().unwrap(), WASTE, MoveInstruction::Flip),
-            5,
-            get_priority,
-            solver::no_onmove,
-        );
+        state.try_move(solver::create_move(STOCK, stock.last().unwrap(), WASTE, MoveInstruction::Flip), 5, get_priority, solver::no_onmove);
     }
 
     // Check where to put a king
-    let mut first_empty_stack: Option<usize> = None;
+    let mut first_empty_stack:Option<usize> = None;
     for (i, tableau_stack) in state.get_stacks(TABLEAU) {
         if tableau_stack.is_empty() {
             first_empty_stack = Some(i);
@@ -362,94 +338,32 @@ fn generate_solver_moves(state: &mut solver::State) {
         }
     }
 
-    for (i, from_stack) in state.get_stacks(&[0, 1, 2, 3, 4, 5, 6, 11]) {
-        // from tableau and waste
+    for (i, from_stack) in state.get_stacks(&[0, 1, 2, 3, 4, 5, 6, 11]) { // from tableau and waste
         let mut len = from_stack.len();
-        if i == 11 && len > 0 {
-            len = 1
-        } // we can only draw from the top of waste (once)
+        if i == 11 && len > 0 { len = 1 } // we can only draw from the top of waste (once)
         for from_card_i in 0..len {
-            let from_card = if i == 11 {
-                from_stack.last().unwrap()
-            } else {
-                &from_stack[from_card_i]
-            }; // we can only draw from the top of waste
-            if solver::is_flipped(&from_card) {
-                continue;
-            }
+            let from_card = if i == 11 { from_stack.last().unwrap() } else { &from_stack[from_card_i] }; // we can only draw from the top of waste
+            if solver::is_flipped(&from_card) { continue }
             for (j, to_card) in state.get_stacks_top(TABLEAU) {
-                if j == i {
-                    continue;
-                }
-                if solver::is_one_rank_above(&from_card, &to_card)
-                    && !solver::is_similar_suit(&from_card, &to_card)
-                {
+                if j == i { continue }
+                if solver::is_one_rank_above(&from_card, &to_card) && !solver::is_similar_suit(&from_card, &to_card) {
                     if i == 11 {
-                        state.try_move(
-                            solver::create_move(i, &from_card, j, MoveInstruction::None),
-                            40,
-                            get_priority,
-                            onmove,
-                        );
-                    } else if from_card_i > 0 && solver::is_flipped(&from_stack[from_card_i - 1]) {
-                        // does the move flip a card?
-                        state.try_move(
-                            solver::create_move(i, &from_card, j, MoveInstruction::None),
-                            30,
-                            get_priority,
-                            onmove,
-                        );
+                        state.try_move(solver::create_move(i, &from_card, j, MoveInstruction::None), 40, get_priority, onmove);
+                    } else if from_card_i > 0 && solver::is_flipped(&from_stack[from_card_i - 1]) { // does the move flip a card?
+                        state.try_move(solver::create_move(i, &from_card, j, MoveInstruction::None), 30, get_priority, onmove);
                     } else {
-                        state.try_move(
-                            solver::create_move(i, &from_card, j, MoveInstruction::None),
-                            1,
-                            get_priority,
-                            onmove,
-                        );
+                        state.try_move(solver::create_move(i, &from_card, j, MoveInstruction::None), 1, get_priority, onmove);
                     }
                 }
             }
             if solver::card_rank(&from_card) == "king" && first_empty_stack.is_some() {
-                if from_card_i == 0 {
-                    continue;
-                } // don't move kings if they are placed
+                if from_card_i == 0 { continue } // don't move kings if they are placed
                 if i == 11 {
-                    state.try_move(
-                        solver::create_move(
-                            i,
-                            &from_card,
-                            first_empty_stack.unwrap(),
-                            MoveInstruction::None,
-                        ),
-                        40,
-                        get_priority,
-                        onmove,
-                    );
-                } else if solver::is_flipped(&from_stack[from_card_i - 1]) {
-                    // does the move flip a card?
-                    state.try_move(
-                        solver::create_move(
-                            i,
-                            &from_card,
-                            first_empty_stack.unwrap(),
-                            MoveInstruction::None,
-                        ),
-                        30,
-                        get_priority,
-                        onmove,
-                    );
+                    state.try_move(solver::create_move(i, &from_card, first_empty_stack.unwrap(), MoveInstruction::None), 40, get_priority, onmove);
+                } else if solver::is_flipped(&from_stack[from_card_i - 1]) { // does the move flip a card?
+                    state.try_move(solver::create_move(i, &from_card, first_empty_stack.unwrap(), MoveInstruction::None), 30, get_priority, onmove);
                 } else {
-                    state.try_move(
-                        solver::create_move(
-                            i,
-                            &from_card,
-                            first_empty_stack.unwrap(),
-                            MoveInstruction::None,
-                        ),
-                        1,
-                        get_priority,
-                        onmove,
-                    );
+                    state.try_move(solver::create_move(i, &from_card, first_empty_stack.unwrap(), MoveInstruction::None), 1, get_priority, onmove);
                 }
             }
         }
@@ -457,12 +371,7 @@ fn generate_solver_moves(state: &mut solver::State) {
 
     let waste = state.get_stack(WASTE);
     if stock.is_empty() && !waste.is_empty() {
-        state.try_move(
-            solver::create_move(WASTE, &waste[0], STOCK, MoveInstruction::Flip),
-            2,
-            get_priority,
-            solver::no_onmove,
-        );
+        state.try_move(solver::create_move(WASTE, &waste[0], STOCK, MoveInstruction::Flip), 2, get_priority, solver::no_onmove);
     }
 }
 

@@ -554,7 +554,7 @@ impl CardStack {
     }
 
     pub fn n_cards(&self) -> usize {
-        self.observe_children().n_items() as usize
+        self.observe_children().n_items() as usize - 1
     }
 
     pub fn get_card(&self, index: usize) -> Option<Card> {

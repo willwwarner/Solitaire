@@ -30,8 +30,6 @@ use crate::{
 use gtk::glib;
 use gtk::{prelude::*, subclass::prelude::*};
 
-const LEVEL_SIZES: [i32; 4] = [3, 6, 9, 10];
-
 pub struct TriPeaks {}
 
 impl TriPeaks {}
